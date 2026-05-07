@@ -1,65 +1,121 @@
-import Image from "next/image";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { BookOpen, Users, ClipboardList, TrendingUp } from "lucide-react";
 
-export default function Home() {
+const stats = [
+  { label: "Total Courses", value: "12", icon: BookOpen },
+  { label: "Active Students", value: "248", icon: Users },
+  { label: "Assignments", value: "36", icon: ClipboardList },
+  { label: "Completion Rate", value: "87%", icon: TrendingUp },
+];
+
+const recentActivity = [
+  {
+    student: "Nguyen Van A",
+    course: "Mathematics 101",
+    action: "Submitted assignment",
+    status: "completed",
+    date: "2026-05-07",
+  },
+  {
+    student: "Tran Thi B",
+    course: "Physics 201",
+    action: "Enrolled",
+    status: "active",
+    date: "2026-05-06",
+  },
+  {
+    student: "Le Van C",
+    course: "Chemistry 101",
+    action: "Missed deadline",
+    status: "overdue",
+    date: "2026-05-05",
+  },
+];
+
+export default function DashboardPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="rounded-xl ring-1 ring-foreground/10">
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
+                <stat.icon className="size-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">{stat.label}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="rounded-xl ring-1 ring-foreground/10">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-gray-900">
+            Recent Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table className="w-full text-sm">
+            <TableHeader className="bg-gray-50 border-b">
+              <TableRow>
+                <TableHead className="px-4 py-3">Student</TableHead>
+                <TableHead className="px-4 py-3">Course</TableHead>
+                <TableHead className="px-4 py-3">Action</TableHead>
+                <TableHead className="px-4 py-3">Status</TableHead>
+                <TableHead className="px-4 py-3 text-right">Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentActivity.map((row) => (
+                <TableRow key={`${row.student}-${row.date}`}>
+                  <TableCell className="px-4 py-3 font-medium text-gray-900">
+                    {row.student}
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-gray-500">
+                    {row.course}
+                  </TableCell>
+                  <TableCell className="px-4 py-3">{row.action}</TableCell>
+                  <TableCell className="px-4 py-3">
+                    <Badge
+                      variant={
+                        row.status === "completed"
+                          ? "default"
+                          : row.status === "overdue"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {row.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right text-gray-500">
+                    {row.date}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
