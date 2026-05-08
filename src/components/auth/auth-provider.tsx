@@ -47,7 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    document.cookie = "token=; Path=/; Max-Age=0";
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+    });
     setUser(null);
     window.location.href = "/login";
   };

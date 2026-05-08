@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, GraduationCap, Bell, Clock } from "lucide-react";
+import { Menu, GraduationCap, Bell, Clock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -12,6 +12,17 @@ import { Separator } from "@/components/ui/separator";
 import { StreakBadge } from "@/components/gamification/streak-badge";
 import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 import { bridge } from "@/lib/study-session-bridge";
+import { ActiveQuizProvider, useActiveQuiz } from "@/lib/active-quiz-context";
+import { useAuth } from "@/components/auth/auth-provider";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 function MobileSidebar() {
   const [open, setOpen] = useState(false);
@@ -43,7 +54,16 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
+  const { user, logout } = useAuth();
   const timerRef = useRef<HTMLSpanElement>(null);
+  const initials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
 
   useEffect(() => {
     if (!isLessonViewer) return;
@@ -92,9 +112,28 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
             </Button>
           </div>
         )}
-        <Avatar size="sm">
-          <AvatarFallback className="text-xs">AD</AvatarFallback>
-        </Avatar>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="cursor-pointer">
+            <Avatar size="sm">
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">{user?.fullName || "Người dùng"}</span>
+                  <span className="text-xs text-muted-foreground">{user?.role || ""}</span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout}>
+              <LogOut className="size-4" />
+              Đăng xuất
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
@@ -106,31 +145,45 @@ function parseLessonPath(pathname: string): string | null {
   return match ? match[1] : null;
 }
 
+function LessonInfoSidebar({ lessonId }: { lessonId: string }) {
+  const { activeQuiz, setActiveQuiz } = useActiveQuiz();
+
+  return (
+    <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
+      <LessonInfoPanel
+        lessonId={lessonId}
+        activeQuiz={activeQuiz}
+        onQuizAnswered={() => setActiveQuiz(null)}
+      />
+    </aside>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const lessonId = parseLessonPath(pathname);
   const isLessonViewer = lessonId !== null;
 
   return (
-    <div className="flex min-h-screen">
-      {/* Desktop sidebar — hidden on lesson viewer, replaced with lesson info */}
-      {isLessonViewer ? (
-        <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
-          <LessonInfoPanel lessonId={lessonId} />
-        </aside>
-      ) : (
-        <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
-          <Sidebar />
-        </aside>
-      )}
+    <ActiveQuizProvider>
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar — hidden on lesson viewer, replaced with lesson info */}
+        {isLessonViewer && lessonId ? (
+          <LessonInfoSidebar lessonId={lessonId} />
+        ) : (
+          <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
+            <Sidebar />
+          </aside>
+        )}
 
-      {/* Main area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        <Header isLessonViewer={isLessonViewer} />
-        <main className="flex-1 px-4 py-6 lg:px-6">
-          {children}
-        </main>
+        {/* Main area */}
+        <div className="flex flex-1 flex-col min-w-0">
+          <Header isLessonViewer={isLessonViewer} />
+          <main className="flex-1 px-4 py-6 lg:px-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ActiveQuizProvider>
   );
 }

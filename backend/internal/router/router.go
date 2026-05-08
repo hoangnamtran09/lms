@@ -131,6 +131,7 @@ func New(
 func mountRoutes(r chi.Router, h *Handlers, jwtSecret string) {
 	// Public routes
 	r.Post("/api/auth/login", h.Auth.Login)
+	r.Post("/api/auth/logout", h.Auth.Logout)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {

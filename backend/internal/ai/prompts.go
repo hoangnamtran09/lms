@@ -144,14 +144,20 @@ Hãy viết một bản tóm tắt ngắn gọn (3-5 đoạn) về tình hình h
 
 // ---- Lesson Summary ----
 
-const lessonSummaryPrompt = `Bạn là trợ lý học tập tại LMS. Hãy tóm tắt nội dung bài học dưới đây một cách ngắn gọn, dễ hiểu.
+const lessonSummaryPrompt = `Bạn là trợ lý học tập tại LMS. Hãy phân tích bài học và trả về kết quả dạng JSON.
 
 Yêu cầu:
-1. Tóm tắt trong 3-5 câu, bằng tiếng Việt.
-2. Nêu bật các ý chính và kiến thức trọng tâm của bài học.
+1. "summary": tóm tắt trong 3-5 câu, bằng tiếng Việt. Nêu bật các ý chính và kiến thức trọng tâm.
+2. "objectives": 3-4 mục tiêu học tập NGẮN (mỗi mục tối đa 10 từ), liệt kê những gì học sinh sẽ làm được sau bài học.
 3. Ngôn ngữ phù hợp với học sinh lớp %d.
-4. Nếu không có nội dung chi tiết, hãy dựa vào tên bài học và môn học để đưa ra mô tả khái quát về những gì học sinh sẽ học.
-5. Xưng "bạn" khi nói về học sinh.`
+4. Nếu không có nội dung chi tiết, hãy dựa vào tên bài học và môn học.
+5. Xưng "bạn" khi nói về học sinh.
+
+Định dạng JSON:
+{
+  "summary": "Tóm tắt 3-5 câu...",
+  "objectives": ["Mục tiêu 1", "Mục tiêu 2", "Mục tiêu 3"]
+}`
 
 func BuildLessonSummaryPrompt(subjectName, lessonTitle, lessonContent string, gradeLevel int) string {
 	content := lessonContent
@@ -171,7 +177,7 @@ Nội dung bài học:
 %s
 ---
 
-Hãy viết tóm tắt ngắn gọn cho bài học này.`, fmt.Sprintf(lessonSummaryPrompt, gradeLevel), subjectName, lessonTitle, gradeLevel, content)
+Trả về JSON (chỉ JSON, không thêm text khác).`, fmt.Sprintf(lessonSummaryPrompt, gradeLevel), subjectName, lessonTitle, gradeLevel, content)
 }
 
 // ---- Assignment Pre-Grade ----

@@ -19,7 +19,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+    if (window.location.pathname !== "/login") {
+      fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
+      window.location.href = "/login";
+    }
     throw new ApiError("Unauthorized", 401);
   }
 
@@ -47,7 +50,10 @@ export async function apiStream(
     });
 
     if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login") {
+        fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
+        window.location.href = "/login";
+      }
       return;
     }
 

@@ -378,7 +378,7 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 	prompt := BuildLessonSummaryPrompt(ctx_.SubjectName, ctx_.LessonTitle, ctx_.Description, ctx_.GradeLevel)
 
 	response, err := h.aiService.Chat([]ChatMessage{
-		{Role: "system", Content: "Bạn là trợ lý tóm tắt bài học. Trả lời ngắn gọn bằng tiếng Việt, không dùng markdown."},
+		{Role: "system", Content: "Bạn là trợ lý tóm tắt bài học. Chỉ trả về JSON, không thêm text khác."},
 		{Role: "user", Content: prompt},
 	})
 	if err != nil {
@@ -386,8 +386,24 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOk(w, map[string]string{
-		"summary":    response,
+	var result struct {
+		Summary    string   `json:"summary"`
+		Objectives []string `json:"objectives"`
+	}
+	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
+		// Fallback: treat whole response as summary
+		jsonOk(w, map[string]interface{}{
+			"summary":     response,
+			"objectives":  []string{},
+			"lessonTitle": ctx_.LessonTitle,
+			"subjectName": ctx_.SubjectName,
+		})
+		return
+	}
+
+	jsonOk(w, map[string]interface{}{
+		"summary":     result.Summary,
+		"objectives":  result.Objectives,
 		"lessonTitle": ctx_.LessonTitle,
 		"subjectName": ctx_.SubjectName,
 	})

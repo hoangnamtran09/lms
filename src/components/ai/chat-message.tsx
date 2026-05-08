@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -49,11 +50,17 @@ export function ChatMessage({
   role,
   content,
   lessonId,
+  hideQuizzes = false,
+  onQuizDetected,
 }: {
   role: "user" | "assistant";
   content: string;
   lessonId: string;
+  hideQuizzes?: boolean;
+  onQuizDetected?: (quiz: QuizData) => void;
 }) {
+  const reportedRef = useRef<Set<string>>(new Set());
+
   if (role === "user") {
     return <p className="whitespace-pre-wrap">{content}</p>;
   }
@@ -62,10 +69,30 @@ export function ChatMessage({
 
   const parts = parseQuizBlocks(content);
 
+  // Notify parent of new quizzes
+  if (onQuizDetected) {
+    for (const part of parts) {
+      if (part.type === "quiz" && part.quiz) {
+        const key = part.quiz.question;
+        if (!reportedRef.current.has(key)) {
+          reportedRef.current.add(key);
+          onQuizDetected(part.quiz);
+        }
+      }
+    }
+  }
+
   return (
     <div className="prose prose-xs max-w-none">
       {parts.map((part, i) => {
         if (part.type === "quiz" && part.quiz) {
+          if (hideQuizzes) {
+            return (
+              <div key={i} className="my-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                Bài trắc nghiệm đã được chuyển vào bảng thông tin bên trên. Hãy trả lời tại đó.
+              </div>
+            );
+          }
           return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} />;
         }
         return (

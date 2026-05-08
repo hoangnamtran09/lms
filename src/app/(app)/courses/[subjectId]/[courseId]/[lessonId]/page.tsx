@@ -13,6 +13,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { useStudyTimer, MIN_TOTAL_TIME, MIN_PAGES, MIN_PAGE_TIME } from "@/hooks/use-study-timer";
 import { bridge } from "@/lib/study-session-bridge";
+import { useActiveQuiz, type QuizData } from "@/lib/active-quiz-context";
 import { CompletionQuizDialog } from "@/components/ai/completion-quiz-dialog";
 import type { QuizQuestion } from "@/components/ai/completion-quiz-dialog";
 
@@ -48,6 +49,8 @@ export default function LessonViewerPage({
   const [chatError, setChatError] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[] | null>(null);
+  const { activeQuiz, setActiveQuiz } = useActiveQuiz();
+  const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // PDF state
@@ -83,6 +86,34 @@ export default function LessonViewerPage({
       bridge.endSession = null;
     };
   }, []);
+
+  // Auto-trigger AI greeting when chat unlocks
+  const greetingSentRef = useRef(false);
+  useEffect(() => {
+    if (chatUnlocked && !greetingSentRef.current && !streaming) {
+      greetingSentRef.current = true;
+      // Gửi tin nhắn trống để AI chủ động chào và dẫn dắt
+      setMessages([{ role: "assistant", content: "" }]);
+      setStreaming(true);
+      apiStream(
+        "/api/ai/chat",
+        { message: "", lessonId: lessonId, sessionId: "" },
+        (delta) => {
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last && last.role === "assistant") last.content += delta;
+            return [...copy];
+          });
+        },
+        () => setStreaming(false),
+        (err) => {
+          setChatError(err.message);
+          setStreaming(false);
+        }
+      );
+    }
+  }, [chatUnlocked, streaming, lessonId]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -186,9 +217,14 @@ export default function LessonViewerPage({
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
+  // Quiz detection from AI response
+  const handleQuizDetected = useCallback((quiz: QuizData) => {
+    setActiveQuiz(quiz);
+  }, [setActiveQuiz]);
+
   const send = () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text || streaming || quizBlocked) return;
 
     setInput("");
     setChatError(null);
@@ -299,7 +335,7 @@ export default function LessonViewerPage({
             </div>
           </div>
 
-          {/* Drag handle — wide click area, thin visual */}
+          {/* Drag handle */}
           <div
             className="hidden lg:flex w-4 shrink-0 cursor-col-resize items-center justify-center group relative -mx-1 z-10"
             onMouseDown={handleMouseDown}
@@ -334,6 +370,8 @@ export default function LessonViewerPage({
                         role="assistant"
                         content={msg.content || (streaming && i === messages.length - 1 ? "..." : "")}
                         lessonId={lessonId}
+                        hideQuizzes={!!activeQuiz}
+                        onQuizDetected={handleQuizDetected}
                       />
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -356,7 +394,7 @@ export default function LessonViewerPage({
                 {/* Time progress */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>⏱ Thời gian đọc bài</span>
+                    <span>Thời gian đọc bài</span>
                     <span className="tabular-nums">{elapsedSeconds}/{MIN_TOTAL_TIME}s</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
@@ -370,7 +408,7 @@ export default function LessonViewerPage({
                 {/* Page progress */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>📄 Số trang đã đọc (≥{MIN_PAGE_TIME}s/trang)</span>
+                    <span>Số trang đã đọc (≥{MIN_PAGE_TIME}s/trang)</span>
                     <span className="tabular-nums">{qualifiedPages.size}/{MIN_PAGES}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
@@ -383,6 +421,12 @@ export default function LessonViewerPage({
               </div>
             ) : (
               <div className="border-t px-3 py-2 shrink-0">
+                {quizBlocked && (
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-2">
+                    <Lock className="size-3" />
+                    <span>Hãy trả lời câu hỏi trắc nghiệm phía trên để tiếp tục chat</span>
+                  </div>
+                )}
                 <div className="flex gap-1.5">
                   <Textarea
                     value={input}
@@ -390,12 +434,12 @@ export default function LessonViewerPage({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
                     }}
-                    placeholder="Nhập câu hỏi..."
+                    placeholder={quizBlocked ? "Trả lời câu hỏi phía trên trước..." : "Nhập câu hỏi..."}
                     rows={2}
                     className="min-h-0 resize-none text-xs"
-                    disabled={streaming}
+                    disabled={streaming || quizBlocked}
                   />
-                  <Button size="sm" onClick={send} disabled={!input.trim() || streaming} className="shrink-0 h-8 w-8 p-0">
+                  <Button size="sm" onClick={send} disabled={!input.trim() || streaming || quizBlocked} className="shrink-0 h-8 w-8 p-0">
                     {streaming ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
                   </Button>
                 </div>
