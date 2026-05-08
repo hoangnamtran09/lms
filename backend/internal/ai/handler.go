@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/lms/backend/internal/gamification"
 	"github.com/lms/backend/internal/lessons"
@@ -122,6 +123,12 @@ func (h *Handler) QuizAnswer(w http.ResponseWriter, r *http.Request) {
 		if err := h.diamondService.Add(r.Context(), claims.UserID, 2, "Trả lời đúng quiz", req.LessonID); err == nil {
 			result["diamondsEarned"] = 2
 		}
+		// Mark improvement on matching weakness
+		if req.Topic != "" {
+			if w, err := h.weaknessService.FindByUserAndTopic(r.Context(), claims.UserID, req.Topic); err == nil {
+				h.weaknessService.MarkImproved(r.Context(), w.ID)
+			}
+		}
 	} else {
 		// Record weakness signal
 		topic := req.Topic
@@ -175,7 +182,7 @@ func (h *Handler) GenerateExercise(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var exercise map[string]interface{}
-	if err := json.Unmarshal([]byte(response), &exercise); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(response)), &exercise); err != nil {
 		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -221,7 +228,7 @@ func (h *Handler) GradeExercise(w http.ResponseWriter, r *http.Request) {
 		IsPassed       bool   `json:"isPassed"`
 		DiamondsEarned int    `json:"diamondsEarned"`
 	}
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
 		jsonErr(w, "Lỗi parse kết quả: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -290,15 +297,15 @@ func (h *Handler) CompletionQuiz(w http.ResponseWriter, r *http.Request) {
 	var result struct {
 		Questions []map[string]interface{} `json:"questions"`
 	}
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
 		jsonErr(w, "Lỗi parse kết quả: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	jsonOk(w, result.Questions)
-}
+	jsonOk(w, result)
+	}
 
-// ---- Learning Coach ----
+	// ---- Learning Coach ----
 
 type coachInput struct {
 	StreakDays        int     `json:"streakDays"`
@@ -440,7 +447,7 @@ func (h *Handler) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var quiz []map[string]interface{}
-	if err := json.Unmarshal([]byte(result), &quiz); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(result)), &quiz); err != nil {
 		jsonErr(w, "Failed to parse quiz: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -494,7 +501,7 @@ Trả về JSON: [{"step": 1, "title": "...", "description": "...", "estimatedMi
 	}
 
 	var roadmap []map[string]interface{}
-	if err := json.Unmarshal([]byte(response), &roadmap); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(response)), &roadmap); err != nil {
 		jsonErr(w, "Failed to parse roadmap: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -522,38 +529,49 @@ func (h *Handler) GenerateRemediation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prompt := fmt.Sprintf(`Học sinh đang gặp khó khăn với chủ đề: "%s"
-Số lần mắc lỗi: %d
+	Số lần mắc lỗi: %d
 
-Hãy tạo 3 bài tập ngắn để giúp học sinh cải thiện. Với mỗi bài tập:
-- Tiêu đề
-- Câu hỏi
-- Gợi ý (không đưa đáp án)
+	Tạo 3-4 bài tập GIÚP HỌC SINH CẢI THIỆN. Kết hợp cả trắc nghiệm và câu trả lời ngắn:
 
-Trả về JSON: [{"title": "...", "question": "...", "hint": "..."}]`, profile.Topic, profile.ErrorCount)
+	- Nếu là trắc nghiệm (phù hợp kiểm tra kiến thức):
+	  {"type": "mcq", "question": "...", "options": [{"text": "Đáp án A", "isCorrect": false}, {"text": "Đáp án B", "isCorrect": true}, {"text": "Đáp án C", "isCorrect": false}, {"text": "Đáp án D", "isCorrect": false}], "explanation": "Giải thích ngắn gọn"}
 
-	response, err := h.aiService.Chat([]ChatMessage{
-		{Role: "system", Content: "Bạn là trợ lý tạo bài tập. Chỉ trả về JSON, không giải thích thêm."},
-		{Role: "user", Content: prompt},
-	})
-	if err != nil {
-		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
-		return
+	- Nếu là câu trả lời ngắn (phù hợp câu hỏi suy luận):
+	  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án mong đợi (ý chính)", "explanation": "Giải thích chi tiết"}
+
+	Yêu cầu:
+	- ÍT NHẤT 1 câu trắc nghiệm VÀ 1 câu trả lời ngắn
+	- Câu hỏi bằng tiếng Việt, NGẮN GỌN
+	- Đáp án trắc nghiệm: ĐÚNG 1 đáp án đúng
+	- expectedAnswer: ghi ý chính, không cần quá dài
+	- explanation: giải thích NGẮN, dễ hiểu
+	- Dùng $...$ cho công thức toán trong câu hỏi, đáp án và giải thích (VD: $u_1 = 3$, $x^2$).
+
+	Trả về MẢNG JSON, không kèm text gì khác.`, profile.Topic, profile.ErrorCount)
+
+		response, err := h.aiService.Chat([]ChatMessage{
+			{Role: "system", Content: "Bạn là trợ lý tạo bài tập. Chỉ trả về MẢNG JSON thuần, không có markdown."},
+			{Role: "user", Content: prompt},
+		})
+		if err != nil {
+			jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var exercises []map[string]interface{}
+		if err := json.Unmarshal([]byte(extractJSON(response)), &exercises); err != nil {
+			jsonErr(w, "Lỗi parse kết quả AI", http.StatusInternalServerError)
+			return
+		}
+
+		exercisesJSON, _ := json.Marshal(exercises)
+		h.weaknessService.AddRemediation(r.Context(), req.WeaknessID, string(exercisesJSON))
+
+		jsonOk(w, map[string]interface{}{
+			"weaknessId": req.WeaknessID,
+			"exercises":  exercises,
+		})
 	}
-
-	var exercises []map[string]interface{}
-	if err := json.Unmarshal([]byte(response), &exercises); err != nil {
-		jsonErr(w, "Lỗi parse kết quả AI", http.StatusInternalServerError)
-		return
-	}
-
-	exercisesJSON, _ := json.Marshal(exercises)
-	h.weaknessService.AddRemediation(r.Context(), req.WeaknessID, string(exercisesJSON))
-
-	jsonOk(w, map[string]interface{}{
-		"weaknessId": req.WeaknessID,
-		"exercises":  exercises,
-	})
-}
 
 func jsonOk(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -564,4 +582,18 @@ func jsonErr(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// extractJSON strips markdown code fences from an AI response.
+func extractJSON(raw string) string {
+	s := strings.TrimSpace(raw)
+	if strings.HasPrefix(s, "```") {
+		s = strings.TrimPrefix(s, "```json")
+		s = strings.TrimPrefix(s, "```")
+		if idx := strings.LastIndex(s, "```"); idx >= 0 {
+			s = s[:idx]
+		}
+		s = strings.TrimSpace(s)
+	}
+	return s
 }

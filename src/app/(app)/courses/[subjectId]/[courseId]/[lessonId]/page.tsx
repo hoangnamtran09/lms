@@ -139,6 +139,18 @@ export default function LessonViewerPage({
       .finally(() => setLoading(false));
   }, [lessonId]);
 
+  // Preload quiz questions
+  useEffect(() => {
+    api<{ questions: QuizQuestion[] }>("/api/ai/completion-quiz", {
+      method: "POST",
+      body: JSON.stringify({ lessonId, questionCount: 5 }),
+    })
+      .then((data) => {
+        if (data.questions?.length) setQuizQuestions(data.questions);
+      })
+      .catch(() => {});
+  }, [lessonId]);
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -397,6 +409,7 @@ export default function LessonViewerPage({
       <CompletionQuizDialog
         open={showQuiz}
         lessonId={lessonId}
+        preloadedQuestions={quizQuestions}
         onComplete={async () => {
           setShowQuiz(false);
           await endSession();

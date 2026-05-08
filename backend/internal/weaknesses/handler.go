@@ -51,6 +51,36 @@ func (h *Handler) RecordError(w http.ResponseWriter, r *http.Request) {
 	jsonOk(w, map[string]string{"status": "recorded"})
 }
 
+func (h *Handler) Improve(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/weaknesses/{id}/improve
+	parts := splitPath(r.URL.Path)
+	id := ""
+	if len(parts) >= 2 {
+		id = parts[len(parts)-2]
+	}
+	if err := h.service.MarkImproved(r.Context(), id); err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Reload to get current state
+	p, _ := h.service.FindByID(r.Context(), id)
+	jsonOk(w, p)
+}
+
+func (h *Handler) Resolve(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/weaknesses/{id}/resolve
+	parts := splitPath(r.URL.Path)
+	id := ""
+	if len(parts) >= 2 {
+		id = parts[len(parts)-2]
+	}
+	if err := h.service.Resolve(r.Context(), id); err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOk(w, map[string]string{"status": "resolved"})
+}
+
 func (h *Handler) UpdateCoachNotes(w http.ResponseWriter, r *http.Request) {
 	weaknessID := extractID(r.URL.Path)
 	var req struct {
@@ -65,6 +95,25 @@ func (h *Handler) UpdateCoachNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOk(w, map[string]string{"status": "updated"})
+}
+
+func splitPath(path string) []string {
+	parts := make([]string, 0)
+	current := ""
+	for _, c := range path {
+		if c == '/' {
+			if current != "" {
+				parts = append(parts, current)
+			}
+			current = ""
+		} else {
+			current += string(c)
+		}
+	}
+	if current != "" {
+		parts = append(parts, current)
+	}
+	return parts
 }
 
 func extractID(path string) string {

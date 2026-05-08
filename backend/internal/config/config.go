@@ -25,7 +25,7 @@ func Load() *Config {
 		JWTSecret:         getEnv("JWT_SECRET", "dev-jwt-secret-change-in-production"),
 		AIAPIURL:          getEnv("AI_API_URL", "https://platform.beeknoee.com/api/v1"),
 		AIAPIKey:          getEnv("AI_API_KEY", "sk-bee-d32a3f4bc08544b4945bee85e9bb3ff8529b51458b6e46b19dfbfc4bba945179"),
-		AIModel:           getEnv("AI_MODEL", "gemini-3-flash"),
+		AIModel:           getEnv("AI_MODEL", "gemini-2.5-pro"),
 		CORSOrigin:        getEnv("CORS_ORIGIN", "http://localhost:3000"),
 		R2BaseURL:         getEnv("R2_BASE_URL", "https://pub-39cbea72738b4b959794efb735bf26b4.r2.dev"),
 		R2AccountID:       getEnv("R2_ACCOUNT_ID", "b194e241517696696eba4c6c3f937b63"),

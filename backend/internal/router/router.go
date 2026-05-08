@@ -290,6 +290,8 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret string) {
 		r.Get("/api/weaknesses", h.Weaknesses.List)
 		r.Get("/api/weaknesses/{id}", h.Weaknesses.Get)
 		r.Post("/api/weaknesses/record", h.Weaknesses.RecordError)
+		r.Post("/api/weaknesses/{id}/improve", h.Weaknesses.Improve)
+		r.Post("/api/weaknesses/{id}/resolve", h.Weaknesses.Resolve)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActGrade)).
 			Patch("/api/weaknesses/{id}/notes", h.Weaknesses.UpdateCoachNotes)
 

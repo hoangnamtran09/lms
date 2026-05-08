@@ -13,25 +13,6 @@ interface StudyProgress {
   endSession: () => Promise<void>;
 }
 
-function sendTime(lessonId: string, elapsedSeconds: number) {
-  fetch("/api/study-sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lessonId, elapsedSeconds }),
-    keepalive: true,
-  }).catch(() => {});
-}
-
-function sendBeaconTime(lessonId: string, elapsedSeconds: number) {
-  navigator.sendBeacon(
-    "/api/study-sessions",
-    new Blob(
-      [JSON.stringify({ lessonId, elapsedSeconds })],
-      { type: "application/json" },
-    ),
-  );
-}
-
 export function useStudyTimer(
   active: boolean,
   visiblePages: Set<number>,
@@ -44,11 +25,47 @@ export function useStudyTimer(
   const pageTimeMapRef = useRef<Map<number, number>>(new Map());
   const visiblePagesRef = useRef(visiblePages);
   const elapsedRef = useRef(0);
-  const lastSentRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     visiblePagesRef.current = visiblePages;
   }, [visiblePages]);
+
+  const startSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/study-sessions/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        sessionIdRef.current = data.id;
+      }
+    } catch {}
+  }, [lessonId]);
+
+  const stopTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const endSession = useCallback(async () => {
+    stopTimer();
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      await fetch(`/api/study-sessions/${sid}/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      sessionIdRef.current = null;
+    } catch {}
+  }, [stopTimer]);
 
   const startTimer = useCallback(() => {
     if (intervalRef.current) return;
@@ -79,13 +96,6 @@ export function useStudyTimer(
     }, 1000);
   }, []);
 
-  const stopTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
   // Start/stop based on active
   useEffect(() => {
     if (!active) {
@@ -93,8 +103,9 @@ export function useStudyTimer(
       return;
     }
     startTimer();
-    return stopTimer;
-  }, [active, startTimer, stopTimer]);
+    startSession();
+    return () => { stopTimer(); };
+  }, [active, startTimer, stopTimer, startSession]);
 
   // Pause on tab hidden
   useEffect(() => {
@@ -110,49 +121,20 @@ export function useStudyTimer(
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [active, startTimer, stopTimer]);
 
-  // Heartbeat every 30s
+  // End session on beforeunload
   useEffect(() => {
-    if (!active || !lessonId) return;
-    const interval = setInterval(() => {
-      const elapsed = elapsedRef.current;
-      const delta = elapsed - lastSentRef.current;
-      if (delta > 0) {
-        sendTime(lessonId, delta);
-        lastSentRef.current = elapsed;
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [active, lessonId]);
-
-  // Save on unmount / beforeunload
-  useEffect(() => {
-    if (!lessonId) return;
     const onBeforeUnload = () => {
-      const delta = elapsedRef.current - lastSentRef.current;
-      if (delta > 0) sendBeaconTime(lessonId, delta);
+      const sid = sessionIdRef.current;
+      if (sid) {
+        navigator.sendBeacon(
+          `/api/study-sessions/${sid}/end`,
+          new Blob([""], { type: "application/json" }),
+        );
+      }
     };
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      // flush remaining on unmount
-      const delta = elapsedRef.current - lastSentRef.current;
-      if (delta > 0) sendBeaconTime(lessonId, delta);
-    };
-  }, [lessonId]);
-
-  const endSession = useCallback(async () => {
-    stopTimer();
-    const elapsed = elapsedRef.current;
-    const delta = elapsed - lastSentRef.current;
-    if (delta > 0) {
-      await fetch("/api/study-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lessonId, elapsedSeconds: delta }),
-      });
-      lastSentRef.current = elapsed;
-    }
-  }, [lessonId, stopTimer]);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   const chatUnlocked =
     elapsedSeconds >= MIN_TOTAL_TIME && qualifiedPages.size >= MIN_PAGES;

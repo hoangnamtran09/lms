@@ -1,6 +1,9 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { InteractiveQuiz } from "./interactive-quiz";
 
 interface QuizData {
@@ -65,7 +68,11 @@ export function ChatMessage({
         if (part.type === "quiz" && part.quiz) {
           return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} />;
         }
-        return <ReactMarkdown key={i}>{part.content}</ReactMarkdown>;
+        return (
+          <ReactMarkdown key={i} remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+            {part.content}
+          </ReactMarkdown>
+        );
       })}
     </div>
   );

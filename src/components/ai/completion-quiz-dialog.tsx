@@ -119,6 +119,7 @@ export function CompletionQuizDialog({
               Câu {currentIndex + 1}/{total}
             </p>
             <InteractiveQuiz
+              key={currentIndex}
               quiz={question}
               lessonId={lessonId}
               onAnswered={(isCorrect) => handleAnswered(isCorrect)}

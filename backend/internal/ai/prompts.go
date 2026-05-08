@@ -12,6 +12,7 @@ Dựa trên nội dung bài học, hãy tạo ra MỘT bài tập tự luận ng
 2. Câu hỏi rõ ràng, kích thích tư duy.
 3. Độ khó phù hợp với khối lớp %d.
 4. Khi viết lời dẫn, xưng "mình" và gọi học sinh là "bạn".
+5. Dùng $...$ cho công thức toán học (VD: $x^2 + y^2 = 1$, $\frac{a}{b}$).
 
 **Định dạng Output (JSON):**
 {
@@ -73,7 +74,8 @@ Yêu cầu:
 3. Độ khó dễ đến trung bình, làm được trong 30-60 giây/câu.
 4. Explanation ngắn, chỉ ra kiến thức cần nhớ.
 5. Không dùng đáp án kiểu "tất cả đều đúng" hoặc "cả A và B".
-6. Trả về JSON hợp lệ, không thêm markdown.
+6. Dùng $...$ cho công thức toán (VD: $u_1 = 3$, $\frac{a}{b}$, $x^2 + y^2 = r^2$).
+7. Trả về JSON hợp lệ, không thêm markdown.
 
 Ngữ cảnh:
 - Bài học: %s

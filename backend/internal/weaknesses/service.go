@@ -17,6 +17,8 @@ type WeaknessProfile struct {
 	LastErrorAt          *time.Time `json:"lastErrorAt"`
 	RemediationExercises string     `gorm:"type:text" json:"remediationExercises"`
 	ImprovementScore     int        `gorm:"default:0" json:"improvementScore"`
+	Resolved             bool       `gorm:"default:false" json:"resolved"`
+	ResolvedAt           *time.Time `json:"resolvedAt"`
 	CoachNotes           string     `gorm:"type:text" json:"coachNotes"`
 	CreatedAt            time.Time  `json:"createdAt"`
 	UpdatedAt            time.Time  `json:"updatedAt"`
@@ -74,5 +76,32 @@ func (s *Service) UpdateCoachNotes(ctx context.Context, id, notes string) error 
 }
 
 func (s *Service) MarkImproved(ctx context.Context, id string) error {
-	return s.db.WithContext(ctx).Model(&WeaknessProfile{}).Where("id = ?", id).Update("improvement_score", gorm.Expr("improvement_score + 1")).Error
+	// Increment improvement_score, then check if threshold reached (>=3) → auto-resolve
+	if err := s.db.WithContext(ctx).Model(&WeaknessProfile{}).Where("id = ?", id).
+		Update("improvement_score", gorm.Expr("improvement_score + 1")).Error; err != nil {
+		return err
+	}
+	// Auto-resolve when improvement reaches threshold
+	now := time.Now()
+	return s.db.WithContext(ctx).Model(&WeaknessProfile{}).
+		Where("id = ? AND improvement_score >= 3 AND resolved = false", id).
+		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
+}
+
+func (s *Service) Resolve(ctx context.Context, id string) error {
+	now := time.Now()
+	return s.db.WithContext(ctx).Model(&WeaknessProfile{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
+}
+
+// FindByUserAndTopic returns the first weakness matching userID + topic (fuzzy match on topic prefix).
+func (s *Service) FindByUserAndTopic(ctx context.Context, userID, topic string) (*WeaknessProfile, error) {
+	var profile WeaknessProfile
+	err := s.db.WithContext(ctx).
+		Where("user_id = ? AND topic = ?", userID, topic).
+		First(&profile).Error
+	if err != nil {
+		return nil, err
+	}
+	return &profile, nil
 }

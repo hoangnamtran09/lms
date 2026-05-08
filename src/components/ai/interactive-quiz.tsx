@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, X, Diamond } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { MathText } from "./math-text";
 
 interface QuizOption {
   text: string;
@@ -61,7 +62,7 @@ export function InteractiveQuiz({
     <div className="my-3 rounded-xl ring-1 ring-foreground/10 bg-white overflow-hidden">
       {/* Question */}
       <div className="px-3 py-2.5 bg-gray-50 border-b">
-        <p className="text-sm font-medium text-gray-900">{quiz.question}</p>
+        <p className="text-sm font-medium text-gray-900"><MathText text={quiz.question} /></p>
       </div>
 
       {/* Options */}
@@ -93,7 +94,7 @@ export function InteractiveQuiz({
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
                   {String.fromCharCode(65 + idx)}
                 </span>
-                <span className="flex-1">{opt.text}</span>
+                <span className="flex-1"><MathText text={opt.text} /></span>
                 {state !== "unanswered" && idx === selectedIdx && (
                   state === "correct" ? (
                     <Check className="size-4 text-green-600 shrink-0" />
@@ -123,7 +124,7 @@ export function InteractiveQuiz({
                     <Diamond className="size-3" />+{diamonds} kim cương
                   </p>
                 )}
-                <p className="text-xs text-gray-600 mt-1">{quiz.explanation}</p>
+                <p className="text-xs text-gray-600 mt-1"><MathText text={quiz.explanation} /></p>
               </div>
             </div>
           ) : (
@@ -131,7 +132,7 @@ export function InteractiveQuiz({
               <X className="size-4 text-red-600 mt-0.5 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-red-700">Chưa đúng</p>
-                <p className="text-xs text-gray-600 mt-1">{quiz.explanation}</p>
+                <p className="text-xs text-gray-600 mt-1"><MathText text={quiz.explanation} /></p>
               </div>
             </div>
           )}
