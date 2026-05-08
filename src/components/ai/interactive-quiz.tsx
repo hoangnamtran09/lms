@@ -20,9 +20,11 @@ type QuizState = "unanswered" | "correct" | "incorrect";
 export function InteractiveQuiz({
   quiz,
   lessonId,
+  onAnswered,
 }: {
   quiz: QuizData;
   lessonId: string;
+  onAnswered?: (isCorrect: boolean) => void;
 }) {
   const [state, setState] = useState<QuizState>("unanswered");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -52,6 +54,7 @@ export function InteractiveQuiz({
     } catch {
       // Silently fail — the quiz UX still works
     }
+    onAnswered?.(isCorrect);
   };
 
   return (

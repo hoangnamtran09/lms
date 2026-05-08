@@ -82,13 +82,15 @@ export function LessonInfoPanel({ lessonId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full border-r border-border bg-white">
-      {/* Header */}
-      <div className="p-5 border-b">
-        <div className="flex items-center gap-2 text-primary mb-1">
-          <BookOpen className="size-4" />
-          <span className="text-sm font-semibold">Thông tin bài học</span>
-        </div>
+    <div className="flex flex-col h-full">
+      {/* Top bar — matches main header h-14 */}
+      <div className="h-14 flex items-center gap-2 px-5 border-b border-border">
+        <BookOpen className="size-4 text-primary" />
+        <span className="text-sm font-semibold text-gray-900">Thông tin bài học</span>
+      </div>
+
+      {/* Lesson title */}
+      <div className="px-5 py-3 border-b">
         <p className="text-xs text-gray-500 leading-snug">{ctx.lessonTitle}</p>
       </div>
 
@@ -128,9 +130,9 @@ export function LessonInfoPanel({ lessonId }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t bg-gray-50">
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Clock className="size-3.5" />
+      <div className="p-4 border-t bg-blue-50">
+        <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+          <Clock className="size-4" />
           <span>Đang học...</span>
         </div>
       </div>
