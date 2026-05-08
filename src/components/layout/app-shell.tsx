@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, GraduationCap, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { StreakBadge } from "@/components/gamification/streak-badge";
+import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 
 function MobileSidebar() {
   const [open, setOpen] = useState(false);
@@ -43,6 +46,7 @@ function Header() {
         </Link>
       </div>
       <div className="flex items-center gap-2">
+        <StreakBadge />
         <Button variant="ghost" size="sm" aria-label="Notifications">
           <Bell className="size-4" />
         </Button>
@@ -55,18 +59,34 @@ function Header() {
   );
 }
 
+// Extract lessonId from pathname like /courses/subjId/courseId/lessonId
+function parseLessonPath(pathname: string): string | null {
+  const match = pathname.match(/^\/courses\/[^/]+\/[^/]+\/([^/]+)/);
+  return match ? match[1] : null;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const lessonId = parseLessonPath(pathname);
+  const isLessonViewer = lessonId !== null;
+
   return (
     <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white">
-        <Sidebar />
-      </aside>
+      {/* Desktop sidebar — hidden on lesson viewer, replaced with lesson info */}
+      {isLessonViewer ? (
+        <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col">
+          <LessonInfoPanel lessonId={lessonId} />
+        </aside>
+      ) : (
+        <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white">
+          <Sidebar />
+        </aside>
+      )}
 
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
         <Header />
-        <main className="flex-1 container mx-auto max-w-7xl px-4 py-6">
+        <main className="flex-1 px-4 py-6 lg:px-6">
           {children}
         </main>
       </div>

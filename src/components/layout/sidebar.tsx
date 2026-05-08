@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/auth-provider";
+import { hasPermission } from "@/lib/permissions-client";
 import {
   LayoutDashboard,
   GraduationCap,
@@ -10,6 +12,16 @@ import {
   ClipboardList,
   BookOpen,
   Calendar,
+  Trophy,
+  AlertCircle,
+  Map,
+  Shield,
+  Presentation,
+  Heart,
+  UserCog,
+  ScreenShare,
+  Library,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,18 +29,35 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  roles: string[];
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Courses", href: "/courses", icon: BookOpen },
-  { label: "Students", href: "/students", icon: Users },
-  { label: "Assignments", href: "/assignments", icon: ClipboardList },
-  { label: "Schedule", href: "/schedule", icon: Calendar },
+const allNavItems: NavItem[] = [
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT", "STUDENT"] },
+  { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
+  { label: "Học sinh", href: "/students", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT", "PARENT"] },
+  { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
+  { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
+  { label: "Lộ trình", href: "/roadmap", icon: Map, roles: ["STUDENT"] },
+  { label: "Lịch", href: "/schedule", icon: Calendar, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
+  { label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
+  // Admin management
+  { label: "Tổng quan", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const navItems = allNavItems.filter(
+    (item) => user && item.roles.includes(user.role)
+  );
 
   return (
     <nav className={cn("flex flex-col gap-1 p-4", className)}>

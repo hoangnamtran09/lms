@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
-import { AppShell } from "@/components/layout/app-shell";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full antialiased">
       <body className="min-h-full bg-gray-50 flex flex-col">
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Toaster />
       </body>
     </html>
