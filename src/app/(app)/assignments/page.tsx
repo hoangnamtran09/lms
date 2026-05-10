@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, ChevronRight, Clock, FileText } from "lucide-react";
+import { ChevronRight, Clock, FileText } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { useAuth } from "@/components/auth/auth-provider";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -37,11 +35,9 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
 };
 
 export default function AssignmentsPage() {
-  const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const isTeacher = user?.role === "TEACHER" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
     api<Assignment[]>("/api/assignments")
@@ -53,10 +49,7 @@ export default function AssignmentsPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-9 w-32" />
-        </div>
+        <Skeleton className="h-8 w-48" />
         {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-24 w-full rounded-lg" />
         ))}
@@ -78,26 +71,14 @@ export default function AssignmentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bài tập</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {isTeacher ? "Quản lý bài tập của bạn" : "Bài tập cần hoàn thành"}
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Bài tập cần hoàn thành</p>
         </div>
-        {isTeacher && (
-          <Link href="/assignments/new">
-            <Button size="sm">
-              <Plus className="size-4" />
-              <span className="ml-2 hidden sm:inline">Tạo bài tập</span>
-            </Button>
-          </Link>
-        )}
       </div>
 
       {assignments.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-lg border">
           <FileText className="size-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">
-            {isTeacher ? "Chưa có bài tập nào. Tạo bài tập đầu tiên!" : "Chưa có bài tập nào được giao"}
-          </p>
+          <p className="text-gray-500">Chưa có bài tập nào được giao</p>
         </div>
       ) : (
         <div className="space-y-3">

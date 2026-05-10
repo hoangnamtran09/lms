@@ -20,6 +20,7 @@ type Assignment struct {
 	SubjectID        string    `gorm:"size:36" json:"subjectId"`
 	GradeLevel       int       `json:"gradeLevel"`
 	ClassID          string    `gorm:"size:36;index" json:"classId"`
+	StudentIDs       string    `gorm:"type:text" json:"studentIds"`
 	MaxScore         int       `gorm:"default:100" json:"maxScore"`
 	Rubric           string    `gorm:"type:text" json:"rubric"`
 	DueDate          time.Time `json:"dueDate"`

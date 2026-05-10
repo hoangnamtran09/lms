@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Shield, Users, BookOpen, ClipboardList, Clock, Download } from "lucide-react";
+import {
+  Users, BookOpen, ClipboardList, Clock, Download,
+  TrendingUp, Sparkles, GraduationCap, AlertCircle, ArrowUpRight, FileText, CheckCircle2,
+} from "lucide-react";
 import { api } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -28,6 +31,30 @@ const roleLabels: Record<string, string> = {
   STUDENT: "Học sinh",
 };
 
+const roleColors: Record<string, string> = {
+  SUPER_ADMIN: "bg-red-500",
+  ADMIN: "bg-orange-500",
+  TEACHER: "bg-blue-500",
+  PARENT: "bg-purple-500",
+  STUDENT: "bg-emerald-500",
+};
+
+const roleBgColors: Record<string, string> = {
+  SUPER_ADMIN: "bg-red-50 text-red-700",
+  ADMIN: "bg-orange-50 text-orange-700",
+  TEACHER: "bg-blue-50 text-blue-700",
+  PARENT: "bg-purple-50 text-purple-700",
+  STUDENT: "bg-emerald-50 text-emerald-700",
+};
+
+function formatStudyTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h >= 1000) return `${(h / 1000).toFixed(1)}k giờ`;
+  if (h >= 1) return `${h}h ${m > 0 ? m + "m" : ""}`;
+  return `${m} phút`;
+}
+
 export default function AdminDashboardPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,169 +68,315 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-72" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-24 rounded-lg" />
+            <Skeleton key={i} className="h-32 rounded-2xl" />
           ))}
         </div>
-        <Skeleton className="h-60 w-full rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <Skeleton className="h-72 rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-72 rounded-2xl" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   if (!overview) {
     return (
-      <div className="text-center py-20">
-        <p className="text-gray-500">Không thể tải dữ liệu</p>
+      <div className="flex flex-col items-center justify-center py-32">
+        <AlertCircle className="size-12 text-gray-300 mb-4" />
+        <p className="text-gray-500">Không thể tải dữ liệu bảng điều khiển</p>
       </div>
     );
   }
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Bảng điều khiển Quản trị</h1>
+  const roleEntries = Object.entries(overview.usersByRole).sort(([, a], [, b]) => b - a);
+  const maxRoleCount = Math.max(...roleEntries.map(([, c]) => c), 1);
+  const gradableRate = overview.totalSubmissions > 0
+    ? Math.round(((overview.totalSubmissions - overview.pendingGrading) / overview.totalSubmissions) * 100)
+    : 100;
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-              <Users className="size-5 text-blue-600" />
+  return (
+    <div className="max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center justify-center size-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-purple-200">
+            <Sparkles className="size-5 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+            Bảng điều khiển
+          </h1>
+        </div>
+        <p className="text-gray-500 ml-13">
+          Tổng quan hệ thống — theo dõi và quản lý toàn bộ nền tảng học tập
+        </p>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+        {/* Users */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-xl shadow-blue-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[80px]" />
+          <div className="relative p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center size-10 rounded-xl bg-white/20 backdrop-blur">
+                <Users className="size-5" />
+              </div>
+              <span className="text-sm font-medium text-blue-100">Tổng người dùng</span>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Tổng người dùng</p>
-              <p className="text-xl font-bold text-gray-900">{overview.totalUsers}</p>
+            <p className="text-4xl font-extrabold tracking-tight mb-1">{overview.totalUsers}</p>
+            <div className="flex items-center gap-1 text-blue-100 text-xs">
+              <TrendingUp className="size-3" />
+              <span>{roleEntries.length} vai trò trong hệ thống</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-              <BookOpen className="size-5 text-green-600" />
+
+        {/* Lessons */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xl shadow-emerald-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[80px]" />
+          <div className="relative p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center size-10 rounded-xl bg-white/20 backdrop-blur">
+                <BookOpen className="size-5" />
+              </div>
+              <span className="text-sm font-medium text-emerald-100">Tổng bài học</span>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Bài học</p>
-              <p className="text-xl font-bold text-gray-900">{overview.totalLessons}</p>
+            <p className="text-4xl font-extrabold tracking-tight mb-1">{overview.totalLessons}</p>
+            <div className="flex items-center gap-1 text-emerald-100 text-xs">
+              <span>{overview.totalSubjects} môn học · {overview.totalCourses} khoá học</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-              <ClipboardList className="size-5 text-amber-600" />
+
+        {/* Assignments */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-xl shadow-amber-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[80px]" />
+          <div className="relative p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center size-10 rounded-xl bg-white/20 backdrop-blur">
+                <ClipboardList className="size-5" />
+              </div>
+              <span className="text-sm font-medium text-amber-100">Tổng bài tập</span>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Bài tập</p>
-              <p className="text-xl font-bold text-gray-900">{overview.totalAssignments}</p>
+            <p className="text-4xl font-extrabold tracking-tight mb-1">{overview.totalAssignments}</p>
+            <div className="flex items-center gap-1 text-amber-100 text-xs">
+              <FileText className="size-3" />
+              <span>{overview.totalSubmissions} bài đã nộp</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
-              <Clock className="size-5 text-purple-600" />
+
+        {/* Study Time */}
+        <Card className="relative overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-xl shadow-violet-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-[80px]" />
+          <div className="relative p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center size-10 rounded-xl bg-white/20 backdrop-blur">
+                <Clock className="size-5" />
+              </div>
+              <span className="text-sm font-medium text-violet-100">Tổng giờ học</span>
             </div>
-            <div>
-              <p className="text-xs text-gray-500">Tổng giờ học</p>
-              <p className="text-xl font-bold text-gray-900">{Math.round(overview.totalStudyMin / 60)}h</p>
+            <p className="text-4xl font-extrabold tracking-tight mb-1">{formatStudyTime(overview.totalStudyMin)}</p>
+            <div className="flex items-center gap-1 text-violet-100 text-xs">
+              <GraduationCap className="size-3" />
+              <span>{Math.round(overview.totalStudyMin / 60)} giờ học tập</span>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Users by role */}
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-bold text-gray-900">Người dùng theo vai trò</CardTitle>
-            <div className="flex gap-3">
-              <Link href="/admin/students" className="text-sm text-primary hover:underline">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        {/* Role distribution - wider column */}
+        <Card className="lg:col-span-2 rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Phân bố người dùng</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Theo vai trò trong hệ thống</p>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/admin/students" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors">
                 Học sinh
               </Link>
-              <Link href="/admin/teachers" className="text-sm text-primary hover:underline">
+              <Link href="/admin/teachers" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors">
                 Giáo viên
               </Link>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(overview.usersByRole).map(([role, count]) => (
-                <div key={role} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{roleLabels[role] || role}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-900">{count}</span>
-                    <Badge variant="outline" className="text-xs">{role}</Badge>
+          </div>
+          <div className="space-y-4">
+            {roleEntries.map(([role, count]) => {
+              const pct = Math.round((count / maxRoleCount) * 100);
+              const sharePct = overview.totalUsers > 0 ? Math.round((count / overview.totalUsers) * 100) : 0;
+              return (
+                <div key={role} className="group">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-sm font-semibold text-gray-800">{roleLabels[role] || role}</span>
+                      <Badge className={`text-[10px] px-1.5 py-0 font-medium ${roleBgColors[role] || "bg-gray-50 text-gray-600"}`}>
+                        {sharePct}%
+                      </Badge>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900 tabular-nums">{count}</span>
+                  </div>
+                  <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out ${roleColors[role] || "bg-gray-400"}`}
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
+              );
+            })}
+          </div>
         </Card>
 
-        {/* Content stats + actions */}
-        <Card className="rounded-xl ring-1 ring-foreground/10">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-bold text-gray-900">Nội dung & Bài nộp</CardTitle>
-            <div className="flex gap-3">
-              <Link href="/admin/courses" className="text-sm text-primary hover:underline">
-                Môn học
-              </Link>
-              <Link href="/admin/assignments" className="text-sm text-primary hover:underline">
-                Bài tập
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Môn học</span>
-                <span className="text-sm font-semibold text-gray-900">{overview.totalSubjects}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Bài giảng</span>
-                <span className="text-sm font-semibold text-gray-900">{overview.totalLessons}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Tổng bài nộp</span>
-                <span className="text-sm font-semibold text-gray-900">{overview.totalSubmissions}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Đang chờ chấm</span>
-                <Badge variant={overview.pendingGrading > 0 ? "default" : "outline"} className="text-xs">
-                  {overview.pendingGrading}
-                </Badge>
+        {/* Grading status */}
+        <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-6 flex flex-col">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Tiến độ chấm bài</h3>
+          <p className="text-xs text-gray-500 mb-5">Trạng thái chấm bài tập</p>
+
+          {/* Donut-style indicator */}
+          <div className="flex items-center justify-center mb-5">
+            <div className="relative size-28">
+              <svg viewBox="0 0 112 112" className="size-full -rotate-90">
+                <circle cx="56" cy="56" r="48" fill="none" stroke="#f3f4f6" strokeWidth="10" />
+                <circle
+                  cx="56" cy="56" r="48"
+                  fill="none"
+                  stroke={gradableRate >= 90 ? "#10b981" : gradableRate >= 70 ? "#f59e0b" : "#ef4444"}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(gradableRate / 100) * 301.6} 301.6`}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-extrabold text-gray-900">{gradableRate}%</span>
+                <span className="text-[10px] text-gray-500">đã chấm</span>
               </div>
             </div>
-          </CardContent>
+          </div>
+
+          <div className="space-y-3 mt-auto">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-emerald-500" />
+                <span className="text-gray-600">Đã chấm</span>
+              </div>
+              <span className="font-semibold text-gray-900">{overview.totalSubmissions - overview.pendingGrading}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="size-4 text-amber-500" />
+                <span className="text-gray-600">Chờ chấm</span>
+              </div>
+              <span className={`font-semibold ${overview.pendingGrading > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                {overview.pendingGrading}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm border-t border-gray-100 pt-3">
+              <span className="text-gray-600 font-medium">Tổng bài nộp</span>
+              <span className="font-bold text-gray-900">{overview.totalSubmissions}</span>
+            </div>
+            {overview.pendingGrading > 0 && (
+              <Link
+                href="/admin/assignments"
+                className="flex items-center justify-center gap-1.5 w-full py-2 mt-2 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
+              >
+                Đi chấm bài ngay
+                <ArrowUpRight className="size-3" />
+              </Link>
+            )}
+          </div>
         </Card>
       </div>
 
-      {/* Export actions */}
-      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <a
-          href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/analytics/export/users`}
-          className="flex items-center gap-3 rounded-xl border p-4 hover:border-gray-300 hover:shadow-sm transition-shadow"
+      {/* Quick links */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Link
+          href="/admin/users"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-md hover:shadow-blue-50 transition-all bg-white"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-            <Download className="size-5 text-blue-600" />
+          <div className="flex items-center justify-center size-11 rounded-xl bg-blue-50 group-hover:bg-blue-100 transition-colors">
+            <Users className="size-5 text-blue-600" />
           </div>
           <div>
-            <p className="font-medium text-gray-900">Xuất danh sách người dùng</p>
-            <p className="text-xs text-gray-500">CSV — Tất cả người dùng trong hệ thống</p>
+            <p className="font-semibold text-gray-900 text-sm">Quản lý người dùng</p>
+            <p className="text-xs text-gray-500">Thêm, sửa, xoá tài khoản</p>
+          </div>
+          <ArrowUpRight className="size-4 text-gray-300 group-hover:text-blue-500 ml-auto transition-colors" />
+        </Link>
+        <Link
+          href="/admin/courses"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 p-4 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-50 transition-all bg-white"
+        >
+          <div className="flex items-center justify-center size-11 rounded-xl bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+            <BookOpen className="size-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Môn &amp; Khoá học</p>
+            <p className="text-xs text-gray-500">{overview.totalSubjects} môn, {overview.totalCourses} khoá</p>
+          </div>
+          <ArrowUpRight className="size-4 text-gray-300 group-hover:text-emerald-500 ml-auto transition-colors" />
+        </Link>
+        <Link
+          href="/admin/assignments"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 p-4 hover:border-amber-300 hover:shadow-md hover:shadow-amber-50 transition-all bg-white"
+        >
+          <div className="flex items-center justify-center size-11 rounded-xl bg-amber-50 group-hover:bg-amber-100 transition-colors">
+            <ClipboardList className="size-5 text-amber-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Bài tập &amp; Chấm điểm</p>
+            <p className="text-xs text-gray-500">{overview.pendingGrading} bài đang chờ chấm</p>
+          </div>
+          <ArrowUpRight className="size-4 text-gray-300 group-hover:text-amber-500 ml-auto transition-colors" />
+        </Link>
+        <Link
+          href="/admin/teachers"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 p-4 hover:border-purple-300 hover:shadow-md hover:shadow-purple-50 transition-all bg-white"
+        >
+          <div className="flex items-center justify-center size-11 rounded-xl bg-purple-50 group-hover:bg-purple-100 transition-colors">
+            <GraduationCap className="size-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Giáo viên</p>
+            <p className="text-xs text-gray-500">{overview.usersByRole.TEACHER || 0} giáo viên</p>
+          </div>
+          <ArrowUpRight className="size-4 text-gray-300 group-hover:text-purple-500 ml-auto transition-colors" />
+        </Link>
+      </div>
+
+      {/* Export */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <a
+          href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/analytics/export/users`}
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:shadow-lg transition-all"
+        >
+          <div className="flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-md shadow-blue-200 group-hover:shadow-lg group-hover:shadow-blue-300 transition-shadow">
+            <Download className="size-5 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-gray-900">Xuất danh sách người dùng</p>
+            <p className="text-xs text-gray-500 mt-0.5">CSV — Tất cả người dùng trong hệ thống</p>
           </div>
         </a>
         <a
           href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/analytics/export/assignments`}
-          className="flex items-center gap-3 rounded-xl border p-4 hover:border-gray-300 hover:shadow-sm transition-shadow"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 hover:border-emerald-300 hover:shadow-lg transition-all"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50">
-            <Download className="size-5 text-green-600" />
+          <div className="flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-200 group-hover:shadow-lg group-hover:shadow-emerald-300 transition-shadow">
+            <Download className="size-5 text-white" />
           </div>
           <div>
-            <p className="font-medium text-gray-900">Xuất bảng điểm</p>
-            <p className="text-xs text-gray-500">CSV — Tất cả bài nộp và điểm số</p>
+            <p className="font-bold text-gray-900">Xuất bảng điểm</p>
+            <p className="text-xs text-gray-500 mt-0.5">CSV — Tất cả bài nộp và điểm số</p>
           </div>
         </a>
       </div>

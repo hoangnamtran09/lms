@@ -4,11 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { api } from "@/lib/api-client";
+import { useEffect } from "react";
+import { api, uploadFile } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+
+interface StudentBrief {
+  id: string;
+  supabaseId: string;
+  fullName: string;
+  username: string;
+}
 
 const backLink = "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-6";
 
@@ -17,11 +25,20 @@ export default function NewAssignmentPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rubric, setRubric] = useState("");
-  const [maxScore, setMaxScore] = useState(100);
+  const [maxScore, setMaxScore] = useState(10);
   const [classId, setClassId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [students, setStudents] = useState<StudentBrief[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    api<StudentBrief[]>("/api/users?role=STUDENT")
+      .then((data) => setStudents(data))
+      .catch(() => {});
+  }, []);
 
   const handleCreate = async () => {
     if (!title.trim()) {
@@ -31,12 +48,19 @@ export default function NewAssignmentPage() {
     setSubmitting(true);
     setError(null);
     try {
+      let attachmentUrl = "";
+      if (selectedFile) {
+        const uploadResult = await uploadFile("/api/assignments/upload", selectedFile);
+        attachmentUrl = uploadResult.url;
+      }
       const body: any = {
         title: title.trim(),
         description: description.trim(),
         rubric: rubric.trim(),
         maxScore,
         classId: classId.trim(),
+        attachmentUrl,
+        studentIds: selectedStudentIds.length > 0 ? JSON.stringify(selectedStudentIds) : "",
       };
       if (dueDate) body.dueDate = new Date(dueDate).toISOString();
       await api("/api/assignments", {
@@ -107,7 +131,7 @@ export default function NewAssignmentPage() {
               value={maxScore}
               onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
               min={1}
-              max={100}
+              max={10}
             />
           </div>
 
@@ -130,6 +154,59 @@ export default function NewAssignmentPage() {
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
+        </div>
+
+        <div>
+          <Label htmlFor="file">Tệp PDF đính kèm (tuỳ chọn)</Label>
+          {selectedFile ? (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-gray-600 truncate flex-1">{selectedFile.name}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedFile(null)}
+                className="text-red-500 hover:text-red-700 shrink-0"
+              >
+                Gỡ
+              </Button>
+            </div>
+          ) : (
+            <Input
+              id="file"
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            />
+          )}
+        </div>
+
+        <div>
+          <Label>Học sinh nhận bài (để trống = cả lớp)</Label>
+          {students.length === 0 ? (
+            <p className="text-sm text-gray-400 mt-1">Đang tải danh sách học sinh...</p>
+          ) : (
+            <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-0.5 mt-1">
+              {students.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudentIds.includes(s.supabaseId)}
+                    onChange={() => {
+                      setSelectedStudentIds((prev) =>
+                        prev.includes(s.supabaseId) ? prev.filter((id) => id !== s.supabaseId) : [...prev, s.supabaseId]
+                      );
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-sm">{s.fullName}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{s.username}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          {selectedStudentIds.length > 0 && (
+            <p className="text-xs text-gray-500 mt-1">Đã chọn {selectedStudentIds.length} học sinh</p>
+          )}
         </div>
 
         <div className="flex gap-3 pt-2">

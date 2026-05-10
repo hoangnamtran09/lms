@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { api } from "@/lib/api-client";
 
 export const MIN_TOTAL_TIME = 60;
 export const MIN_PAGES = 3;
@@ -33,16 +34,11 @@ export function useStudyTimer(
 
   const startSession = useCallback(async () => {
     try {
-      const res = await fetch("/api/study-sessions/start", {
+      const data = await api<{ id: string }>("/api/study-sessions/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lessonId }),
-        credentials: "include",
       });
-      if (res.ok) {
-        const data = await res.json();
-        sessionIdRef.current = data.id;
-      }
+      sessionIdRef.current = data.id;
     } catch {}
   }, [lessonId]);
 
@@ -58,11 +54,7 @@ export function useStudyTimer(
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      await fetch(`/api/study-sessions/${sid}/end`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
       sessionIdRef.current = null;
     } catch {}
   }, [stopTimer]);

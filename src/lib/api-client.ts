@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/client";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export class ApiError extends Error {
@@ -8,21 +10,77 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // Supabase not initialized (SSR), skip Bearer token
+  }
+  return headers;
+}
+
+async function handle401() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+  try {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+  window.location.href = "/login";
+}
+
+export async function uploadFile(path: string, file: File): Promise<{ url: string; key: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers: Record<string, string> = {};
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // ignore
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    await handle401();
+    throw new ApiError("Unauthorized", 401);
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new ApiError(body, res.status);
+  }
+
+  return res.json();
+}
+
+export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const authHeaders = await getAuthHeaders();
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...authHeaders,
       ...options?.headers,
     },
   });
 
-  if (res.status === 401 && typeof window !== "undefined") {
-    if (window.location.pathname !== "/login") {
-      fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
-      window.location.href = "/login";
-    }
+  if (res.status === 401) {
+    await handle401();
     throw new ApiError("Unauthorized", 401);
   }
 
@@ -42,18 +100,15 @@ export async function apiStream(
   onError: (err: Error) => void
 ): Promise<void> {
   try {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders,
       body: JSON.stringify(body),
     });
 
     if (res.status === 401 && typeof window !== "undefined") {
-      if (window.location.pathname !== "/login") {
-        fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
-        window.location.href = "/login";
-      }
+      await handle401();
       return;
     }
 

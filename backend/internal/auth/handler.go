@@ -3,139 +3,59 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
+	"github.com/lms/backend/internal/middleware"
 	"github.com/lms/backend/internal/users"
 )
 
 type Handler struct {
-	authService *Service
 	userService *users.Service
 }
 
-func NewHandler(authService *Service, userService *users.Service) *Handler {
-	return &Handler{authService: authService, userService: userService}
-}
-
-type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type loginResponse struct {
-	Token string       `json:"token"`
-	User  userResponse `json:"user"`
+func NewHandler(userService *users.Service) *Handler {
+	return &Handler{userService: userService}
 }
 
 type userResponse struct {
-	ID       string `json:"id"`
-	FullName string `json:"fullName"`
-	Role     string `json:"role"`
-	ClassID  string `json:"classId"`
-}
-
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErrRespond(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	user, err := h.userService.FindByUsername(r.Context(), req.Username)
-	if err != nil {
-		jsonErrRespond(w, "Sai tên đăng nhập hoặc mật khẩu", http.StatusUnauthorized)
-		return
-	}
-
-	if !h.authService.CheckPassword(req.Password, user.PasswordHash) {
-		jsonErrRespond(w, "Sai tên đăng nhập hoặc mật khẩu", http.StatusUnauthorized)
-		return
-	}
-
-	token, err := h.authService.GenerateToken(user.ID, user.Role, user.ClassID, user.FullName)
-	if err != nil {
-		jsonErrRespond(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(loginResponse{
-		Token: token,
-		User: userResponse{
-			ID:       user.ID,
-			FullName: user.FullName,
-			Role:     user.Role,
-			ClassID:  user.ClassID,
-		},
-	})
+	ID         string `json:"id"`
+	SupabaseID string `json:"supabaseId"`
+	FullName   string `json:"fullName"`
+	Role       string `json:"role"`
+	ClassID    string `json:"classId"`
+	Email      string `json:"email"`
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	tokenStr := extractToken(r)
-	if tokenStr == "" {
-		jsonErrRespond(w, "Unauthorized", http.StatusUnauthorized)
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
+		jsonErr(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	claims, err := h.authService.ParseToken(tokenStr)
+	// Look up by supabase_id (from JWT sub) first, fall back to legacy uid
+	userID := claims.UserID
+	user, err := h.userService.FindBySupabaseID(r.Context(), userID)
 	if err != nil {
-		jsonErrRespond(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	user, err := h.userService.FindByID(r.Context(), claims.UserID)
-	if err != nil {
-		jsonErrRespond(w, "User not found", http.StatusNotFound)
-		return
+		// Fallback: try legacy ID lookup
+		user, err = h.userService.FindByID(r.Context(), userID)
+		if err != nil {
+			jsonErr(w, "Không tìm thấy người dùng", http.StatusNotFound)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(userResponse{
-		ID:       user.ID,
-		FullName: user.FullName,
-		Role:     user.Role,
-		ClassID:  user.ClassID,
+		ID:         user.ID,
+		SupabaseID: user.SupabaseID,
+		FullName:   user.FullName,
+		Role:       user.Role,
+		ClassID:    user.ClassID,
+		Email:      user.Email,
 	})
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "ok"})
-}
-
-func extractToken(r *http.Request) string {
-	if h := r.Header.Get("Authorization"); h != "" {
-		if strings.HasPrefix(h, "Bearer ") {
-			return strings.TrimPrefix(h, "Bearer ")
-		}
-		return h
-	}
-	if c, err := r.Cookie("token"); err == nil {
-		return c.Value
-	}
-	return ""
-}
-
-func jsonErrRespond(w http.ResponseWriter, msg string, code int) {
+func jsonErr(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})

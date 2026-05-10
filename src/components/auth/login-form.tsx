@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GraduationCap } from "lucide-react";
 
 export function LoginForm() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { login, error } = useAuth();
@@ -20,8 +20,9 @@ export function LoginForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await login(username, password);
-      router.push("/");
+      const user = await login(email, password);
+      const adminRoles = ["SUPER_ADMIN", "ADMIN"];
+      router.push(adminRoles.includes(user.role) ? "/admin" : "/");
     } catch {
       // error is set by AuthProvider
     } finally {
@@ -43,12 +44,13 @@ export function LoginForm() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Tên đăng nhập</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tên đăng nhập"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Nhập email"
                 required
               />
             </div>

@@ -65,8 +65,7 @@ func New(
 
 	// Services
 	usersSvc := users.NewService(db)
-	authSvc := auth.NewService(cfg.JWTSecret)
-	subjectsSvc := subjects.NewService(db)
+		subjectsSvc := subjects.NewService(db)
 	coursesSvc := courses.NewService(db)
 	lessonsSvc := lessons.NewService(db)
 	quizzesSvc := quizzes.NewService(db)
@@ -79,8 +78,8 @@ func New(
 	progressSvc := progress.NewService(db)
 
 	// Handlers
-	authH := auth.NewHandler(authSvc, usersSvc)
-	usersH := users.NewHandler(usersSvc)
+	authH := auth.NewHandler(usersSvc)
+	usersH := users.NewHandler(usersSvc, cfg.SupabaseURL, cfg.SupabaseServiceRole)
 	subjectsH := subjects.NewHandler(subjectsSvc, db)
 	coursesH := courses.NewHandler(coursesSvc)
 	lessonsH := lessons.NewHandler(lessonsSvc)
@@ -124,18 +123,20 @@ func New(
 
 	_ = quizzesSvc
 
-	mountRoutes(r, h, cfg.JWTSecret)
+	jwtSecret := cfg.SupabaseJWTSecret
+	if jwtSecret == "" {
+		jwtSecret = cfg.JWTSecret
+	}
+	mountRoutes(r, h, jwtSecret, cfg.SupabaseURL)
 	return r
 }
 
-func mountRoutes(r chi.Router, h *Handlers, jwtSecret string) {
-	// Public routes
-	r.Post("/api/auth/login", h.Auth.Login)
-	r.Post("/api/auth/logout", h.Auth.Logout)
+func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
+	// Public routes (login/logout handled by Supabase)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(jwtSecret))
+		r.Use(middleware.Auth(jwtSecret, supabaseURL))
 
 		// Auth
 		r.Get("/api/auth/me", h.Auth.Me)
@@ -178,7 +179,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret string) {
 			Post("/api/users", h.Users.Create)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
 			Patch("/api/users/{id}", h.Users.Update)
-		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActManage)).
+		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
 			Delete("/api/users/{id}", h.Users.Delete)
 
 		// Assignments
@@ -190,6 +191,10 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret string) {
 			Patch("/api/assignments/{id}", h.Assignments.Update)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActManage)).
 			Delete("/api/assignments/{id}", h.Assignments.Delete)
+
+		// Assignment file upload (PDF)
+		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActWrite)).
+			Post("/api/assignments/upload", h.Media.Upload)
 
 		// Submissions
 		r.Post("/api/assignments/{id}/submit", h.Assignments.Submit)

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/joho/godotenv"
 	"github.com/lms/backend/internal/config"
 	"github.com/lms/backend/internal/router"
 	"gorm.io/driver/postgres"
@@ -13,6 +14,8 @@ import (
 )
 
 func main() {
+	godotenv.Load()
+
 	cfg := config.Load()
 
 	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{

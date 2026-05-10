@@ -9,8 +9,9 @@ import (
 
 type User struct {
 	ID           string    `gorm:"primaryKey;size:36" json:"id"`
-	Username     string    `gorm:"uniqueIndex;size:100;not null" json:"username"`
-	PasswordHash string    `gorm:"size:255;not null" json:"-"`
+	SupabaseID   string    `gorm:"size:36;uniqueIndex" json:"supabaseId"`
+	Username     string    `gorm:"uniqueIndex;size:100" json:"username"`
+	PasswordHash string    `gorm:"size:255" json:"-"`
 	FullName     string    `gorm:"size:255;not null" json:"fullName"`
 	Email        string    `gorm:"size:255" json:"email"`
 	Role         string    `gorm:"size:20;not null;default:STUDENT" json:"role"`
@@ -37,6 +38,12 @@ func (s *Service) FindByUsername(ctx context.Context, username string) (*User, e
 func (s *Service) FindByID(ctx context.Context, id string) (*User, error) {
 	var user User
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
+	return &user, err
+}
+
+func (s *Service) FindBySupabaseID(ctx context.Context, supabaseID string) (*User, error) {
+	var user User
+	err := s.db.WithContext(ctx).Where("supabase_id = ?", supabaseID).First(&user).Error
 	return &user, err
 }
 

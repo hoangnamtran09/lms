@@ -3,19 +3,22 @@ package config
 import "os"
 
 type Config struct {
-	Port              string
-	DatabaseURL       string
-	JWTSecret         string
-	AIAPIURL          string
-	AIAPIKey          string
-	AIModel           string
-	CORSOrigin        string
-	R2BaseURL         string
-	R2AccountID       string
-	R2AccessKeyID     string
-	R2SecretAccessKey string
-	R2BucketName      string
-	R2PublicURL       string
+	Port                  string
+	DatabaseURL           string
+	JWTSecret             string
+	SupabaseJWTSecret     string
+	SupabaseURL           string
+	SupabaseServiceRole   string
+	AIAPIURL              string
+	AIAPIKey              string
+	AIModel               string
+	CORSOrigin            string
+	R2BaseURL             string
+	R2AccountID           string
+	R2AccessKeyID         string
+	R2SecretAccessKey     string
+	R2BucketName          string
+	R2PublicURL           string
 }
 
 func Load() *Config {
@@ -23,6 +26,9 @@ func Load() *Config {
 		Port:              getEnv("PORT", "8080"),
 		DatabaseURL:       getEnv("DATABASE_URL", "postgres://lms:lms_secret@localhost:5433/lms?sslmode=disable"),
 		JWTSecret:         getEnv("JWT_SECRET", "dev-jwt-secret-change-in-production"),
+		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
+		SupabaseURL:       getEnv("SUPABASE_URL", ""),
+		SupabaseServiceRole: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
 		AIAPIURL:          getEnv("AI_API_URL", "https://platform.beeknoee.com/api/v1"),
 		AIAPIKey:          getEnv("AI_API_KEY", "sk-bee-d32a3f4bc08544b4945bee85e9bb3ff8529b51458b6e46b19dfbfc4bba945179"),
 		AIModel:           getEnv("AI_MODEL", "gemini-2.5-pro"),

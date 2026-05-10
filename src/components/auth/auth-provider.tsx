@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api-client";
 
 interface User {
@@ -14,44 +15,77 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<User>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function setTokenCookie(token: string | null) {
+  if (typeof document === "undefined") return;
+  if (token) {
+    document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+  } else {
+    document.cookie = "token=; path=/; max-age=0";
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
-  useEffect(() => {
-    api<{ id: string; fullName: string; role: string; classId?: string }>("/api/auth/me")
-      .then((u) => setUser(u))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+  // Fetch local user profile from backend after Supabase session is established
+  const fetchLocalUser = useCallback(async (token?: string) => {
+    try {
+      const u = await api<{ id: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
+      setUser(u);
+      if (token) setTokenCookie(token);
+    } catch {
+      setUser(null);
+      setTokenCookie(null);
+    }
   }, []);
 
-  const login = async (username: string, password: string) => {
+  useEffect(() => {
+    // Restore session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchLocalUser(session.access_token).finally(() => setLoading(false));
+      } else {
+        setTokenCookie(null);
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchLocalUser(session.access_token);
+      } else {
+        setUser(null);
+        setTokenCookie(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, fetchLocalUser]);
+
+  const login = async (email: string, password: string): Promise<User> => {
     setError(null);
-    try {
-      const data = await api<{ token: string; user: User }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ username, password }),
-      });
-      setUser(data.user);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
-      throw err;
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      setError(signInError.message);
+      throw signInError;
     }
+    const me = await api<{ id: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
+    setUser(me);
+    return me;
   };
 
-  const logout = () => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      keepalive: true,
-    });
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     window.location.href = "/login";
   };

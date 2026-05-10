@@ -26,7 +26,22 @@ func (s *Service) List(ctx context.Context, scope ScopeFilter) ([]Assignment, er
 	q := s.db.WithContext(ctx)
 	switch scope.Role {
 	case "STUDENT":
-		q = q.Where("class_id = ? AND status IN ?", scope.ClassID, []string{StatusAssigned, StatusReturned})
+		classID := scope.ClassID
+		if classID == "" {
+			// Look up classId from local users table by supabase_id
+			var userClassID string
+			s.db.WithContext(ctx).
+				Table("users").
+				Select("class_id").
+				Where("supabase_id = ?", scope.UserID).
+				Scan(&userClassID)
+			classID = userClassID
+		}
+		// Show assignments where: (class-wide AND no student filter) OR (student is specifically selected)
+		q = q.Where(
+			"((class_id = ? AND (student_ids = '' OR student_ids IS NULL)) OR student_ids LIKE ?) AND status IN ?",
+			classID, "%\""+scope.UserID+"\"%", []string{StatusAssigned, StatusReturned},
+		)
 	case "TEACHER":
 		q = q.Where("creator_id = ?", scope.UserID)
 	case "PARENT":
