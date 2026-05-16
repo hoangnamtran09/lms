@@ -55,6 +55,7 @@ interface Course {
   id: string;
   title: string;
   subjectId: string;
+  sortOrder: number;
 }
 
 interface Lesson {
@@ -148,24 +149,24 @@ export default function AdminAssignmentsPage() {
       .catch(() => {});
   }, []);
 
-  // Fetch lessons for all courses under selected subject
+  // Fetch lessons — same logic as admin/courses page
   useEffect(() => {
     if (!selectedSubjectId) { setLessons([]); setSelectedLessonId(""); return; }
     setSelectedLessonId("");
-    // Get courses for this subject, then fetch all lessons
-    api<Course[]>(`/api/courses?subjectId=${selectedSubjectId}`)
-      .then((data) => {
-        const courseList = data || [];
-        if (courseList.length === 0) { setLessons([]); return; }
-        Promise.all(
-          courseList.map((c) => api<Lesson[]>(`/api/lessons?courseId=${c.id}`).then((l) => l || []))
-        ).then((results) => {
-          const all = results.flat();
-          all.sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
-          setLessons(all);
-        }).catch(() => setLessons([]));
-      })
-      .catch(() => setLessons([]));
+    (async () => {
+      const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubjectId}`);
+      const all: Lesson[] = [];
+      for (const c of courses) {
+        const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
+        all.push(...l);
+      }
+      all.sort((a, b) => {
+        const na = parseInt((a.title.match(/\d+/) || [""])[0]) || 0;
+        const nb = parseInt((b.title.match(/\d+/) || [""])[0]) || 0;
+        return na - nb;
+      });
+      setLessons(all);
+    })().catch(() => setLessons([]));
   }, [selectedSubjectId]);
 
   // Fetch weakness topics when class changes
@@ -417,7 +418,9 @@ export default function AdminAssignmentsPage() {
                     <Label className="text-xs text-gray-500 mb-1 block">Môn học</Label>
                     <Select value={selectedSubjectId} onValueChange={(v) => setSelectedSubjectId(v ?? "")}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn môn..." />
+                        <SelectValue placeholder="Chọn môn...">
+                          {(value: string) => subjects.find((s) => s.id === value)?.name || ""}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {subjects.map((s) => (
@@ -430,7 +433,9 @@ export default function AdminAssignmentsPage() {
                     <Label className="text-xs text-gray-500 mb-1 block">Bài học</Label>
                     <Select value={selectedLessonId} onValueChange={(v) => setSelectedLessonId(v ?? "")} disabled={!selectedSubjectId}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder={selectedSubjectId ? "Chọn bài học..." : "Chọn môn trước"} />
+                        <SelectValue placeholder={selectedSubjectId ? "Chọn bài học..." : "Chọn môn trước"}>
+                        {(value: string) => lessons.find((l) => l.id === value)?.title || ""}
+                      </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {lessons.map((l) => (
@@ -447,7 +452,9 @@ export default function AdminAssignmentsPage() {
                     <Label className="text-xs text-gray-500 mb-1 block">Loại câu hỏi</Label>
                     <Select value={questionType} onValueChange={(v) => setQuestionType(v ?? "mixed")}>
                       <SelectTrigger className="w-full">
-                        <SelectValue />
+                        <SelectValue>
+                          {(value: string) => ({ mixed: "Hỗn hợp", mcq: "Trắc nghiệm", open_ended: "Tự luận" }[value] || "")}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="mixed">Hỗn hợp</SelectItem>
@@ -512,7 +519,9 @@ export default function AdminAssignmentsPage() {
                   <Label className="text-xs text-gray-500 mb-1 block">Chọn lớp</Label>
                   <Select value={selectedClassId} onValueChange={(v) => setSelectedClassId(v ?? "")}>
                     <SelectTrigger className="w-64">
-                      <SelectValue placeholder="Chọn lớp..." />
+                      <SelectValue placeholder="Chọn lớp...">
+                        {(value: string) => classes.find((c) => c.id === value)?.name || ""}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {classes.map((c) => (
@@ -654,7 +663,9 @@ export default function AdminAssignmentsPage() {
                       <Label htmlFor="class">Lớp (tuỳ chọn)</Label>
                       <Select value={classId} onValueChange={(v) => setClassId(v ?? "")}>
                         <SelectTrigger id="class" className="w-full">
-                          <SelectValue placeholder="Chọn lớp..." />
+                          <SelectValue placeholder="Chọn lớp...">
+                            {(value: string) => value ? classes.find((c) => c.id === value)?.name || "" : "Tất cả"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">Tất cả</SelectItem>
@@ -749,7 +760,9 @@ export default function AdminAssignmentsPage() {
                       <Label htmlFor="class-manual">Lớp (tuỳ chọn)</Label>
                       <Select value={classId} onValueChange={(v) => setClassId(v ?? "")}>
                         <SelectTrigger id="class-manual" className="w-full">
-                          <SelectValue placeholder="Chọn lớp..." />
+                          <SelectValue placeholder="Chọn lớp...">
+                            {(value: string) => value ? classes.find((c) => c.id === value)?.name || "" : "Tất cả"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">Tất cả</SelectItem>

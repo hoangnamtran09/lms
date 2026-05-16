@@ -81,7 +81,11 @@ export default function AdminCoursesPage() {
         const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
         allLessons.push(...l);
       }
-      allLessons.sort((a, b) => a.sortOrder - b.sortOrder);
+      allLessons.sort((a, b) => {
+        const na = parseInt((a.title.match(/\d+/) || [""])[0]) || 0;
+        const nb = parseInt((b.title.match(/\d+/) || [""])[0]) || 0;
+        return na - nb;
+      });
       setLessons(allLessons);
     } catch { /* empty */ }
     setLessonLoading(false);
