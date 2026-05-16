@@ -4,12 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/lms/backend/internal/courses"
 	"github.com/lms/backend/internal/gamification"
 	"github.com/lms/backend/internal/lessons"
 	"github.com/lms/backend/internal/middleware"
 	"github.com/lms/backend/internal/weaknesses"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
@@ -17,16 +22,19 @@ type Handler struct {
 	lessonService   *lessons.Service
 	weaknessService *weaknesses.Service
 	diamondService  *gamification.DiamondService
+	courseService   *courses.Service
+	db              *gorm.DB
 }
 
-func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService) *Handler {
-	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc}
+func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, db *gorm.DB) *Handler {
+	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, db: db}
 }
 
 type chatInput struct {
-	Message   string `json:"message"`
-	LessonID  string `json:"lessonId"`
-	SessionID string `json:"sessionId"`
+	Message   string        `json:"message"`
+	LessonID  string        `json:"lessonId"`
+	SessionID string        `json:"sessionId"`
+	History   []ChatMessage `json:"history"`
 }
 
 func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +85,27 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.aiService.ChatStream([]ChatMessage{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: req.Message},
-	}, func(text string) {
+	messages := []ChatMessage{{Role: "system", Content: systemPrompt}}
+	messages = append(messages, req.History...)
+	messages = append(messages, ChatMessage{Role: "user", Content: req.Message})
+
+	var fullResponse strings.Builder
+	err := h.aiService.ChatStream(messages, func(text string) {
+		fullResponse.WriteString(text)
 		data, _ := json.Marshal(map[string]string{"delta": text})
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
 	}, func() {
+		// Parse :::weakness markers and record weakness signals
+		if claims != nil {
+			weaknessRe := regexp.MustCompile(`:::weakness topic="([^"]+)"`)
+			matches := weaknessRe.FindAllStringSubmatch(fullResponse.String(), -1)
+			for _, match := range matches {
+				topic := match[1]
+				h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "chat", 0.8)
+			}
+		}
+
 		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	})
@@ -93,6 +114,50 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "data: {\"error\":\"%s\"}\n\n", err.Error())
 		flusher.Flush()
 	}
+}
+
+// ---- Extract Questions from Document ----
+
+type extractQuestionsInput struct {
+	Text string `json:"text"`
+}
+
+func (h *Handler) ExtractQuestions(w http.ResponseWriter, r *http.Request) {
+	var req extractQuestionsInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Text) == "" {
+		jsonErr(w, "text is required", http.StatusBadRequest)
+		return
+	}
+
+	response, err := h.aiService.ExtractQuestions(req.Text)
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var questions []map[string]interface{}
+	cleaned := extractJSON(response)
+	if err := json.Unmarshal([]byte(cleaned), &questions); err != nil {
+		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Add IDs to each question
+	for i := range questions {
+		questions[i]["id"] = uuid.New().String()
+		if _, ok := questions[i]["expectedAnswer"]; !ok {
+			questions[i]["expectedAnswer"] = ""
+		}
+		if _, ok := questions[i]["score"]; !ok {
+			questions[i]["score"] = 10
+		}
+	}
+
+	jsonOk(w, map[string]interface{}{"questions": questions})
 }
 
 // ---- Quiz Answer ----
@@ -138,7 +203,7 @@ func (h *Handler) QuizAnswer(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if topic != "" {
-			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic)
+			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "quiz", 1.0)
 		}
 		result["weaknessRecorded"] = topic
 	}
@@ -245,7 +310,7 @@ func (h *Handler) GradeExercise(w http.ResponseWriter, r *http.Request) {
 			topic = ctx_.LessonTitle
 		}
 		if topic != "" {
-			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic)
+			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "exercise", 1.0)
 		}
 	}
 
@@ -375,6 +440,24 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return cached summary if available (saves AI call)
+	lesson, err := h.lessonService.FindByID(r.Context(), req.LessonID)
+	if err == nil && lesson.Summary != "" {
+		var objectives []string
+		if lesson.Objectives != "" {
+			json.Unmarshal([]byte(lesson.Objectives), &objectives)
+		}
+		jsonOk(w, map[string]interface{}{
+			"summary":     lesson.Summary,
+			"objectives":  objectives,
+			"lessonTitle": lesson.Title,
+			"subjectName": ctx_.SubjectName,
+			"description": ctx_.Description,
+			"gradeLevel":  ctx_.GradeLevel,
+		})
+		return
+	}
+
 	prompt := BuildLessonSummaryPrompt(ctx_.SubjectName, ctx_.LessonTitle, ctx_.Description, ctx_.GradeLevel)
 
 	response, err := h.aiService.Chat([]ChatMessage{
@@ -391,14 +474,32 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 		Objectives []string `json:"objectives"`
 	}
 	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
-		// Fallback: treat whole response as summary
+		// Fallback: save raw response as summary
+		if lesson != nil {
+			objectivesJSON, _ := json.Marshal([]string{})
+			h.lessonService.Update(r.Context(), lesson.ID, map[string]interface{}{
+				"summary":    response,
+				"objectives": string(objectivesJSON),
+			})
+		}
 		jsonOk(w, map[string]interface{}{
 			"summary":     response,
 			"objectives":  []string{},
 			"lessonTitle": ctx_.LessonTitle,
 			"subjectName": ctx_.SubjectName,
+			"description": ctx_.Description,
+			"gradeLevel":  ctx_.GradeLevel,
 		})
 		return
+	}
+
+	// Cache the generated result
+	if lesson != nil {
+		objectivesJSON, _ := json.Marshal(result.Objectives)
+		h.lessonService.Update(r.Context(), lesson.ID, map[string]interface{}{
+			"summary":    result.Summary,
+			"objectives": string(objectivesJSON),
+		})
 	}
 
 	jsonOk(w, map[string]interface{}{
@@ -406,6 +507,8 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 		"objectives":  result.Objectives,
 		"lessonTitle": ctx_.LessonTitle,
 		"subjectName": ctx_.SubjectName,
+		"description": ctx_.Description,
+		"gradeLevel":  ctx_.GradeLevel,
 	})
 }
 
@@ -425,6 +528,81 @@ func (h *Handler) Grade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOk(w, result)
+}
+
+// ---- Generate Assignment from Lesson ----
+
+type generateAssignmentInput struct {
+	LessonID      string `json:"lessonId"`
+	QuestionCount int    `json:"questionCount"`
+	QuestionType  string `json:"questionType"` // "mcq", "open_ended", or "mixed"
+}
+
+func (h *Handler) GenerateAssignment(w http.ResponseWriter, r *http.Request) {
+	var req generateAssignmentInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.LessonID == "" {
+		jsonErr(w, "lessonId is required", http.StatusBadRequest)
+		return
+	}
+	if req.QuestionCount <= 0 {
+		req.QuestionCount = 5
+	}
+	if req.QuestionCount > 20 {
+		req.QuestionCount = 20
+	}
+	if req.QuestionType == "" {
+		req.QuestionType = "mixed"
+	}
+
+	var typeLabel string
+	switch req.QuestionType {
+	case "mcq":
+		typeLabel = "trắc nghiệm (câu hỏi + 4 đáp án A/B/C/D)"
+	case "open_ended":
+		typeLabel = "tự luận (câu hỏi mở, yêu cầu suy luận)"
+	default:
+		typeLabel = "hỗn hợp trắc nghiệm và tự luận"
+	}
+
+	ctx_, err := h.lessonService.GetContext(r.Context(), req.LessonID)
+	if err != nil {
+		jsonErr(w, "Không tìm thấy bài học", http.StatusNotFound)
+		return
+	}
+
+	response, err := h.aiService.GenerateAssignment(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, req.QuestionCount, typeLabel, ctx_.GradeLevel)
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var questions []map[string]interface{}
+	cleaned := extractJSON(response)
+	if err := json.Unmarshal([]byte(cleaned), &questions); err != nil {
+		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for i := range questions {
+		questions[i]["id"] = uuid.New().String()
+		if _, ok := questions[i]["expectedAnswer"]; !ok {
+			questions[i]["expectedAnswer"] = ""
+		}
+		if _, ok := questions[i]["score"]; !ok {
+			questions[i]["score"] = 10
+		}
+	}
+
+	jsonOk(w, map[string]interface{}{
+		"questions":    questions,
+		"lessonTitle":  ctx_.LessonTitle,
+		"subjectName":  ctx_.SubjectName,
+		"questionType": req.QuestionType,
+	})
 }
 
 // ---- Existing: Generate Quiz (classic) ----
@@ -544,22 +722,36 @@ func (h *Handler) GenerateRemediation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Look up lesson → course → subject for metadata
+	var subjectID string
+	var gradeLevel int
+	if profile.LessonID != "" {
+		lesson, err := h.lessonService.FindByID(r.Context(), profile.LessonID)
+		if err == nil {
+			course, err := h.courseService.FindByID(r.Context(), lesson.CourseID)
+			if err == nil {
+				subjectID = course.SubjectID
+				gradeLevel = course.GradeLevel
+			}
+		}
+	}
+
 	prompt := fmt.Sprintf(`Học sinh đang gặp khó khăn với chủ đề: "%s"
 	Số lần mắc lỗi: %d
 
 	Tạo 3-4 bài tập GIÚP HỌC SINH CẢI THIỆN. Kết hợp cả trắc nghiệm và câu trả lời ngắn:
 
-	- Nếu là trắc nghiệm (phù hợp kiểm tra kiến thức):
+	- Nếu là trắc nghiệm:
 	  {"type": "mcq", "question": "...", "options": [{"text": "Đáp án A", "isCorrect": false}, {"text": "Đáp án B", "isCorrect": true}, {"text": "Đáp án C", "isCorrect": false}, {"text": "Đáp án D", "isCorrect": false}], "explanation": "Giải thích ngắn gọn"}
 
-	- Nếu là câu trả lời ngắn (phù hợp câu hỏi suy luận):
-	  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án mong đợi (ý chính)", "explanation": "Giải thích chi tiết"}
+	- Nếu là câu trả lời ngắn (dành cho câu hỏi có đáp án CỤ THỂ, NGẮN GỌN như số, công thức, định nghĩa):
+	  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án chính xác (TỐI ĐA 5 TỪ)", "explanation": "Giải thích ngắn gọn"}
 
-	Yêu cầu:
+	Yêu cầu QUAN TRỌNG:
 	- ÍT NHẤT 1 câu trắc nghiệm VÀ 1 câu trả lời ngắn
 	- Câu hỏi bằng tiếng Việt, NGẮN GỌN
 	- Đáp án trắc nghiệm: ĐÚNG 1 đáp án đúng
-	- expectedAnswer: ghi ý chính, không cần quá dài
+	- expectedAnswer: PHẢI là đáp án NGẮN (tối đa 5 từ), cụ thể, dùng để so khớp chính xác. Ví dụ: "3", "đường trung trực", "lực hấp dẫn", "phản xạ có điều kiện".
 	- explanation: giải thích NGẮN, dễ hiểu
 	- Dùng $...$ cho công thức toán trong câu hỏi, đáp án và giải thích (VD: $u_1 = 3$, $x^2$).
 
@@ -575,9 +767,28 @@ func (h *Handler) GenerateRemediation(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var exercises []map[string]interface{}
-		if err := json.Unmarshal([]byte(extractJSON(response)), &exercises); err != nil {
-			jsonErr(w, "Lỗi parse kết quả AI", http.StatusInternalServerError)
-			return
+		cleaned := extractJSON(response)
+		if err := json.Unmarshal([]byte(cleaned), &exercises); err != nil {
+			// Fallback: try parsing as a wrapper object with an array field
+			var wrapper map[string]interface{}
+			if err2 := json.Unmarshal([]byte(cleaned), &wrapper); err2 == nil {
+				for _, v := range wrapper {
+					if arr, ok := v.([]interface{}); ok {
+						for _, item := range arr {
+							if m, ok := item.(map[string]interface{}); ok {
+								exercises = append(exercises, m)
+							}
+						}
+						break
+					}
+				}
+			}
+			if len(exercises) == 0 {
+				// Log debug info: the cleaned string and the parse error
+				errMsg := fmt.Sprintf("Lỗi parse kết quả AI (unmarshal: %s). Cleaned: %s. Raw: %s", err.Error(), cleaned, response)
+				jsonErr(w, errMsg, http.StatusInternalServerError)
+				return
+			}
 		}
 
 		exercisesJSON, _ := json.Marshal(exercises)
@@ -586,8 +797,143 @@ func (h *Handler) GenerateRemediation(w http.ResponseWriter, r *http.Request) {
 		jsonOk(w, map[string]interface{}{
 			"weaknessId": req.WeaknessID,
 			"exercises":  exercises,
+			"topic":      profile.Topic,
+			"subjectId":  subjectID,
+			"gradeLevel": gradeLevel,
 		})
 	}
+
+// ---- Generate Remediation Assignment ----
+
+type generateRemediationAssignmentInput struct {
+	ClassID string `json:"classId"`
+	Topic   string `json:"topic"`
+	Title   string `json:"title"`
+}
+
+func (h *Handler) GenerateRemediationAssignment(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
+	var req generateRemediationAssignmentInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.ClassID == "" || req.Topic == "" {
+		jsonErr(w, "classId và topic là bắt buộc", http.StatusBadRequest)
+		return
+	}
+
+	studentIDs, err := h.weaknessService.FindStudentIDsByClassAndTopic(r.Context(), req.ClassID, req.Topic)
+	if err != nil {
+		jsonErr(w, "Lỗi truy vấn học sinh: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(studentIDs) == 0 {
+		jsonErr(w, "Không có học sinh nào trong lớp có điểm yếu về chủ đề này", http.StatusNotFound)
+		return
+	}
+
+	title := req.Title
+	if title == "" {
+		title = "Bài tập khắc phục: " + req.Topic
+	}
+
+	prompt := fmt.Sprintf(`Học sinh đang gặp khó khăn với chủ đề: "%s".
+
+Tạo 4-5 bài tập khắc phục, kết hợp trắc nghiệm và câu trả lời ngắn:
+
+- Trắc nghiệm:
+  {"type": "mcq", "question": "...", "options": [{"text": "Đáp án A", "isCorrect": false}, {"text": "Đáp án B", "isCorrect": true}, {"text": "Đáp án C", "isCorrect": false}, {"text": "Đáp án D", "isCorrect": false}], "expectedAnswer": "B", "explanation": "Giải thích ngắn gọn", "score": 10}
+
+- Câu trả lời ngắn:
+  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án chính xác (TỐI ĐA 5 TỪ)", "explanation": "Giải thích ngắn gọn", "score": 10}
+
+Yêu cầu:
+- ÍT NHẤT 1 trắc nghiệm VÀ 1 câu trả lời ngắn
+- Câu hỏi bằng tiếng Việt, NGẮN GỌN, bám sát chủ đề
+- expectedAnswer: đáp án NGẮN, cụ thể (tối đa 5 từ)
+- Dùng $...$ cho công thức toán
+- Trả về MẢNG JSON, không kèm text khác.`, req.Topic)
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tạo bài tập khắc phục. Chỉ trả về MẢNG JSON thuần, không có markdown."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var questions []map[string]interface{}
+	cleaned := extractJSON(response)
+	if err := json.Unmarshal([]byte(cleaned), &questions); err != nil {
+		// Fallback: try wrapper
+		var wrapper map[string]interface{}
+		if err2 := json.Unmarshal([]byte(cleaned), &wrapper); err2 == nil {
+			for _, v := range wrapper {
+				if arr, ok := v.([]interface{}); ok {
+					for _, item := range arr {
+						if m, ok := item.(map[string]interface{}); ok {
+							questions = append(questions, m)
+						}
+					}
+					break
+				}
+			}
+		}
+		if len(questions) == 0 {
+			jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Add IDs and defaults
+	maxScore := 0
+	for i := range questions {
+		questions[i]["id"] = uuid.New().String()
+		if _, ok := questions[i]["score"]; !ok {
+			questions[i]["score"] = 10
+		}
+		if s, ok := questions[i]["score"].(float64); ok {
+			maxScore += int(s)
+		}
+	}
+	if maxScore == 0 {
+		maxScore = 100
+	}
+
+	questionsJSON, _ := json.Marshal(questions)
+	studentIDsJSON, _ := json.Marshal(studentIDs)
+
+	assignmentID := uuid.New().String()
+	now := time.Now()
+	assignment := map[string]interface{}{
+		"id":          assignmentID,
+		"creator_id":  claims.UserID,
+		"creator_name": claims.UserName,
+		"title":       title,
+		"class_id":    req.ClassID,
+		"student_ids": string(studentIDsJSON),
+		"max_score":   maxScore,
+		"questions":   string(questionsJSON),
+		"status":      "ASSIGNED",
+		"source":      "ai_remediation",
+		"created_at":  now,
+		"updated_at":  now,
+	}
+
+	if err := h.db.WithContext(r.Context()).Table("assignments").Create(assignment).Error; err != nil {
+		jsonErr(w, "Lỗi tạo bài tập: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonOk(w, map[string]interface{}{
+		"assignmentId":         assignmentID,
+		"title":                title,
+		"questions":            questions,
+		"assignedStudentCount": len(studentIDs),
+	})
+}
 
 func jsonOk(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -603,13 +949,92 @@ func jsonErr(w http.ResponseWriter, msg string, code int) {
 // extractJSON strips markdown code fences from an AI response.
 func extractJSON(raw string) string {
 	s := strings.TrimSpace(raw)
+
+	// Strip markdown code fences
 	if strings.HasPrefix(s, "```") {
-		s = strings.TrimPrefix(s, "```json")
 		s = strings.TrimPrefix(s, "```")
+		// Strip optional language tag (e.g., "json", "JSON")
+		if idx := strings.Index(s, "\n"); idx >= 0 && idx < 20 {
+			tag := strings.TrimSpace(s[:idx])
+			if len(tag) < 15 && !strings.Contains(tag, " ") {
+				s = s[idx+1:]
+			}
+		}
 		if idx := strings.LastIndex(s, "```"); idx >= 0 {
 			s = s[:idx]
 		}
 		s = strings.TrimSpace(s)
 	}
+
+	// If not JSON array or object, try to find one
+	if !strings.HasPrefix(s, "[") && !strings.HasPrefix(s, "{") {
+		if idx := strings.Index(s, "["); idx >= 0 {
+			s = s[idx:]
+		} else if idx := strings.Index(s, "{"); idx >= 0 {
+			s = s[idx:]
+		}
+	}
+	// Find matching closing bracket
+	if strings.HasPrefix(s, "[") {
+		if idx := strings.LastIndex(s, "]"); idx > 0 {
+			s = s[:idx+1]
+		}
+	} else if strings.HasPrefix(s, "{") {
+		if idx := strings.LastIndex(s, "}"); idx > 0 {
+			s = s[:idx+1]
+		}
+	}
+
+	// Sanitize control characters that are invalid in JSON strings.
+	// AI sometimes returns raw tabs or other control chars inside string values.
+	s = sanitizeJSONString(s)
+
 	return s
+}
+
+// sanitizeJSONString replaces raw control characters that are invalid inside JSON strings.
+func sanitizeJSONString(s string) string {
+	// Replace raw tabs, carriage returns, and other control chars (except \n)
+	// within JSON string values. We keep \n as it may appear escaped.
+	var b strings.Builder
+	b.Grow(len(s))
+	inString := false
+	escaped := false
+	for _, r := range s {
+		if escaped {
+			escaped = false
+			b.WriteRune(r)
+			continue
+		}
+		if r == '\\' && inString {
+			escaped = true
+			b.WriteRune(r)
+			continue
+		}
+		if r == '"' {
+			inString = !inString
+			b.WriteRune(r)
+			continue
+		}
+		// Inside a JSON string, control chars (except \n which is common in AI output) are invalid
+		if inString {
+			switch r {
+			case '\t':
+				b.WriteString("\\t")
+			case '\r':
+				b.WriteString("\\r")
+			case '\n':
+				b.WriteString("\\n")
+			default:
+				if r < 0x20 {
+					b.WriteString(fmt.Sprintf("\\u%04x", r))
+				} else {
+					b.WriteRune(r)
+				}
+			}
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

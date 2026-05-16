@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock } from "lucide-react";
 import { api, apiStream } from "@/lib/api-client";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ChatMessage } from "@/components/ai/chat-message";
@@ -97,7 +98,7 @@ export default function LessonViewerPage({
       setStreaming(true);
       apiStream(
         "/api/ai/chat",
-        { message: "", lessonId: lessonId, sessionId: "" },
+        { message: "Xin chào", lessonId: lessonId, sessionId: "", history: [] },
         (delta) => {
           setMessages((prev) => {
             const next = [...prev];
@@ -226,12 +227,16 @@ export default function LessonViewerPage({
 
   const sendMessage = useCallback((text: string) => {
     setChatError(null);
-    setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
+    let prevMessages: Message[] = [];
+    setMessages((prev) => {
+      prevMessages = prev.filter((m) => m.content !== "");
+      return [...prev, { role: "user", content: text }, { role: "assistant", content: "" }];
+    });
     setStreaming(true);
 
     apiStream(
       "/api/ai/chat",
-      { message: text, lessonId: lessonId, sessionId: "" },
+      { message: text, lessonId: lessonId, sessionId: "", history: prevMessages },
       (delta) => {
         setMessages((prev) => {
           const next = [...prev];
@@ -259,13 +264,13 @@ export default function LessonViewerPage({
   };
 
   // Auto-continue chat after quiz answered
-  const prevResultRef = useRef<boolean | null>(null);
   useEffect(() => {
-    if (lastQuizResult !== null && lastQuizResult !== prevResultRef.current && !streaming && chatUnlocked) {
-      prevResultRef.current = lastQuizResult;
-      const msg = lastQuizResult
-        ? "Mình vừa trả lời đúng câu hỏi trắc nghiệm rồi nhé."
-        : "Mình vừa trả lời sai câu hỏi trắc nghiệm rồi.";
+    if (lastQuizResult !== null && !streaming && chatUnlocked) {
+      const { isCorrect, question } = lastQuizResult;
+      const shortQuestion = question.length > 80 ? question.slice(0, 80) + "..." : question;
+      const msg = isCorrect
+        ? `Mình vừa trả lời đúng câu hỏi "${shortQuestion}".`
+        : `Mình vừa trả lời sai câu hỏi "${shortQuestion}". Hãy giải thích giúp mình nhé.`;
       clearLastQuizResult();
       sendMessage(msg);
     }
@@ -273,9 +278,9 @@ export default function LessonViewerPage({
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 w-48 rounded bg-gray-200" />
-        <div className="h-[70vh] rounded-xl bg-gray-100" />
+      <div className="space-y-4">
+        <Skeleton delay={0} className="h-8 w-48" />
+        <Skeleton delay={120} className="h-[70vh] rounded-xl" />
       </div>
     );
   }
@@ -293,7 +298,7 @@ export default function LessonViewerPage({
 
   return (
     <>
-    <div className="flex flex-col -my-6 -mx-4 lg:-mx-6 h-[calc(100vh-3.5rem)] w-[calc(100%+2rem)] lg:w-[calc(100%+3rem)] min-h-0 overflow-hidden">
+    <div className="animate-fade-in flex flex-col -my-6 -mx-4 lg:-mx-6 h-[calc(100vh-3.5rem)] w-[calc(100%+2rem)] lg:w-[calc(100%+3rem)] min-h-0 overflow-hidden">
       {!proxyUrl ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">

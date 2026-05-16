@@ -8,11 +8,16 @@ export interface QuizData {
   explanation: string;
 }
 
+export interface QuizResult {
+  isCorrect: boolean;
+  question: string;
+}
+
 interface ActiveQuizContextValue {
   activeQuiz: QuizData | null;
   setActiveQuiz: (quiz: QuizData | null) => void;
-  lastQuizResult: boolean | null;
-  handleQuizAnswered: (isCorrect: boolean) => void;
+  lastQuizResult: QuizResult | null;
+  handleQuizAnswered: (result: QuizResult) => void;
   clearLastQuizResult: () => void;
 }
 
@@ -26,14 +31,14 @@ const ActiveQuizContext = createContext<ActiveQuizContextValue>({
 
 export function ActiveQuizProvider({ children }: { children: ReactNode }) {
   const [activeQuiz, setActiveQuiz] = useState<QuizData | null>(null);
-  const [lastQuizResult, setLastQuizResult] = useState<boolean | null>(null);
+  const [lastQuizResult, setLastQuizResult] = useState<QuizResult | null>(null);
 
-  const handleQuizAnswered = (isCorrect: boolean) => {
-    setLastQuizResult(isCorrect);
+  const handleQuizAnswered = useCallback((result: QuizResult) => {
+    setLastQuizResult(result);
     setActiveQuiz(null);
-  };
+  }, []);
 
-  const clearLastQuizResult = () => setLastQuizResult(null);
+  const clearLastQuizResult = useCallback(() => setLastQuizResult(null), []);
 
   return (
     <ActiveQuizContext.Provider value={{ activeQuiz, setActiveQuiz, lastQuizResult, handleQuizAnswered, clearLastQuizResult }}>

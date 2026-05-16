@@ -8,20 +8,16 @@ import {
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InteractiveQuiz } from "@/components/ai/interactive-quiz";
+import { MathText } from "@/components/ai/math-text";
 import { bridge } from "@/lib/study-session-bridge";
-
-interface LessonContext {
-  subjectName: string;
-  lessonTitle: string;
-  description: string;
-  gradeLevel: number;
-}
 
 interface LessonSummary {
   summary: string;
   objectives?: string[];
   lessonTitle: string;
   subjectName: string;
+  description: string;
+  gradeLevel: number;
 }
 
 interface QuizData {
@@ -33,7 +29,7 @@ interface QuizData {
 interface Props {
   lessonId: string;
   activeQuiz?: QuizData | null;
-  onQuizAnswered?: (isCorrect: boolean) => void;
+  onQuizAnswered?: (result: { isCorrect: boolean; question: string }) => void;
 }
 
 type QuizPhase = "answering" | "result";
@@ -45,7 +41,7 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props) {
-  const [ctx, setCtx] = useState<LessonContext | null>(null);
+  const [ctx, setCtx] = useState<{ subjectName: string; lessonTitle: string; description: string; gradeLevel: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +54,8 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
   const [lastCorrect, setLastCorrect] = useState(false);
   const [streak, setStreak] = useState(0);
   const prevQuizRef = useRef<string | null>(null);
+  const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Session stats
   const [quizCorrect, setQuizCorrect] = useState(0);
@@ -73,11 +71,21 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     return () => clearInterval(interval);
   }, []);
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
+  }, []);
+
   // Reset phase when a new quiz arrives
   useEffect(() => {
     if (activeQuiz && activeQuiz.question !== prevQuizRef.current) {
       prevQuizRef.current = activeQuiz.question;
       setQuizPhase("answering");
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+      if (clearTimerRef.current) { clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
     }
   }, [activeQuiz]);
 
@@ -86,26 +94,25 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     setError(null);
     setSummary(null);
     setObjectives([]);
-    api<LessonContext>(`/api/lessons/${lessonId}/context`)
-      .then((data) => {
-        setCtx(data);
-        setSummaryLoading(true);
-        api<LessonSummary>("/api/ai/lesson-summary", {
-          method: "POST",
-          body: JSON.stringify({ lessonId }),
-        })
-          .then((s) => {
-            setSummary(s.summary);
-            if (s.objectives?.length) setObjectives(s.objectives);
-          })
-          .catch(() => setSummary(null))
-          .finally(() => setSummaryLoading(false));
+    setSummaryLoading(true);
+    api<LessonSummary>("/api/ai/lesson-summary", {
+      method: "POST",
+      body: JSON.stringify({ lessonId }),
+    })
+      .then((s) => {
+        setCtx({ subjectName: s.subjectName, lessonTitle: s.lessonTitle, description: s.description, gradeLevel: s.gradeLevel });
+        setSummary(s.summary);
+        if (s.objectives?.length) setObjectives(s.objectives);
       })
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setSummaryLoading(false);
+        setLoading(false);
+      });
   }, [lessonId]);
 
   const handleQuizAnswered = (isCorrect: boolean) => {
+    const question = activeQuiz?.question || "";
     setLastCorrect(isCorrect);
     setQuizTotal((t) => t + 1);
     if (isCorrect) {
@@ -115,8 +122,8 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     } else {
       setStreak(0);
     }
-    setTimeout(() => setQuizPhase("result"), 1500);
-    setTimeout(() => onQuizAnswered?.(isCorrect), 4000);
+    phaseTimerRef.current = setTimeout(() => setQuizPhase("result"), 1500);
+    clearTimerRef.current = setTimeout(() => onQuizAnswered?.({ isCorrect, question }), 4000);
   };
 
   // -- Loading / Error / Empty states --
@@ -334,7 +341,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
                     <div className="text-center">
                       <p className="text-lg font-bold text-red-600">Chưa đúng</p>
                       <p className="text-xs text-gray-500 mt-1">Đáp án đúng:</p>
-                      <p className="text-sm font-medium text-gray-900 mt-0.5">{correctAnswer}</p>
+                      <p className="text-sm font-medium text-gray-900 mt-0.5"><MathText text={correctAnswer} /></p>
                     </div>
                     <div className="rounded-full bg-gray-50 border border-gray-200 px-4 py-2">
                       <p className="text-xs text-gray-600">Đừng lo, cố gắng nhé!</p>

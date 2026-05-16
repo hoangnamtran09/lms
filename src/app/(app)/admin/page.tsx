@@ -69,19 +69,19 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-72" />
+        <Skeleton delay={0} className="h-10 w-72" />
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-2xl" />
+            <Skeleton key={i} delay={80 + i * 100} className="h-32 rounded-2xl" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <Skeleton className="h-72 rounded-2xl lg:col-span-2" />
-          <Skeleton className="h-72 rounded-2xl" />
+          <Skeleton delay={480} className="h-72 rounded-2xl lg:col-span-2" />
+          <Skeleton delay={580} className="h-72 rounded-2xl" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Skeleton className="h-24 rounded-2xl" />
-          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton delay={680} className="h-24 rounded-2xl" />
+          <Skeleton delay={760} className="h-24 rounded-2xl" />
         </div>
       </div>
     );
@@ -103,7 +103,7 @@ export default function AdminDashboardPage() {
     : 100;
 
   return (
-    <div className="max-w-7xl">
+    <div className="animate-fade-in max-w-7xl">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">

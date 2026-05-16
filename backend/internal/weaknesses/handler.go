@@ -15,6 +15,24 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+func (h *Handler) ClassSummary(w http.ResponseWriter, r *http.Request) {
+	classID := r.URL.Query().Get("classId")
+	if classID == "" {
+		jsonErr(w, "classId is required", http.StatusBadRequest)
+		return
+	}
+
+	summary, err := h.service.ClassSummary(r.Context(), classID)
+	if err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if summary == nil {
+		summary = []ClassTopicSummary{}
+	}
+	jsonOk(w, summary)
+}
+
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	profiles, err := h.service.ListByUser(r.Context(), claims.UserID)
@@ -96,11 +114,11 @@ func (h *Handler) Resolve(w http.ResponseWriter, r *http.Request) {
 	if len(parts) >= 2 {
 		id = parts[len(parts)-2]
 	}
-	if err := h.service.Resolve(r.Context(), id); err != nil {
+	if err := h.service.Delete(r.Context(), id); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonOk(w, map[string]string{"status": "resolved"})
+	jsonOk(w, map[string]string{"status": "deleted"})
 }
 
 func (h *Handler) UpdateCoachNotes(w http.ResponseWriter, r *http.Request) {

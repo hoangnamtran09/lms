@@ -22,7 +22,6 @@ import {
   ScreenShare,
   Library,
   ClipboardCheck,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,7 +40,7 @@ const allNavItems: NavItem[] = [
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
   { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
   { label: "Lộ trình", href: "/roadmap", icon: Map, roles: ["STUDENT"] },
-  { label: "Lịch", href: "/schedule", icon: Calendar, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
+
   { label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
   { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
   // Admin management
@@ -49,8 +48,9 @@ const allNavItems: NavItem[] = [
   { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí lớp học", href: "/admin/classes", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Cài đặt", href: "/admin/settings", icon: Settings, roles: ["SUPER_ADMIN", "ADMIN"] },
+
 ];
 
 export function Sidebar({ className }: { className?: string }) {

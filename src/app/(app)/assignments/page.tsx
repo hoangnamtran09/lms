@@ -50,9 +50,9 @@ export default function AssignmentsPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
+        <Skeleton delay={0} className="h-8 w-48" />
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-lg" />
+          <Skeleton key={i} delay={80 + i * 100} className="h-24 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -68,7 +68,7 @@ export default function AssignmentsPage() {
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bài tập</h1>

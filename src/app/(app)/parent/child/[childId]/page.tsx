@@ -47,9 +47,9 @@ export default function ChildDetailPage({ params }: { params: Promise<{ childId:
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton delay={0} className="h-8 w-48" />
+        <Skeleton delay={100} className="h-20 w-full rounded-lg" />
+        <Skeleton delay={200} className="h-40 w-full rounded-lg" />
       </div>
     );
   }
@@ -67,7 +67,7 @@ export default function ChildDetailPage({ params }: { params: Promise<{ childId:
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <Link href="/parent" className={backLink}>
         <ArrowLeft className="size-4" />
         Quay lại

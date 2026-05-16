@@ -12,6 +12,7 @@ import (
 	"github.com/lms/backend/internal/analytics"
 	"github.com/lms/backend/internal/assignments"
 	"github.com/lms/backend/internal/auth"
+	"github.com/lms/backend/internal/classes"
 	"github.com/lms/backend/internal/config"
 	"github.com/lms/backend/internal/courses"
 	"github.com/lms/backend/internal/gamification"
@@ -47,6 +48,7 @@ type Handlers struct {
 	Teacher      *teacher.Handler
 	Analytics    *analytics.Handler
 	GradeLevels  *gradelevels.Handler
+	Classes      *classes.Handler
 }
 
 func New(
@@ -85,7 +87,7 @@ func New(
 	subjectsH := subjects.NewHandler(subjectsSvc, db)
 	coursesH := courses.NewHandler(coursesSvc)
 	lessonsH := lessons.NewHandler(lessonsSvc)
-	aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc)
+	aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, db)
 	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
@@ -104,6 +106,8 @@ func New(
 	chatHistoryH := ai.NewChatHistoryHandler(chatHistorySvc)
 	gradeLevelsSvc := gradelevels.NewService(db)
 	gradeLevelsH := gradelevels.NewHandler(gradeLevelsSvc)
+	classesSvc := classes.NewService(db)
+	classesH := classes.NewHandler(classesSvc)
 
 	// Mount
 	h := &Handlers{
@@ -124,6 +128,7 @@ func New(
 		Teacher:      teacherH,
 		Analytics:    analyticsH,
 		GradeLevels:  gradeLevelsH,
+		Classes:      classesH,
 	}
 
 	_ = quizzesSvc
@@ -248,6 +253,15 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 			Post("/api/ai/grade-exercise", h.AI.GradeExercise)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+			Post("/api/ai/extract-questions", h.AI.ExtractQuestions)
+		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+			Post("/api/ai/generate-assignment", h.AI.GenerateAssignment)
+		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+			Post("/api/ai/generate-remediation-assignment", h.AI.GenerateRemediationAssignment)
+		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
 			Post("/api/ai/completion-quiz", h.AI.CompletionQuiz)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
@@ -299,6 +313,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 
 		// Weaknesses — diagnosis
 		r.Get("/api/weaknesses", h.Weaknesses.List)
+		r.Get("/api/weaknesses/class-summary", h.Weaknesses.ClassSummary)
 		r.Get("/api/weaknesses/{id}", h.Weaknesses.Get)
 		r.Post("/api/weaknesses/record", h.Weaknesses.RecordError)
 		r.Post("/api/weaknesses/{id}/improve", h.Weaknesses.Improve)
@@ -324,6 +339,16 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 				Patch("/api/grade-levels/{id}", h.GradeLevels.Update)
 			r.With(middleware.RequirePermission(permissions.ResGradeLevels, permissions.ActManage)).
 				Delete("/api/grade-levels/{id}", h.GradeLevels.Delete)
+
+			// Settings — Classes
+			r.Get("/api/classes", h.Classes.List)
+			r.Get("/api/classes/{id}", h.Classes.Get)
+			r.With(middleware.RequirePermission(permissions.ResClasses, permissions.ActManage)).
+				Post("/api/classes", h.Classes.Create)
+			r.With(middleware.RequirePermission(permissions.ResClasses, permissions.ActManage)).
+				Patch("/api/classes/{id}", h.Classes.Update)
+			r.With(middleware.RequirePermission(permissions.ResClasses, permissions.ActManage)).
+				Delete("/api/classes/{id}", h.Classes.Delete)
 
 			// Teacher dashboard
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type Service struct {
@@ -22,7 +23,7 @@ func NewService(apiURL, apiKey, model string) *Service {
 		apiURL: strings.TrimSuffix(apiURL, "/"),
 		apiKey: apiKey,
 		model:  model,
-		client: &http.Client{},
+		client: &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
@@ -151,6 +152,11 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		errBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
+	}
+
 	var result struct {
 		Choices []struct {
 			Message struct {
@@ -206,6 +212,24 @@ Chỉ trả về JSON, không giải thích thêm.`, count, lessonTitle, truncat
 
 	return s.Chat([]ChatMessage{
 		{Role: "system", Content: "Bạn là người tạo đề thi. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+}
+
+// GenerateAssignment generates assignment questions from lesson content.
+func (s *Service) GenerateAssignment(lessonTitle, subjectName, lessonContent string, questionCount int, questionType string, gradeLevel int) (string, error) {
+	prompt := BuildGenerateAssignmentPrompt(lessonTitle, subjectName, lessonContent, questionCount, questionType, gradeLevel)
+	return s.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tạo đề. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+}
+
+// ExtractQuestions extracts individual questions from document text.
+func (s *Service) ExtractQuestions(text string) (string, error) {
+	prompt := BuildExtractQuestionsPrompt(text)
+	return s.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tách câu hỏi. Chỉ trả về JSON, không giải thích thêm."},
 		{Role: "user", Content: prompt},
 	})
 }

@@ -180,6 +180,91 @@ Nội dung bài học:
 Trả về JSON (chỉ JSON, không thêm text khác).`, fmt.Sprintf(lessonSummaryPrompt, gradeLevel), subjectName, lessonTitle, gradeLevel, content)
 }
 
+// ---- Extract Questions from Document ----
+
+const extractQuestionsPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ của bạn là đọc văn bản được trích xuất từ file Word và tách thành các câu hỏi riêng biệt.
+
+**Yêu cầu:**
+1. Xác định từng câu hỏi trong văn bản (có thể được đánh số 1, 2, 3 hoặc Câu 1, Câu 2, v.v.)
+2. Với mỗi câu hỏi, trả về nội dung đầy đủ của câu hỏi đó
+3. Giữ nguyên công thức toán học trong định dạng $...$ (VD: $x^2 + y^2 = 1$, $\frac{a}{b}$)
+4. Nếu văn bản không chứa câu hỏi rõ ràng, hãy cố gắng chia thành các phần/bài tập nhỏ
+5. Số lượng câu hỏi: tối thiểu 1, tối đa 20
+
+**Định dạng Output (MẢNG JSON):**
+[
+  {
+    "question": "Nội dung đầy đủ của câu hỏi 1"
+  },
+  {
+    "question": "Nội dung đầy đủ của câu hỏi 2"
+  }
+]
+
+CHỈ trả về mảng JSON, không thêm text hay markdown.`
+
+func BuildExtractQuestionsPrompt(docxText string) string {
+	text := docxText
+	if len(text) > 8000 {
+		text = text[:8000] + "..."
+	}
+	return fmt.Sprintf(`%s
+
+**Văn bản trích xuất từ file:**
+---
+%s
+---
+
+Hãy tách các câu hỏi từ văn bản trên và trả về mảng JSON.`, extractQuestionsPrompt, text)
+}
+
+// ---- Generate Assignment from Lesson ----
+
+const generateAssignmentPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ của bạn là tạo một đề bài tập từ nội dung bài học có sẵn.
+
+**Yêu cầu:**
+1. Tạo đúng %d câu hỏi dựa trên nội dung bài học được cung cấp
+2. Loại câu hỏi: %s
+3. Câu hỏi phải bám sát nội dung bài học, kiểm tra mức độ hiểu bài
+4. Mỗi câu hỏi cần có đáp án mong đợi (expectedAnswer) — ngắn gọn, chính xác
+5. Với câu trắc nghiệm: câu hỏi + 4 đáp án A/B/C/D trong nội dung question, expectedAnswer là đáp án đúng (VD: "B")
+6. Với câu tự luận: câu hỏi mở, expectedAnswer là các ý chính cần có
+7. Dùng $...$ cho công thức toán học (VD: $x^2 + y^2 = 1$, $\frac{a}{b}$)
+8. Độ khó phù hợp với khối lớp %d
+
+**Định dạng Output (MẢNG JSON):**
+[
+  {
+    "question": "Nội dung đầy đủ câu hỏi (nếu trắc nghiệm thì bao gồm cả 4 đáp án A/B/C/D)",
+    "expectedAnswer": "Đáp án mong đợi",
+    "score": 10
+  }
+]
+
+CHỈ trả về mảng JSON, không thêm text hay markdown.`
+
+func BuildGenerateAssignmentPrompt(lessonTitle, subjectName, lessonContent string, questionCount int, questionType string, gradeLevel int) string {
+	content := lessonContent
+	if len(content) > 3000 {
+		content = content[:3000] + "..."
+	}
+	if content == "" {
+		content = "Chưa có nội dung bài học"
+	}
+	return fmt.Sprintf(generateAssignmentPrompt, questionCount, questionType, gradeLevel) + fmt.Sprintf(`
+
+**Ngữ cảnh:**
+- Môn: %s
+- Bài học: %s
+- Khối lớp: %d
+- Nội dung bài học:
+---
+%s
+---
+
+Hãy tạo %d câu hỏi và trả về mảng JSON.`, subjectName, lessonTitle, gradeLevel, content, questionCount)
+}
+
 // ---- Assignment Pre-Grade ----
 
 const assignmentPreGradePrompt = `Bạn là giáo viên AI tại LMS, đang chấm sơ bộ bài tập được nộp bởi học sinh.

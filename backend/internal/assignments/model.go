@@ -25,6 +25,7 @@ type Assignment struct {
 	Rubric           string    `gorm:"type:text" json:"rubric"`
 	DueDate          time.Time `json:"dueDate"`
 	AttachmentURL    string    `gorm:"size:1000" json:"attachmentUrl"`
+	Questions        string    `gorm:"type:text" json:"questions"`
 	Status           string    `gorm:"size:20;default:ASSIGNED" json:"status"`
 	Source           string    `gorm:"size:20;default:teacher" json:"source"`
 	AllowResubmit    bool      `gorm:"default:false" json:"allowResubmit"`

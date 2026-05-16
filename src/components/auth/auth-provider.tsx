@@ -6,6 +6,7 @@ import { api } from "@/lib/api-client";
 
 interface User {
   id: string;
+  supabaseId: string;
   fullName: string;
   role: string;
   classId?: string;
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch local user profile from backend after Supabase session is established
   const fetchLocalUser = useCallback(async (token?: string) => {
     try {
-      const u = await api<{ id: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
+      const u = await api<{ id: string; supabaseId: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
       setUser(u);
       if (token) setTokenCookie(token);
     } catch {
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(signInError.message);
       throw signInError;
     }
-    const me = await api<{ id: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
+    const me = await api<{ id: string; supabaseId: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
     setUser(me);
     return me;
   };

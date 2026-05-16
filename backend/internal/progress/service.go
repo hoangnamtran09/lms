@@ -60,11 +60,13 @@ func (s *Service) Leaderboard(ctx context.Context, period string) ([]Leaderboard
 	}
 
 	q := s.db.WithContext(ctx).
-		Table("study_sessions").
-		Select("user_id, SUM(duration_seconds) as total_seconds").
-		Group("user_id")
+		Table("study_sessions ss").
+		Select("ss.user_id, u.full_name as user_name, SUM(ss.duration_seconds) as total_seconds, COALESCE(d.total_diamonds, 0) as total_diamonds").
+		Joins("JOIN users u ON u.id = ss.user_id").
+		Joins("LEFT JOIN (SELECT user_id, SUM(amount) as total_diamonds FROM diamond_transactions GROUP BY user_id) d ON d.user_id = ss.user_id").
+		Group("ss.user_id, u.full_name")
 	if !since.IsZero() {
-		q = q.Where("started_at >= ?", since)
+		q = q.Where("ss.started_at >= ?", since)
 	}
 	if err := q.Order("total_seconds DESC").Limit(20).Find(&entries).Error; err != nil {
 		return nil, err

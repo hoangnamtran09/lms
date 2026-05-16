@@ -2,6 +2,7 @@ package weaknesses
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -90,6 +91,8 @@ func sourceWeightPriority(source string) int {
 		return 2
 	case "exercise":
 		return 1
+	case "chat":
+		return 1
 	case "progress":
 		return 0
 	}
@@ -156,10 +159,73 @@ func (s *Service) MarkImproved(ctx context.Context, id string) error {
 		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
 }
 
-func (s *Service) Resolve(ctx context.Context, id string) error {
-	now := time.Now()
-	return s.db.WithContext(ctx).Model(&WeaknessProfile{}).Where("id = ?", id).
-		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
+func (s *Service) Delete(ctx context.Context, id string) error {
+	return s.db.WithContext(ctx).Where("id = ?", id).Delete(&WeaknessProfile{}).Error
+}
+
+// ClassTopicSummary represents aggregated weakness data for a topic within a class.
+type ClassTopicSummary struct {
+	Topic        string   `json:"topic"`
+	TotalErrors  int      `json:"totalErrors"`
+	StudentCount int      `json:"studentCount"`
+	StudentIDs   []string `json:"studentIds"`
+}
+
+// ClassSummary returns unresolved weakness topics aggregated across a class, sorted by severity.
+func (s *Service) ClassSummary(ctx context.Context, classID string) ([]ClassTopicSummary, error) {
+	type row struct {
+		Topic        string
+		TotalErrors  int
+		StudentCount int
+		StudentIDs   string
+	}
+
+	var rows []row
+	err := s.db.WithContext(ctx).
+		Table("weakness_profiles w").
+		Select("w.topic, SUM(w.error_count) as total_errors, COUNT(DISTINCT w.user_id) as student_count, STRING_AGG(DISTINCT w.user_id, ',') as student_ids").
+		Joins("JOIN users u ON u.supabase_id = w.user_id AND u.class_id = ?", classID).
+		Where("w.resolved = false").
+		Group("w.topic").
+		Order("total_errors DESC").
+		Limit(10).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ClassTopicSummary, 0, len(rows))
+	for _, r := range rows {
+		studentIDs := strings.Split(r.StudentIDs, ",")
+		if len(studentIDs) == 1 && studentIDs[0] == "" {
+			studentIDs = nil
+		}
+		result = append(result, ClassTopicSummary{
+			Topic:        r.Topic,
+			TotalErrors:  r.TotalErrors,
+			StudentCount: int(r.StudentCount),
+			StudentIDs:   studentIDs,
+		})
+	}
+	return result, nil
+}
+
+// FindStudentIDsByClassAndTopic returns supabase IDs of students in a class who have an unresolved weakness for the given topic.
+func (s *Service) FindStudentIDsByClassAndTopic(ctx context.Context, classID, topic string) ([]string, error) {
+	var ids []string
+	err := s.db.WithContext(ctx).
+		Table("weakness_profiles w").
+		Select("DISTINCT w.user_id").
+		Joins("JOIN users u ON u.supabase_id = w.user_id AND u.class_id = ?", classID).
+		Where("w.topic = ? AND w.resolved = false", topic).
+		Pluck("w.user_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, nil
 }
 
 // FindByUserAndTopic returns the first weakness matching userID + topic (fuzzy match on topic prefix).

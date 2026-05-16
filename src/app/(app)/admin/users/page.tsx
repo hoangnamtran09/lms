@@ -38,6 +38,18 @@ interface UserRow {
   createdAt: string;
 }
 
+interface ClassItem {
+  id: string;
+  name: string;
+  gradeLevelId: string;
+  gradeLevelName?: string;
+}
+
+interface GradeLevel {
+  id: string;
+  name: string;
+}
+
 const roleOptions = [
   { value: "STUDENT", label: "Học sinh" },
   { value: "TEACHER", label: "Giáo viên" },
@@ -63,6 +75,10 @@ export default function AdminUsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+  const [classGradeFilter, setClassGradeFilter] = useState("");
+
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -82,11 +98,27 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    Promise.all([
+      api<ClassItem[]>("/api/classes"),
+      api<GradeLevel[]>("/api/grade-levels"),
+    ]).then(([cls, gl]) => {
+      setClasses(cls);
+      setGradeLevels(gl);
+    }).catch(() => {});
   }, [roleFilter]);
 
   useEffect(() => {
     if (users.length > 0) setLoading(false);
   }, [users]);
+
+  const filteredClasses = classGradeFilter
+    ? classes.filter((c) => c.gradeLevelId === classGradeFilter)
+    : classes;
+
+  const getClassName = (classId: string) => {
+    const c = classes.find((c) => c.id === classId);
+    return c ? `${c.name}${c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}` : classId;
+  };
 
   const handleCreate = async () => {
     setError("");
@@ -128,15 +160,15 @@ export default function AdminUsersPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-full rounded-lg" />
-        <Skeleton className="h-60 w-full rounded-lg" />
+        <Skeleton delay={0} className="h-8 w-48" />
+        <Skeleton delay={100} className="h-10 w-full rounded-lg" />
+        <Skeleton delay={200} className="h-60 w-full rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
@@ -208,12 +240,32 @@ export default function AdminUsersPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="classId">Mã lớp</Label>
-                <Input
-                  id="classId"
-                  value={form.classId}
-                  onChange={(e) => setForm({ ...form, classId: e.target.value })}
-                />
+                <Label>Khối lớp (lọc)</Label>
+                <Select value={classGradeFilter} onValueChange={(v) => { setClassGradeFilter(v || ""); setForm({ ...form, classId: "" }); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tất cả khối" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Tất cả khối</SelectItem>
+                    {gradeLevels.map((gl) => (
+                      <SelectItem key={gl.id} value={gl.id}>{gl.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="classId">Lớp học</Label>
+                <Select value={form.classId} onValueChange={(v) => setForm({ ...form, classId: v || "" })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn lớp (tuỳ chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">-- Chưa chọn --</SelectItem>
+                    {filteredClasses.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button onClick={handleCreate} disabled={saving} className="w-full">
@@ -289,7 +341,7 @@ export default function AdminUsersPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-gray-500">{u.classId || "—"}</TableCell>
+                    <TableCell className="text-gray-500 text-xs">{getClassName(u.classId) || "—"}</TableCell>
                     <TableCell>
                       <Button
                         variant="outline"

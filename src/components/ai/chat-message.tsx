@@ -13,19 +13,24 @@ interface QuizData {
   explanation: string;
 }
 
+function stripWeaknessMarkers(content: string): string {
+  return content.replace(/:::weakness topic="[^"]*"/g, "");
+}
+
 // Parse ::quiz markers and extract JSON blocks
 function parseQuizBlocks(
   content: string
 ): Array<{ type: "text" | "quiz"; content: string; quiz?: QuizData }> {
+  const cleaned = stripWeaknessMarkers(content);
   const parts: Array<{ type: "text" | "quiz"; content: string; quiz?: QuizData }> = [];
   const regex = /:::quiz\s*([\s\S]*?):::/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(content)) !== null) {
+  while ((match = regex.exec(cleaned)) !== null) {
     // Text before quiz
     if (match.index > lastIdx) {
-      parts.push({ type: "text", content: content.slice(lastIdx, match.index) });
+      parts.push({ type: "text", content: cleaned.slice(lastIdx, match.index) });
     }
     // Parse quiz JSON
     try {
@@ -39,8 +44,8 @@ function parseQuizBlocks(
   }
 
   // Remaining text
-  if (lastIdx < content.length) {
-    parts.push({ type: "text", content: content.slice(lastIdx) });
+  if (lastIdx < cleaned.length) {
+    parts.push({ type: "text", content: cleaned.slice(lastIdx) });
   }
 
   return parts;
@@ -52,6 +57,7 @@ export function ChatMessage({
   lessonId,
   hideQuizzes = false,
   onQuizDetected,
+  onQuizAnswered,
   isStreaming = false,
 }: {
   role: "user" | "assistant";
@@ -59,9 +65,26 @@ export function ChatMessage({
   lessonId: string;
   hideQuizzes?: boolean;
   onQuizDetected?: (quiz: QuizData) => void;
+  onQuizAnswered?: (result: { isCorrect: boolean; question: string }) => void;
   isStreaming?: boolean;
 }) {
   const reportedRef = useRef<Set<string>>(new Set());
+
+  const parts = parseQuizBlocks(content);
+
+  // Notify parent of new quizzes (in effect to avoid setState during render)
+  useEffect(() => {
+    if (!onQuizDetected) return;
+    for (const part of parts) {
+      if (part.type === "quiz" && part.quiz) {
+        const key = part.quiz.question;
+        if (!reportedRef.current.has(key)) {
+          reportedRef.current.add(key);
+          onQuizDetected(part.quiz);
+        }
+      }
+    }
+  }, [parts, onQuizDetected]);
 
   if (role === "user") {
     return (
@@ -85,22 +108,6 @@ export function ChatMessage({
     return null;
   }
 
-  const parts = parseQuizBlocks(content);
-
-  // Notify parent of new quizzes (in effect to avoid setState during render)
-  useEffect(() => {
-    if (!onQuizDetected) return;
-    for (const part of parts) {
-      if (part.type === "quiz" && part.quiz) {
-        const key = part.quiz.question;
-        if (!reportedRef.current.has(key)) {
-          reportedRef.current.add(key);
-          onQuizDetected(part.quiz);
-        }
-      }
-    }
-  }, [parts, onQuizDetected]);
-
   return (
     <div className="prose max-w-none">
       {parts.map((part, i) => {
@@ -112,7 +119,7 @@ export function ChatMessage({
               </div>
             );
           }
-          return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} />;
+          return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} onAnswered={(isCorrect) => onQuizAnswered?.({ isCorrect, question: part.quiz!.question })} />;
         }
         const isLastText = i === parts.length - 1 || (i === parts.length - 2 && parts[parts.length - 1].type === "quiz");
         return (

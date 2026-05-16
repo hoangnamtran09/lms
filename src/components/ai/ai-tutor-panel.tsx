@@ -8,6 +8,12 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { apiStream } from "@/lib/api-client";
 import ReactMarkdown from "react-markdown";
 
+const weaknessRe = /:::weakness topic="[^"]*"/g;
+
+function stripWeakness(content: string): string {
+  return content.replace(weaknessRe, "");
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -37,16 +43,16 @@ export function AITutorPanel({ open, onOpenChange, lessonId, lessonTitle }: AITu
 
     setInput("");
     setError(null);
-    const userMsg: Message = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
 
+    const history = messages.filter((m) => m.content !== "");
+    const userMsg: Message = { role: "user", content: text };
     const assistantMsg: Message = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, assistantMsg]);
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setStreaming(true);
 
     apiStream(
       "/api/ai/chat",
-      { message: text, lessonId: lessonId || "", sessionId: "" },
+      { message: text, lessonId: lessonId || "", sessionId: "", history },
       (delta) => {
         setMessages((prev) => {
           const next = [...prev];
@@ -112,7 +118,7 @@ export function AITutorPanel({ open, onOpenChange, lessonId, lessonTitle }: AITu
                 }`}
               >
                 {msg.role === "assistant" ? (
-                  <ReactMarkdown>{msg.content || (streaming && i === messages.length - 1 ? "..." : "")}</ReactMarkdown>
+                  <ReactMarkdown>{stripWeakness(msg.content) || (streaming && i === messages.length - 1 ? "..." : "")}</ReactMarkdown>
                 ) : (
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 )}

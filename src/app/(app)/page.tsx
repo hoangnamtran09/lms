@@ -108,17 +108,17 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-6 w-96" />
+        <Skeleton delay={0} className="h-12 w-64" />
+        <Skeleton delay={80} className="h-6 w-96" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} delay={100 + i * 100} className="h-32 rounded-2xl" />)}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
-          <Skeleton className="h-80 rounded-2xl" />
+          <Skeleton delay={500} className="h-80 rounded-2xl lg:col-span-2" />
+          <Skeleton delay={600} className="h-80 rounded-2xl" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} delay={700 + i * 80} className="h-36 rounded-2xl" />)}
         </div>
       </div>
     );
@@ -140,7 +140,7 @@ export default function DashboardPage() {
   const recentCourses = courses.slice(0, 3);
 
   return (
-    <div className="max-w-6xl">
+    <div className="animate-fade-in max-w-6xl">
       {/* Hero */}
       <div className="mb-8">
         <div className="flex flex-wrap items-center gap-3 mb-2">

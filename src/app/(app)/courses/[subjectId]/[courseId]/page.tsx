@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Course {
   id: string;
@@ -15,7 +16,6 @@ interface Lesson {
   id: string;
   title: string;
   description?: string;
-  durationMinutes?: number;
   mediaUrl?: string;
 }
 
@@ -36,6 +36,11 @@ export default function LessonListPage({
     ])
       .then(([c, l]) => {
         setCourse(c);
+        l.sort((a, b) => {
+          const na = parseInt((a.title.match(/\d+/) || [""])[0]) || 0;
+          const nb = parseInt((b.title.match(/\d+/) || [""])[0]) || 0;
+          return na - nb;
+        });
         setLessons(l);
       })
       .finally(() => setLoading(false));
@@ -43,11 +48,11 @@ export default function LessonListPage({
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded bg-gray-200" />
+      <div className="space-y-4">
+        <Skeleton delay={0} className="h-8 w-48" />
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-gray-100" />
+            <Skeleton key={i} delay={100 + i * 80} className="h-16 rounded-xl" />
           ))}
         </div>
       </div>
@@ -55,7 +60,7 @@ export default function LessonListPage({
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <Link href={`/courses/${subjectId}`} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-4">
         <ArrowLeft className="size-4" />
         Quay lại
@@ -69,7 +74,7 @@ export default function LessonListPage({
         </div>
       ) : (
         <div className="space-y-3">
-          {lessons.map((lesson, i) => (
+          {lessons.map((lesson) => (
             <Link
               key={lesson.id}
               href={`/courses/${subjectId}/${courseId}/${lesson.id}`}
@@ -80,17 +85,12 @@ export default function LessonListPage({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">
-                  {i + 1}. {lesson.title}
+                  {lesson.title}
                 </p>
                 {lesson.description && (
                   <p className="text-xs text-gray-500 line-clamp-1">{lesson.description}</p>
                 )}
               </div>
-              {lesson.durationMinutes && (
-                <span className="text-xs text-gray-400 shrink-0">
-                  {lesson.durationMinutes} phút
-                </span>
-              )}
             </Link>
           ))}
         </div>

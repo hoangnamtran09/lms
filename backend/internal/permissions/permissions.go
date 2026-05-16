@@ -13,6 +13,7 @@ const (
 	ResAchievements Resource = "achievements"
 	ResSettings     Resource = "settings"
 	ResGradeLevels  Resource = "grade_levels"
+	ResClasses      Resource = "classes"
 	ResAI           Resource = "ai"
 	ResChildren     Resource = "children"
 )
@@ -50,6 +51,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResAchievements: {ActManage},
 		ResSettings:     {ActManage},
 		ResGradeLevels:  {ActManage},
+		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
 	},
@@ -64,6 +66,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResAchievements: {ActManage},
 		ResSettings:     {ActRead},
 		ResGradeLevels:  {ActManage},
+		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
 	},

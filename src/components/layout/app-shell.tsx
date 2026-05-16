@@ -153,7 +153,7 @@ function LessonInfoSidebar({ lessonId }: { lessonId: string }) {
       <LessonInfoPanel
         lessonId={lessonId}
         activeQuiz={activeQuiz}
-        onQuizAnswered={(isCorrect) => handleQuizAnswered(isCorrect)}
+        onQuizAnswered={(result) => handleQuizAnswered(result)}
       />
     </aside>
   );

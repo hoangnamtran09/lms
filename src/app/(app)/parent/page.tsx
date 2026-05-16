@@ -40,14 +40,14 @@ export default function ParentDashboardPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        {[1, 2].map(i => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}
+        <Skeleton delay={0} className="h-8 w-48" />
+        {[1, 2].map(i => <Skeleton key={i} delay={i * 120} className="h-40 w-full rounded-lg" />)}
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Bảng điều khiển Phụ huynh</h1>
       <p className="text-sm text-gray-500 mb-6">Theo dõi tiến độ học tập của con</p>
 

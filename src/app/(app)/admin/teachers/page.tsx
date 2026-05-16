@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -22,6 +23,18 @@ interface TeacherRow {
   email: string;
   classId: string;
   createdAt: string;
+}
+
+interface ClassItem {
+  id: string;
+  name: string;
+  gradeLevelId: string;
+  gradeLevelName?: string;
+}
+
+interface GradeLevel {
+  id: string;
+  name: string;
 }
 
 export default function AdminTeachersPage() {
@@ -48,6 +61,11 @@ export default function AdminTeachersPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+  const [editGradeFilter, setEditGradeFilter] = useState("");
+  const [createGradeFilter, setCreateGradeFilter] = useState("");
+
   const fetchTeachers = () => {
     api<TeacherRow[]>("/api/users?role=TEACHER")
       .then(setTeachers)
@@ -55,7 +73,24 @@ export default function AdminTeachersPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchTeachers(); }, []);
+  useEffect(() => {
+    fetchTeachers();
+    Promise.all([
+      api<ClassItem[]>("/api/classes"),
+      api<GradeLevel[]>("/api/grade-levels"),
+    ]).then(([cls, gl]) => {
+      setClasses(cls);
+      setGradeLevels(gl);
+    }).catch(() => {});
+  }, []);
+
+  const filteredClasses = (gradeFilter: string) =>
+    gradeFilter ? classes.filter((c) => c.gradeLevelId === gradeFilter) : classes;
+
+  const getClassName = (classId: string) => {
+    const c = classes.find((c) => c.id === classId);
+    return c ? `${c.name}${c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}` : classId;
+  };
 
   const startEdit = (t: TeacherRow) => {
     setEditingId(t.id);
@@ -63,6 +98,8 @@ export default function AdminTeachersPage() {
     setEditUsername(t.username);
     setEditEmail(t.email || "");
     setEditClassId(t.classId || "");
+    const cls = classes.find((c) => c.id === t.classId);
+    setEditGradeFilter(cls?.gradeLevelId || "");
     setEditError(null);
   };
 
@@ -143,14 +180,14 @@ export default function AdminTeachersPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-60 w-full rounded-lg" />
+        <Skeleton delay={0} className="h-8 w-48" />
+        <Skeleton delay={120} className="h-60 w-full rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
@@ -224,13 +261,32 @@ export default function AdminTeachersPage() {
                   />
                 </div>
                 <div>
+                  <Label>Khối lớp (lọc)</Label>
+                  <Select value={createGradeFilter} onValueChange={(v) => { setCreateGradeFilter(v || ""); setNewClassId(""); }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tất cả khối" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Tất cả khối</SelectItem>
+                      {gradeLevels.map((gl) => (
+                        <SelectItem key={gl.id} value={gl.id}>{gl.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label htmlFor="new-class">Lớp phụ trách (tuỳ chọn)</Label>
-                  <Input
-                    id="new-class"
-                    value={newClassId}
-                    onChange={(e) => setNewClassId(e.target.value)}
-                    placeholder="ID của lớp"
-                  />
+                  <Select value={newClassId} onValueChange={(v) => setNewClassId(v || "")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn lớp" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">-- Chưa chọn --</SelectItem>
+                      {filteredClasses(createGradeFilter).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button onClick={handleCreate} disabled={creating} className="gap-2">
@@ -307,13 +363,19 @@ export default function AdminTeachersPage() {
                       </TableCell>
                       <TableCell>
                         {isEditing ? (
-                          <Input
-                            value={editClassId}
-                            onChange={(e) => setEditClassId(e.target.value)}
-                            placeholder="ID lớp"
-                          />
+                          <Select value={editClassId} onValueChange={(v) => setEditClassId(v || "")}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Chọn lớp" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">-- Chưa chọn --</SelectItem>
+                              {filteredClasses(editGradeFilter).map((c) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
-                          <Badge variant="outline" className="text-xs">{t.classId || "—"}</Badge>
+                          <Badge variant="outline" className="text-xs">{getClassName(t.classId) || "—"}</Badge>
                         )}
                       </TableCell>
                       <TableCell>

@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, FileVideo } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Subject {
   id: string;
@@ -21,9 +22,7 @@ interface Lesson {
   courseId: string;
   title: string;
   description?: string;
-  durationMinutes?: number;
   mediaUrl?: string;
-  sortOrder?: number;
 }
 
 export default function LessonListPage({ params }: { params: Promise<{ subjectId: string }> }) {
@@ -42,18 +41,22 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
         const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
         allLessons.push(...l);
       }
-      allLessons.sort((a, b) => a.sortOrder !== undefined && b.sortOrder !== undefined ? a.sortOrder - b.sortOrder : 0);
+      allLessons.sort((a, b) => {
+        const na = parseInt((a.title.match(/\d+/) || [""])[0]) || 0;
+        const nb = parseInt((b.title.match(/\d+/) || [""])[0]) || 0;
+        return na - nb;
+      });
       setLessons(allLessons);
     })().finally(() => setLoading(false));
   }, [subjectId]);
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded bg-gray-200" />
+      <div className="space-y-4">
+        <Skeleton delay={0} className="h-8 w-48" />
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-gray-100" />
+            <Skeleton key={i} delay={100 + i * 80} className="h-16 rounded-xl" />
           ))}
         </div>
       </div>
@@ -61,7 +64,7 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <Link href="/courses" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-4">
         <ArrowLeft className="size-4" />
         Tất cả môn học
@@ -75,7 +78,7 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
         </div>
       ) : (
         <div className="space-y-3">
-          {lessons.map((lesson, i) => (
+          {lessons.map((lesson) => (
             <Link
               key={lesson.id}
               href={`/courses/${subjectId}/${lesson.courseId}/${lesson.id}`}
@@ -90,17 +93,12 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">
-                  {i + 1}. {lesson.title}
+                  {lesson.title}
                 </p>
                 {lesson.description && (
                   <p className="text-xs text-gray-500 line-clamp-1">{lesson.description}</p>
                 )}
               </div>
-              {lesson.durationMinutes ? (
-                <span className="text-xs text-gray-400 shrink-0">
-                  {lesson.durationMinutes} phút
-                </span>
-              ) : null}
             </Link>
           ))}
         </div>

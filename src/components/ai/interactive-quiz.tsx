@@ -55,7 +55,7 @@ export function InteractiveQuiz({
       if (res.diamondsEarned) setDiamonds(res.diamondsEarned);
       if (res.weaknessRecorded) {
         toast.warning("Điểm yếu đã được ghi nhận", {
-          description: `Bạn cần ôn tập thêm chủ đề này (trọng số: ${res.weaknessWeight})`,
+          description: `Bạn cần ôn tập thêm chủ đề này${res.weaknessWeight != null ? ` (trọng số: ${res.weaknessWeight})` : ""}`,
           position: "top-right",
         });
       }

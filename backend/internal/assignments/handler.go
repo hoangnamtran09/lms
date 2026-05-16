@@ -238,6 +238,127 @@ func (h *Handler) AutoGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if assignment has per-question structure
+	type Question struct {
+		ID             string `json:"id"`
+		Question       string `json:"question"`
+		ExpectedAnswer string `json:"expectedAnswer"`
+		Score          int    `json:"score"`
+	}
+	var questions []Question
+	hasQuestions := false
+	if assignment.Questions != "" {
+		if err := json.Unmarshal([]byte(assignment.Questions), &questions); err == nil && len(questions) > 0 {
+			hasQuestions = true
+		}
+	}
+
+	if hasQuestions {
+		// Parse student answers from submission content
+		type Answer struct {
+			QuestionID string `json:"questionId"`
+			Answer     string `json:"answer"`
+		}
+		type AnswerWrapper struct {
+			Answers []Answer `json:"answers"`
+		}
+		var answerWrapper AnswerWrapper
+		if err := json.Unmarshal([]byte(sub.Content), &answerWrapper); err != nil {
+			jsonErr(w, "Không thể đọc câu trả lời của học sinh", http.StatusBadRequest)
+			return
+		}
+
+		answerMap := make(map[string]string)
+		for _, a := range answerWrapper.Answers {
+			answerMap[a.QuestionID] = a.Answer
+		}
+
+		// Grade each question
+		type QuestionResult struct {
+			QuestionID string `json:"questionId"`
+			Question   string `json:"question"`
+			Score      int    `json:"score"`
+			MaxScore   int    `json:"maxScore"`
+			Feedback   string `json:"feedback"`
+		}
+
+		var detailResults []QuestionResult
+		totalScore := 0
+		totalMaxScore := 0
+
+		for _, q := range questions {
+			studentAns := answerMap[q.ID]
+			qMaxScore := q.Score
+			if qMaxScore <= 0 {
+				qMaxScore = 10
+			}
+			totalMaxScore += qMaxScore
+
+			expectedInfo := ""
+			if q.ExpectedAnswer != "" {
+				expectedInfo = fmt.Sprintf("\nĐáp án mong đợi: %s", q.ExpectedAnswer)
+			}
+
+			result, err := h.aiService.GradeSubmission(ai.GradingRequest{
+				Question:      q.Question + expectedInfo,
+				StudentAnswer: studentAns,
+				Rubric:        assignment.Rubric,
+				MaxScore:      qMaxScore,
+			})
+			if err != nil {
+				detailResults = append(detailResults, QuestionResult{
+					QuestionID: q.ID,
+					Question:   q.Question,
+					Score:      0,
+					MaxScore:   qMaxScore,
+					Feedback:   "Lỗi chấm: " + err.Error(),
+				})
+				continue
+			}
+			totalScore += result.Score
+			detailResults = append(detailResults, QuestionResult{
+				QuestionID: q.ID,
+				Question:   q.Question,
+				Score:      result.Score,
+				MaxScore:   qMaxScore,
+				Feedback:   result.Feedback,
+			})
+		}
+
+		// Cap total score at assignment maxScore (or totalMaxScore)
+		if totalScore > assignment.MaxScore && assignment.MaxScore > 0 {
+			totalScore = assignment.MaxScore
+		}
+		if totalScore > totalMaxScore {
+			totalScore = totalMaxScore
+		}
+
+		detailJSON, _ := json.Marshal(detailResults)
+		summaryFeedback := fmt.Sprintf("Tổng điểm: %d/%d (AI chấm từng câu)", totalScore, totalMaxScore)
+
+		if err := h.service.GradeSubmission(r.Context(), subID, totalScore, summaryFeedback+"\n"+string(detailJSON), "AI"); err != nil {
+			jsonErr(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		go h.service.LogAudit(r.Context(), &AuditLog{
+			ID:           uuid.New().String(),
+			SubmissionID: subID,
+			UserID:       claims.UserID,
+			UserName:     claims.UserName,
+			Action:       "AUTO_GRADE",
+			Detail:       fmt.Sprintf("AI chấm từng câu: %d/%d", totalScore, totalMaxScore),
+		})
+		jsonOk(w, map[string]interface{}{
+			"score":    totalScore,
+			"feedback": summaryFeedback,
+			"details":  detailResults,
+			"status":   "graded",
+		})
+		return
+	}
+
+	// Fallback: single-question grading (original behaviour)
 	result, err := h.aiService.GradeSubmission(ai.GradingRequest{
 		Question:      assignment.Description,
 		StudentAnswer: sub.Content,

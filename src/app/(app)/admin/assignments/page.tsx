@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Trash2, Plus, ChevronDown, ChevronUp, ClipboardList, FileText, Users } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Plus, ChevronDown, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain } from "lucide-react";
 import { api, ApiError, uploadFile } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -33,23 +36,89 @@ interface StudentBrief {
   username: string;
 }
 
+interface GeneratedQuestion {
+  id: string;
+  question: string;
+  expectedAnswer?: string;
+  score?: number;
+  type?: string;
+  options?: { text: string; isCorrect: boolean }[];
+  explanation?: string;
+}
+
+interface Subject {
+  id: string;
+  name: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  subjectId: string;
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  courseId: string;
+  sortOrder: number;
+}
+
+interface ClassItem {
+  id: string;
+  name: string;
+}
+
+interface WeaknessTopic {
+  topic: string;
+  totalErrors: number;
+  studentCount: number;
+  studentIds: string[];
+}
+
+type CreationMode = "lesson" | "weakness" | "manual";
+
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Create form state
+  // Create form
   const [showForm, setShowForm] = useState(false);
+  const [creationMode, setCreationMode] = useState<CreationMode>("lesson");
+  const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Manual mode
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rubric, setRubric] = useState("");
-  const [maxScore, setMaxScore] = useState(10);
+  const [maxScore, setMaxScore] = useState(100);
   const [classId, setClassId] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [students, setStudents] = useState<StudentBrief[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  // Lesson mode
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [selectedLessonId, setSelectedLessonId] = useState("");
+  const [questionType, setQuestionType] = useState("mixed");
+  const [questionCount, setQuestionCount] = useState(5);
+
+  // Weakness mode
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [topics, setTopics] = useState<WeaknessTopic[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<WeaknessTopic | null>(null);
+
+  // Generated questions (shared across AI modes)
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generatedTitle, setGeneratedTitle] = useState("");
 
   const fetchAssignments = () => {
     api<AssignmentRow[]>("/api/assignments")
@@ -65,8 +134,118 @@ export default function AdminAssignmentsPage() {
       .catch(() => {});
   }, []);
 
+  // Fetch subjects on mount
+  useEffect(() => {
+    api<Subject[]>("/api/subjects")
+      .then((data) => setSubjects(data || []))
+      .catch(() => {});
+  }, []);
+
+  // Fetch classes on mount
+  useEffect(() => {
+    api<ClassItem[]>("/api/classes")
+      .then((data) => setClasses(data || []))
+      .catch(() => {});
+  }, []);
+
+  // Fetch lessons for all courses under selected subject
+  useEffect(() => {
+    if (!selectedSubjectId) { setLessons([]); setSelectedLessonId(""); return; }
+    setSelectedLessonId("");
+    // Get courses for this subject, then fetch all lessons
+    api<Course[]>(`/api/courses?subjectId=${selectedSubjectId}`)
+      .then((data) => {
+        const courseList = data || [];
+        if (courseList.length === 0) { setLessons([]); return; }
+        Promise.all(
+          courseList.map((c) => api<Lesson[]>(`/api/lessons?courseId=${c.id}`).then((l) => l || []))
+        ).then((results) => {
+          const all = results.flat();
+          all.sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+          setLessons(all);
+        }).catch(() => setLessons([]));
+      })
+      .catch(() => setLessons([]));
+  }, [selectedSubjectId]);
+
+  // Fetch weakness topics when class changes
+  useEffect(() => {
+    if (!selectedClassId) { setTopics([]); return; }
+    setLoadingTopics(true);
+    setSelectedTopic(null);
+    api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${selectedClassId}`)
+      .then((data) => setTopics(data || []))
+      .catch(() => setTopics([]))
+      .finally(() => setLoadingTopics(false));
+  }, [selectedClassId]);
+
+  // ---- Generate from lesson ----
+  const handleGenerateFromLesson = async () => {
+    if (!selectedLessonId) {
+      setGenerateError("Vui lòng chọn bài học");
+      return;
+    }
+    setGeneratingQuestions(true);
+    setGenerateError(null);
+    try {
+      const result = await api<{
+        questions: GeneratedQuestion[];
+        lessonTitle: string;
+        subjectName: string;
+      }>("/api/ai/generate-assignment", {
+        method: "POST",
+        body: JSON.stringify({ lessonId: selectedLessonId, questionCount, questionType }),
+      });
+      setGeneratedQuestions(result.questions || []);
+      setGeneratedTitle(`Bài tập: ${result.lessonTitle || "Bài học"}`);
+    } catch (e: unknown) {
+      setGenerateError(e instanceof Error ? e.message : "Lỗi tạo câu hỏi");
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
+  // ---- Generate remediation ----
+  const handleGenerateRemediation = async () => {
+    if (!selectedTopic) {
+      setGenerateError("Vui lòng chọn chủ đề điểm yếu");
+      return;
+    }
+    setGeneratingQuestions(true);
+    setGenerateError(null);
+    try {
+      const result = await api<{
+        assignmentId: string;
+        title: string;
+        questions: GeneratedQuestion[];
+        assignedStudentCount: number;
+      }>("/api/ai/generate-remediation-assignment", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: selectedClassId,
+          topic: selectedTopic.topic,
+        }),
+      });
+      setGeneratedQuestions(result.questions || []);
+      setGeneratedTitle(result.title || `Khắc phục: ${selectedTopic.topic}`);
+      // Store assignment ID so we don't create a duplicate
+      sessionStorage.setItem("lastRemediationAssignmentId", result.assignmentId);
+      setCreateError(null);
+      alert(`Đã tạo bài tập và gán cho ${result.assignedStudentCount} học sinh.`);
+      fetchAssignments();
+      // Reset form
+      setShowForm(false);
+      resetForm();
+    } catch (e: unknown) {
+      setGenerateError(e instanceof Error ? e.message : "Lỗi tạo bài tập khắc phục");
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
+  // ---- Create manual assignment or save generated questions ----
   const handleCreate = async () => {
-    if (!title.trim()) {
+    if (!title.trim() && generatedQuestions.length === 0) {
       setCreateError("Vui lòng nhập tiêu đề bài tập");
       return;
     }
@@ -78,28 +257,28 @@ export default function AdminAssignmentsPage() {
         const uploadResult = await uploadFile("/api/assignments/upload", selectedFile);
         attachmentUrl = uploadResult.url;
       }
+      const totalScore = generatedQuestions.length > 0
+        ? generatedQuestions.reduce((s, q) => s + (q.score || 10), 0)
+        : maxScore;
+
       const body: Record<string, unknown> = {
-        title: title.trim(),
+        title: title.trim() || generatedTitle || "Bài tập mới",
         description: description.trim(),
         rubric: rubric.trim(),
-        maxScore,
+        maxScore: totalScore,
         classId: classId.trim(),
         attachmentUrl,
         studentIds: selectedStudentIds.length > 0 ? JSON.stringify(selectedStudentIds) : "",
       };
+      if (generatedQuestions.length > 0) {
+        body.questions = JSON.stringify(generatedQuestions);
+      }
       if (dueDate) body.dueDate = new Date(dueDate).toISOString();
       await api("/api/assignments", {
         method: "POST",
         body: JSON.stringify(body),
       });
-      setTitle("");
-      setDescription("");
-      setRubric("");
-      setMaxScore(100);
-      setClassId("");
-      setDueDate("");
-      setSelectedFile(null);
-      setSelectedStudentIds([]);
+      resetForm();
       setShowForm(false);
       fetchAssignments();
     } catch (e: unknown) {
@@ -107,6 +286,25 @@ export default function AdminAssignmentsPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setRubric("");
+    setMaxScore(100);
+    setClassId("");
+    setDueDate("");
+    setSelectedFile(null);
+    setSelectedStudentIds([]);
+    setGeneratedQuestions([]);
+    setGeneratedTitle("");
+    setGenerateError(null);
+    setSelectedSubjectId("");
+    setSelectedLessonId("");
+    setSelectedClassId("");
+    setSelectedTopic(null);
+    setTopics([]);
   };
 
   const handleDelete = async (id: string) => {
@@ -119,21 +317,33 @@ export default function AdminAssignmentsPage() {
     }
   };
 
+  const updateQuestion = (index: number, field: keyof GeneratedQuestion, value: string | number) => {
+    setGeneratedQuestions((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const removeQuestion = (index: number) => {
+    setGeneratedQuestions((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const totalSubmissions = assignments.reduce((sum, a) => sum + a.submissionCount, 0);
   const pendingCount = assignments.filter((a) => a.submissionCount > 0).length;
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-40" />
-        <Skeleton className="h-60 w-full rounded-lg" />
+        <Skeleton delay={0} className="h-8 w-48" />
+        <Skeleton delay={100} className="h-10 w-40" />
+        <Skeleton delay={200} className="h-60 w-full rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl">
+    <div className="animate-fade-in max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -146,7 +356,7 @@ export default function AdminAssignmentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Quản lý Bài tập</h1>
           <p className="text-sm text-gray-500 mt-1">{assignments.length} bài tập · {totalSubmissions} bài nộp</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+        <Button onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }} className="gap-2">
           {showForm ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
           {showForm ? "Thu gọn" : "Tạo bài tập"}
         </Button>
@@ -167,132 +377,474 @@ export default function AdminAssignmentsPage() {
               <div className="mb-4 p-3 bg-red-50 rounded-lg text-sm text-red-600">{createError}</div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Mode tabs */}
+            <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+              {([
+                { key: "lesson", label: "Từ bài học", icon: BookOpen },
+                { key: "weakness", label: "Khắc phục điểm yếu", icon: Brain },
+                { key: "manual", label: "Thủ công", icon: FileText },
+              ] as const).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setCreationMode(key as CreationMode);
+                    setGenerateError(null);
+                    setGeneratedQuestions([]);
+                    setGeneratedTitle("");
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    creationMode === key
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* === MODE: Từ bài học === */}
+            {creationMode === "lesson" && (
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Tiêu đề</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Nhập tiêu đề bài tập"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="desc">Mô tả / Câu hỏi</Label>
-                  <Textarea
-                    id="desc"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Nhập nội dung câu hỏi hoặc yêu cầu bài tập"
-                    rows={5}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="rubric">Tiêu chí chấm điểm</Label>
-                  <Textarea
-                    id="rubric"
-                    value={rubric}
-                    onChange={(e) => setRubric(e.target.value)}
-                    placeholder="VD: Trả lời đúng ý chính: 50%, Lập luận rõ ràng: 30%, Trình bày: 20%"
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <div className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Chọn bài học, AI sẽ tự động tạo câu hỏi từ nội dung bài học.
+                </p>
+
+                {/* Cascading dropdowns */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="score">Điểm tối đa</Label>
+                    <Label className="text-xs text-gray-500 mb-1 block">Môn học</Label>
+                    <Select value={selectedSubjectId} onValueChange={(v) => setSelectedSubjectId(v ?? "")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn môn..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">Bài học</Label>
+                    <Select value={selectedLessonId} onValueChange={(v) => setSelectedLessonId(v ?? "")} disabled={!selectedSubjectId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={selectedSubjectId ? "Chọn bài học..." : "Chọn môn trước"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lessons.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Question config */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">Loại câu hỏi</Label>
+                    <Select value={questionType} onValueChange={(v) => setQuestionType(v ?? "mixed")}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mixed">Hỗn hợp</SelectItem>
+                        <SelectItem value="mcq">Trắc nghiệm</SelectItem>
+                        <SelectItem value="open_ended">Tự luận</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">Số câu hỏi</Label>
+                    <Select value={String(questionCount)} onValueChange={(v) => setQuestionCount(Number(v))}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[5, 10, 15, 20].map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n} câu</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      onClick={handleGenerateFromLesson}
+                      disabled={!selectedLessonId || generatingQuestions}
+                      className="gap-2 w-full"
+                    >
+                      {generatingQuestions ? (
+                        <><Loader2 className="size-4 animate-spin" /> Đang tạo...</>
+                      ) : (
+                        <><Sparkles className="size-4" /> Tạo bằng AI</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {generateError && (
+                  <div className="p-3 bg-red-50 rounded-lg text-sm text-red-600">{generateError}</div>
+                )}
+
+                {/* Generated questions preview */}
+                {generatedQuestions.length > 0 && (
+                  <QuestionPreview
+                    questions={generatedQuestions}
+                    updateQuestion={updateQuestion}
+                    removeQuestion={removeQuestion}
+                    title={generatedTitle}
+                    onTitleChange={setGeneratedTitle}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* === MODE: Khắc phục điểm yếu === */}
+            {creationMode === "weakness" && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Chọn lớp, xem các chủ đề học sinh đang yếu, sau đó AI sẽ tạo bài tập khắc phục và tự động gán cho học sinh.
+                </p>
+
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Chọn lớp</Label>
+                  <Select value={selectedClassId} onValueChange={(v) => setSelectedClassId(v ?? "")}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Chọn lớp..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Weakness topics */}
+                {selectedClassId && (
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-2 block">
+                      Chủ đề điểm yếu ({topics.length})
+                    </Label>
+                    {loadingTopics ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                        <Loader2 className="size-4 animate-spin" />
+                        Đang tải dữ liệu điểm yếu...
+                      </div>
+                    ) : topics.length === 0 ? (
+                      <div className="p-6 text-center bg-gray-50 rounded-lg">
+                        <Brain className="size-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Lớp này không có điểm yếu nào</p>
+                        <p className="text-xs text-gray-400 mt-1">Tất cả học sinh đều đang học tốt</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Chủ đề</TableHead>
+                            <TableHead className="text-center">Số HS yếu</TableHead>
+                            <TableHead className="text-center">Tổng lỗi</TableHead>
+                            <TableHead className="w-24"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {topics.map((t) => (
+                            <TableRow key={t.topic} className={selectedTopic?.topic === t.topic ? "bg-blue-50" : ""}>
+                              <TableCell className="font-medium">{t.topic}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="outline" className="text-xs">{t.studentCount}</Badge>
+                              </TableCell>
+                              <TableCell className="text-center text-red-500 font-medium">{t.totalErrors}</TableCell>
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant={selectedTopic?.topic === t.topic ? "default" : "outline"}
+                                  onClick={() => setSelectedTopic(t)}
+                                >
+                                  Chọn
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                )}
+
+                {selectedTopic && (
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <p className="text-sm">
+                      <span className="font-medium">Chủ đề đã chọn:</span>{" "}
+                      <Badge variant="default" className="ml-1">{selectedTopic.topic}</Badge>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {selectedTopic.studentCount} học sinh · {selectedTopic.totalErrors} lỗi
+                    </p>
+                    <Button
+                      onClick={handleGenerateRemediation}
+                      disabled={generatingQuestions}
+                      className="gap-2 mt-3"
+                    >
+                      {generatingQuestions ? (
+                        <><Loader2 className="size-4 animate-spin" /> Đang tạo...</>
+                      ) : (
+                        <><Sparkles className="size-4" /> Tạo bài tập khắc phục & gán tự động</>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {generateError && (
+                  <div className="p-3 bg-red-50 rounded-lg text-sm text-red-600">{generateError}</div>
+                )}
+              </div>
+            )}
+
+            {/* === MODE: Thủ công === */}
+            {creationMode === "manual" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">Tiêu đề</Label>
                     <Input
-                      id="score"
-                      type="number"
-                      value={maxScore}
-                      onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
-                      min={1}
-                      max={10}
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Nhập tiêu đề bài tập"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="class">Lớp (tuỳ chọn)</Label>
-                    <Input
-                      id="class"
-                      value={classId}
-                      onChange={(e) => setClassId(e.target.value)}
-                      placeholder="ID của lớp"
+                    <Label htmlFor="desc">Mô tả / Câu hỏi</Label>
+                    <Textarea
+                      id="desc"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Nhập nội dung câu hỏi hoặc yêu cầu bài tập"
+                      rows={5}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="rubric">Tiêu chí chấm điểm</Label>
+                    <Textarea
+                      id="rubric"
+                      value={rubric}
+                      onChange={(e) => setRubric(e.target.value)}
+                      placeholder="VD: Trả lời đúng ý chính: 50%, Lập luận rõ ràng: 30%, Trình bày: 20%"
+                      rows={3}
                     />
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="due">Hạn nộp (tuỳ chọn)</Label>
-                  <Input
-                    id="due"
-                    type="datetime-local"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="file">Tệp PDF đính kèm (tuỳ chọn)</Label>
-                  {selectedFile ? (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm text-gray-600 truncate flex-1">{selectedFile.name}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFile(null)}
-                        className="text-red-500 hover:text-red-700 shrink-0"
-                      >
-                        Gỡ
-                      </Button>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="score">Điểm tối đa</Label>
+                      <Input
+                        id="score"
+                        type="number"
+                        value={maxScore}
+                        onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
+                        min={1}
+                        max={100}
+                      />
                     </div>
-                  ) : (
+                    <div>
+                      <Label htmlFor="class">Lớp (tuỳ chọn)</Label>
+                      <Select value={classId} onValueChange={(v) => setClassId(v ?? "")}>
+                        <SelectTrigger id="class" className="w-full">
+                          <SelectValue placeholder="Chọn lớp..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Tất cả</SelectItem>
+                          {classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+              </div>
+              <div>
+                    <Label htmlFor="due">Hạn nộp (tuỳ chọn)</Label>
                     <Input
-                      id="file"
-                      type="file"
-                      accept="application/pdf"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      id="due"
+                      type="datetime-local"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
                     />
-                  )}
-                </div>
-                <div>
-                  <Label>Học sinh nhận bài (để trống = cả lớp)</Label>
-                  {students.length === 0 ? (
-                    <p className="text-sm text-gray-400 mt-1">Đang tải danh sách học sinh...</p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-0.5 mt-1">
-                      {students.map((s) => (
-                        <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedStudentIds.includes(s.supabaseId)}
-                            onChange={() => {
-                              setSelectedStudentIds((prev) =>
-                                prev.includes(s.supabaseId) ? prev.filter((id) => id !== s.supabaseId) : [...prev, s.supabaseId]
-                              );
-                            }}
-                            className="rounded"
-                          />
-                          <span className="text-sm">{s.fullName}</span>
-                          <span className="text-xs text-gray-400 ml-auto">{s.username}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {selectedStudentIds.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">Đã chọn {selectedStudentIds.length} học sinh</p>
-                  )}
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button onClick={handleCreate} disabled={submitting} className="gap-2">
-                    <Plus className="size-4" />
-                    {submitting ? "Đang tạo..." : "Tạo bài tập"}
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowForm(false)}>
-                    Huỷ
-                  </Button>
+                  </div>
+                  <div>
+                    <Label htmlFor="file">Tệp đính kèm (PDF, tuỳ chọn)</Label>
+                    {selectedFile ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm text-gray-600 truncate flex-1">{selectedFile.name}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedFile(null)}
+                          className="text-red-500 hover:text-red-700 shrink-0"
+                        >
+                          Gỡ
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input
+                        id="file"
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label>Học sinh nhận bài (để trống = cả lớp)</Label>
+                    {students.length === 0 ? (
+                      <p className="text-sm text-gray-400 mt-1">Đang tải danh sách học sinh...</p>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-0.5 mt-1">
+                        {students.map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(s.supabaseId)}
+                              onChange={() => {
+                                setSelectedStudentIds((prev) =>
+                                  prev.includes(s.supabaseId) ? prev.filter((id) => id !== s.supabaseId) : [...prev, s.supabaseId]
+                                );
+                              }}
+                              className="rounded"
+                            />
+                            <span className="text-sm">{s.fullName}</span>
+                            <span className="text-xs text-gray-400 ml-auto">{s.username}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {selectedStudentIds.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Đã chọn {selectedStudentIds.length} học sinh</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Shared: Generated questions preview & form actions for lesson/manual modes */}
+            {creationMode !== "weakness" && generatedQuestions.length > 0 && (
+              <QuestionPreview
+                questions={generatedQuestions}
+                updateQuestion={updateQuestion}
+                removeQuestion={removeQuestion}
+                title={generatedTitle}
+                onTitleChange={setGeneratedTitle}
+              />
+            )}
+
+            {/* Form actions (lesson mode only — manual has its own) */}
+            {creationMode === "lesson" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="class-manual">Lớp (tuỳ chọn)</Label>
+                      <Select value={classId} onValueChange={(v) => setClassId(v ?? "")}>
+                        <SelectTrigger id="class-manual" className="w-full">
+                          <SelectValue placeholder="Chọn lớp..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Tất cả</SelectItem>
+                          {classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="due-manual">Hạn nộp (tuỳ chọn)</Label>
+                      <Input
+                        id="due-manual"
+                        type="datetime-local"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Học sinh nhận bài (để trống = cả lớp)</Label>
+                    {students.length === 0 ? (
+                      <p className="text-sm text-gray-400 mt-1">Đang tải danh sách học sinh...</p>
+                    ) : (
+                      <div className="max-h-36 overflow-y-auto border rounded-lg p-2 space-y-0.5 mt-1">
+                        {students.map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(s.supabaseId)}
+                              onChange={() => {
+                                setSelectedStudentIds((prev) =>
+                                  prev.includes(s.supabaseId) ? prev.filter((id) => id !== s.supabaseId) : [...prev, s.supabaseId]
+                                );
+                              }}
+                              className="rounded"
+                            />
+                            <span className="text-sm">{s.fullName}</span>
+                            <span className="text-xs text-gray-400 ml-auto">{s.username}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {selectedStudentIds.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">Đã chọn {selectedStudentIds.length} học sinh</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {/* Generated title for AI modes */}
+                  {generatedQuestions.length > 0 && creationMode === "lesson" && (
+                    <div>
+                      <Label htmlFor="gen-title">Tiêu đề bài tập</Label>
+                      <Input
+                        id="gen-title"
+                        value={generatedTitle}
+                        onChange={(e) => setGeneratedTitle(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <Label htmlFor="rubric-gen">Tiêu chí chấm điểm</Label>
+                    <Textarea
+                      id="rubric-gen"
+                      value={rubric}
+                      onChange={(e) => setRubric(e.target.value)}
+                      placeholder="VD: Trả lời đúng ý chính: 50%, Lập luận rõ ràng: 30%, Trình bày: 20%"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button onClick={handleCreate} disabled={submitting} className="gap-2">
+                      <Plus className="size-4" />
+                      {submitting ? "Đang tạo..." : "Lưu bài tập"}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>
+                      Huỷ
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Manual mode own actions */}
+            {creationMode === "manual" && (
+              <div className="flex gap-3 pt-2 mt-6">
+                <Button onClick={handleCreate} disabled={submitting} className="gap-2">
+                  <Plus className="size-4" />
+                  {submitting ? "Đang tạo..." : "Tạo bài tập"}
+                </Button>
+                <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>
+                  Huỷ
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -399,6 +951,130 @@ export default function AdminAssignmentsPage() {
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Shared question preview component
+function QuestionPreview({
+  questions,
+  updateQuestion,
+  removeQuestion,
+  title,
+  onTitleChange,
+}: {
+  questions: GeneratedQuestion[];
+  updateQuestion: (index: number, field: keyof GeneratedQuestion, value: string | number) => void;
+  removeQuestion: (index: number) => void;
+  title?: string;
+  onTitleChange?: (t: string) => void;
+}) {
+  if (questions.length === 0) return null;
+
+  return (
+    <div className="border-t pt-6 mt-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="size-5 text-purple-600" />
+        <h3 className="font-bold text-gray-900">
+          {questions.length} câu hỏi đã tạo
+        </h3>
+        <span className="text-sm text-gray-500">
+          — Chỉnh sửa nếu cần trước khi lưu
+        </span>
+      </div>
+      {title !== undefined && onTitleChange && (
+        <div className="mb-4">
+          <Label htmlFor="gen-title-preview">Tiêu đề bài tập</Label>
+          <Input
+            id="gen-title-preview"
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
+      )}
+      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+        {questions.map((q, i) => (
+          <div key={q.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-purple-600">Câu {i + 1}</span>
+                {q.type && (
+                  <Badge variant="outline" className="text-xs">
+                    {q.type === "mcq" ? "Trắc nghiệm" : q.type === "short_answer" ? "Trả lời ngắn" : "Tự luận"}
+                  </Badge>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeQuestion(i)}
+                className="text-red-400 hover:text-red-600 h-6 px-2"
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-gray-500">Nội dung câu hỏi</Label>
+                <Textarea
+                  value={q.question}
+                  onChange={(e) => updateQuestion(i, "question", e.target.value)}
+                  rows={2}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                <div className="col-span-3">
+                  <Label className="text-xs text-gray-500">Đáp án mong đợi</Label>
+                  <Input
+                    value={q.expectedAnswer || ""}
+                    onChange={(e) => updateQuestion(i, "expectedAnswer", e.target.value)}
+                    placeholder="Nhập đáp án đúng..."
+                    className="mt-1"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs text-gray-500">Điểm</Label>
+                  <Input
+                    type="number"
+                    value={q.score || 10}
+                    onChange={(e) => updateQuestion(i, "score", parseInt(e.target.value) || 0)}
+                    min={1}
+                    max={100}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              {q.explanation && (
+                <div>
+                  <Label className="text-xs text-gray-500">Giải thích</Label>
+                  <p className="text-sm text-gray-600 mt-1">{q.explanation}</p>
+                </div>
+              )}
+              {/* Show options for MCQ */}
+              {q.options && q.options.length > 0 && (
+                <div>
+                  <Label className="text-xs text-gray-500">Đáp án</Label>
+                  <div className="grid grid-cols-2 gap-1 mt-1">
+                    {q.options.map((opt, j) => (
+                      <span key={j} className={`text-sm px-2 py-1 rounded ${opt.isCorrect ? "bg-emerald-100 text-emerald-700 font-medium" : "bg-gray-100 text-gray-600"}`}>
+                        {opt.text}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+        <span>Tổng điểm:</span>
+        <Badge variant="default">
+          {questions.reduce((s, q) => s + (q.score || 10), 0)}
+        </Badge>
+      </div>
     </div>
   );
 }

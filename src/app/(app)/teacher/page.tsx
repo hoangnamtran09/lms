@@ -43,11 +43,11 @@ export default function TeacherDashboardPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
+        <Skeleton delay={0} className="h-8 w-48" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          {[1,2,3].map(i => <Skeleton key={i} delay={80 + i * 100} className="h-24 rounded-lg" />)}
         </div>
-        <Skeleton className="h-60 w-full rounded-lg" />
+        <Skeleton delay={400} className="h-60 w-full rounded-lg" />
       </div>
     );
   }
@@ -61,7 +61,7 @@ export default function TeacherDashboardPage() {
   }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Bảng điều khiển Giáo viên</h1>
 
       {/* Stats */}
