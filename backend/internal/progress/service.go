@@ -28,16 +28,17 @@ func (s *Service) Start(ctx context.Context, session *StudySession) error {
 	return s.db.WithContext(ctx).Create(session).Error
 }
 
-func (s *Service) End(ctx context.Context, sessionID string) error {
+func (s *Service) End(ctx context.Context, sessionID string) (*StudySession, error) {
 	now := time.Now()
 	var session StudySession
 	if err := s.db.WithContext(ctx).Where("id = ?", sessionID).First(&session).Error; err != nil {
-		return err
+		return nil, err
 	}
-	duration := int(now.Sub(session.StartedAt).Seconds())
-	return s.db.WithContext(ctx).Model(&StudySession{}).Where("id = ?", sessionID).Updates(map[string]interface{}{
+	session.EndedAt = &now
+	session.DurationSeconds = int(now.Sub(session.StartedAt).Seconds())
+	return &session, s.db.WithContext(ctx).Model(&StudySession{}).Where("id = ?", sessionID).Updates(map[string]interface{}{
 		"ended_at":         &now,
-		"duration_seconds": duration,
+		"duration_seconds": session.DurationSeconds,
 	}).Error
 }
 

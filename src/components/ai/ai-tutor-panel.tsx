@@ -49,12 +49,12 @@ export function AITutorPanel({ open, onOpenChange, lessonId, lessonTitle }: AITu
       { message: text, lessonId: lessonId || "", sessionId: "" },
       (delta) => {
         setMessages((prev) => {
-          const copy = [...prev];
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") {
-            last.content += delta;
+          const next = [...prev];
+          const idx = next.length - 1;
+          if (idx >= 0 && next[idx].role === "assistant") {
+            next[idx] = { ...next[idx], content: next[idx].content + delta };
           }
-          return [...copy];
+          return next;
         });
       },
       () => setStreaming(false),

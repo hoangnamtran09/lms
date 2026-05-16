@@ -6,13 +6,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lms/backend/internal/middleware"
+	"github.com/lms/backend/internal/weaknesses"
 )
 
 type Handler struct {
-	service *Service
+	service         *Service
+	weaknessService *weaknesses.Service
 }
 
-func NewHandler(service *Service) *Handler { return &Handler{service: service} }
+func NewHandler(service *Service, weaknessSvc *weaknesses.Service) *Handler {
+	return &Handler{service: service, weaknessService: weaknessSvc}
+}
 
 func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
@@ -38,16 +42,24 @@ func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) EndSession(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
 	// Path: /api/study-sessions/{id}/end → extract second-to-last segment
 	parts := splitPath(r.URL.Path)
 	sessionID := ""
 	if len(parts) >= 2 {
 		sessionID = parts[len(parts)-2]
 	}
-	if err := h.service.End(r.Context(), sessionID); err != nil {
+	session, err := h.service.End(r.Context(), sessionID)
+	if err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Stuck detection: > 30 min on a lesson → record progress weakness
+	if session.DurationSeconds > 1800 && session.LessonID != "" && h.weaknessService != nil {
+		_ = h.weaknessService.RecordError(r.Context(), claims.UserID, session.LessonID, session.LessonID, "progress", 1)
+	}
+
 	jsonOk(w, map[string]string{"status": "ended"})
 }
 

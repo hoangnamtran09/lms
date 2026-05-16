@@ -146,14 +146,14 @@ function parseLessonPath(pathname: string): string | null {
 }
 
 function LessonInfoSidebar({ lessonId }: { lessonId: string }) {
-  const { activeQuiz, setActiveQuiz } = useActiveQuiz();
+  const { activeQuiz, handleQuizAnswered } = useActiveQuiz();
 
   return (
     <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
       <LessonInfoPanel
         lessonId={lessonId}
         activeQuiz={activeQuiz}
-        onQuizAnswered={() => setActiveQuiz(null)}
+        onQuizAnswered={(isCorrect) => handleQuizAnswered(isCorrect)}
       />
     </aside>
   );

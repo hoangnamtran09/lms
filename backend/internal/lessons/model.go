@@ -13,7 +13,9 @@ type Lesson struct {
 	CourseID        string    `gorm:"size:36;not null;index" json:"courseId"`
 	Title           string    `gorm:"size:500;not null" json:"title"`
 	Description     string    `gorm:"type:text" json:"description"`
-	MediaURL        string    `gorm:"size:1000" json:"mediaUrl"`      // R2 PDF URL
+	Summary         string    `gorm:"type:text" json:"summary"`
+	Objectives      string    `gorm:"type:text" json:"objectives"`
+	MediaURL        string    `gorm:"size:1000" json:"mediaUrl"`
 	DurationMinutes int       `json:"durationMinutes"`
 	SortOrder       int       `gorm:"default:0" json:"sortOrder"`
 	IsPublished     bool      `gorm:"default:false" json:"isPublished"`

@@ -14,6 +14,7 @@ interface Assignment {
   maxScore: number;
   dueDate: string;
   status: string;
+  source: string;
   creatorName: string;
   createdAt: string;
 }
@@ -95,6 +96,11 @@ export default function AssignmentsPage() {
                     <Badge variant={statusVariant[a.status] || "secondary"}>
                       {statusLabel[a.status] || a.status}
                     </Badge>
+                    {a.source === "weakness" && (
+                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                        Điểm yếu
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-gray-500 line-clamp-1">{a.description || "Không có mô tả"}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">

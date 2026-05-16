@@ -22,6 +22,7 @@ import {
   ScreenShare,
   Library,
   ClipboardCheck,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ const allNavItems: NavItem[] = [
   { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Cài đặt", href: "/admin/settings", icon: Settings, roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
 
 export function Sidebar({ className }: { className?: string }) {

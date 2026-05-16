@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -52,25 +52,44 @@ export function ChatMessage({
   lessonId,
   hideQuizzes = false,
   onQuizDetected,
+  isStreaming = false,
 }: {
   role: "user" | "assistant";
   content: string;
   lessonId: string;
   hideQuizzes?: boolean;
   onQuizDetected?: (quiz: QuizData) => void;
+  isStreaming?: boolean;
 }) {
   const reportedRef = useRef<Set<string>>(new Set());
 
   if (role === "user") {
-    return <p className="whitespace-pre-wrap">{content}</p>;
+    return (
+      <p className="whitespace-pre-wrap">
+        {content}
+        {isStreaming && <span className="inline-block w-0.5 h-4 bg-primary animate-pulse align-middle ml-0.5" />}
+      </p>
+    );
   }
 
-  if (!content) return null;
+  if (!content) {
+    if (isStreaming) {
+      return (
+        <div className="flex items-center gap-1 py-1">
+          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
+          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
+          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
+        </div>
+      );
+    }
+    return null;
+  }
 
   const parts = parseQuizBlocks(content);
 
-  // Notify parent of new quizzes
-  if (onQuizDetected) {
+  // Notify parent of new quizzes (in effect to avoid setState during render)
+  useEffect(() => {
+    if (!onQuizDetected) return;
     for (const part of parts) {
       if (part.type === "quiz" && part.quiz) {
         const key = part.quiz.question;
@@ -80,10 +99,10 @@ export function ChatMessage({
         }
       }
     }
-  }
+  }, [parts, onQuizDetected]);
 
   return (
-    <div className="prose prose-xs max-w-none">
+    <div className="prose max-w-none">
       {parts.map((part, i) => {
         if (part.type === "quiz" && part.quiz) {
           if (hideQuizzes) {
@@ -95,10 +114,16 @@ export function ChatMessage({
           }
           return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} />;
         }
+        const isLastText = i === parts.length - 1 || (i === parts.length - 2 && parts[parts.length - 1].type === "quiz");
         return (
-          <ReactMarkdown key={i} remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-            {part.content}
-          </ReactMarkdown>
+          <span key={i}>
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {part.content}
+            </ReactMarkdown>
+            {isStreaming && isLastText && (
+              <span className="inline-block w-0.5 h-4 bg-violet-500 animate-pulse align-middle ml-0.5 rounded" />
+            )}
+          </span>
         );
       })}
     </div>

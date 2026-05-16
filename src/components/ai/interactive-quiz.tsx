@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, X, Diamond } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { MathText } from "./math-text";
 
@@ -40,7 +41,7 @@ export function InteractiveQuiz({
 
     // Notify backend
     try {
-      const res = await api<{ diamondsEarned?: number; weaknessRecorded?: string }>(
+      const res = await api<{ diamondsEarned?: number; weaknessRecorded?: string; weaknessWeight?: number }>(
         "/api/ai/quiz-answer",
         {
           method: "POST",
@@ -52,6 +53,12 @@ export function InteractiveQuiz({
         }
       );
       if (res.diamondsEarned) setDiamonds(res.diamondsEarned);
+      if (res.weaknessRecorded) {
+        toast.warning("Điểm yếu đã được ghi nhận", {
+          description: `Bạn cần ôn tập thêm chủ đề này (trọng số: ${res.weaknessWeight})`,
+          position: "top-right",
+        });
+      }
     } catch {
       // Silently fail — the quiz UX still works
     }

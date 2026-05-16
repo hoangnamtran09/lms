@@ -49,7 +49,7 @@ export default function LessonViewerPage({
   const [chatError, setChatError] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[] | null>(null);
-  const { activeQuiz, setActiveQuiz } = useActiveQuiz();
+  const { activeQuiz, setActiveQuiz, lastQuizResult, clearLastQuizResult } = useActiveQuiz();
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -100,10 +100,12 @@ export default function LessonViewerPage({
         { message: "", lessonId: lessonId, sessionId: "" },
         (delta) => {
           setMessages((prev) => {
-            const copy = [...prev];
-            const last = copy[copy.length - 1];
-            if (last && last.role === "assistant") last.content += delta;
-            return [...copy];
+            const next = [...prev];
+            const idx = next.length - 1;
+            if (idx >= 0 && next[idx].role === "assistant") {
+              next[idx] = { ...next[idx], content: next[idx].content + delta };
+            }
+            return next;
           });
         },
         () => setStreaming(false),
@@ -222,11 +224,7 @@ export default function LessonViewerPage({
     setActiveQuiz(quiz);
   }, [setActiveQuiz]);
 
-  const send = () => {
-    const text = input.trim();
-    if (!text || streaming || quizBlocked) return;
-
-    setInput("");
+  const sendMessage = useCallback((text: string) => {
     setChatError(null);
     setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
     setStreaming(true);
@@ -236,10 +234,12 @@ export default function LessonViewerPage({
       { message: text, lessonId: lessonId, sessionId: "" },
       (delta) => {
         setMessages((prev) => {
-          const copy = [...prev];
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") last.content += delta;
-          return [...copy];
+          const next = [...prev];
+          const idx = next.length - 1;
+          if (idx >= 0 && next[idx].role === "assistant") {
+            next[idx] = { ...next[idx], content: next[idx].content + delta };
+          }
+          return next;
         });
       },
       () => setStreaming(false),
@@ -248,7 +248,28 @@ export default function LessonViewerPage({
         setStreaming(false);
       }
     );
+  }, [lessonId]);
+
+  const send = () => {
+    const text = input.trim();
+    if (!text || streaming || quizBlocked) return;
+
+    setInput("");
+    sendMessage(text);
   };
+
+  // Auto-continue chat after quiz answered
+  const prevResultRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (lastQuizResult !== null && lastQuizResult !== prevResultRef.current && !streaming && chatUnlocked) {
+      prevResultRef.current = lastQuizResult;
+      const msg = lastQuizResult
+        ? "Mình vừa trả lời đúng câu hỏi trắc nghiệm rồi nhé."
+        : "Mình vừa trả lời sai câu hỏi trắc nghiệm rồi.";
+      clearLastQuizResult();
+      sendMessage(msg);
+    }
+  }, [lastQuizResult, streaming, chatUnlocked, sendMessage, clearLastQuizResult]);
 
   if (loading) {
     return (
@@ -346,39 +367,62 @@ export default function LessonViewerPage({
 
           {/* AI Chat */}
           <div className="bg-white flex flex-col min-h-0 flex-1 min-w-0">
-            <div className="px-4 py-3 border-b shrink-0">
+            <div className="px-4 py-3 border-b shrink-0 bg-gradient-to-r from-violet-50 to-purple-50">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <MessageCircle className="size-4" /> Trợ lý AI
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[9px] font-bold shadow-sm">
+                  AI
+                </div>
+                Gia sư AI
               </h2>
             </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0">
               {messages.length === 0 && (
-                <div className="text-center py-8">
-                  <MessageCircle className="size-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">Hỏi tôi về nội dung bài học</p>
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
+                    <MessageCircle className="size-7 text-violet-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">Gia sư AI sẵn sàng giúp bạn</p>
+                  <p className="text-xs text-gray-400 mt-1">Hãy đọc tài liệu để mở khoá chat</p>
                 </div>
               )}
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[90%] rounded-lg px-2.5 py-1.5 text-xs ${
-                    msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-gray-100 text-gray-900"
+              {messages.map((msg, i) => {
+                const isLast = i === messages.length - 1;
+                const isStreamingThis = isLast && streaming;
+                return (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {msg.role === "assistant" && (
+                    <div className={`shrink-0 mt-1 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${isStreamingThis ? "animate-pulse" : ""}`}>
+                      AI
+                    </div>
+                  )}
+                  <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : `bg-gradient-to-br from-violet-50 to-purple-50 text-gray-800 rounded-bl-md border shadow-sm ${isStreamingThis ? "border-violet-300" : "border-violet-100"}`
                   }`}>
                     {msg.role === "assistant" ? (
                       <ChatMessage
                         role="assistant"
-                        content={msg.content || (streaming && i === messages.length - 1 ? "..." : "")}
+                        content={msg.content}
                         lessonId={lessonId}
-                        hideQuizzes={!!activeQuiz}
+                        hideQuizzes={true}
                         onQuizDetected={handleQuizDetected}
+                        isStreaming={isStreamingThis}
                       />
                     ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
                     )}
                   </div>
+                  {msg.role === "user" && (
+                    <div className="shrink-0 mt-1 w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+                      B
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
               {chatError && <div className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">{chatError}</div>}
               <div ref={messagesEndRef} />
             </div>

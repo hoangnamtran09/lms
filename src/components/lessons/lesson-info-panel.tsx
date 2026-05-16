@@ -33,7 +33,7 @@ interface QuizData {
 interface Props {
   lessonId: string;
   activeQuiz?: QuizData | null;
-  onQuizAnswered?: () => void;
+  onQuizAnswered?: (isCorrect: boolean) => void;
 }
 
 type QuizPhase = "answering" | "result";
@@ -116,7 +116,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
       setStreak(0);
     }
     setTimeout(() => setQuizPhase("result"), 1500);
-    setTimeout(() => onQuizAnswered?.(), 4000);
+    setTimeout(() => onQuizAnswered?.(isCorrect), 4000);
   };
 
   // -- Loading / Error / Empty states --

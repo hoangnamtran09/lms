@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, ChevronRight, BookOpen, FileText, UploadCloud, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronRight, BookOpen, FileText, UploadCloud, Loader2, Pencil } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +30,9 @@ interface Lesson {
 interface Course {
   id: string; subjectId: string; title: string;
 }
+interface GradeLevel {
+  id: string; name: string; level: number;
+}
 
 type Tab = "subjects" | "lessons";
 
@@ -44,6 +50,7 @@ export default function AdminCoursesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<{ type: "subject"; entity: Subject } | { type: "lesson"; entity: Lesson } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   // Bulk upload
@@ -52,6 +59,11 @@ export default function AdminCoursesPage() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [bulkError, setBulkError] = useState("");
+  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+
+  const fetchGradeLevels = () => {
+    api<GradeLevel[]>("/api/grade-levels").then(setGradeLevels).catch(() => {});
+  };
 
   const fetchSubjects = () => {
     setSubLoading(true);
@@ -75,75 +87,137 @@ export default function AdminCoursesPage() {
     setLessonLoading(false);
   };
 
-  useEffect(() => { fetchSubjects(); }, []);
+  useEffect(() => { fetchSubjects(); fetchGradeLevels(); }, []);
 
-  const handleCreate = async () => {
+  const handleEditSubject = (s: Subject) => {
+    setEditing({ type: "subject", entity: s });
+    setForm({ name: s.name, gradeLevel: String(s.gradeLevel), sortOrder: String(s.sortOrder) });
+    setTab("subjects");
+    setDialogOpen(true);
+  };
+
+  const handleEditLesson = (l: Lesson) => {
+    setEditing({ type: "lesson", entity: l });
+    setForm({ title: l.title, durationMinutes: String(l.durationMinutes), sortOrder: String(l.sortOrder), isPublished: String(l.isPublished) });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      if (tab === "subjects") {
-        await api("/api/subjects", {
-          method: "POST",
-          body: JSON.stringify({
-            id: crypto.randomUUID(), name: form.name,
-            gradeLevel: parseInt(form.gradeLevel || "0"),
-            sortOrder: parseInt(form.sortOrder || "0"),
-            icon: "BookOpen", color: "#4F46E5",
-          }),
-        });
-        fetchSubjects();
-      } else {
-        if (!selectedSubject) return;
-
-        // Upload PDF if selected
-        let mediaUrl = "";
-        const file = fileRef.current?.files?.[0];
-        if (file) {
-          setUploading(true);
-          const formData = new FormData();
-          formData.append("file", file);
-          const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-          const uploadRes = await fetch(`${API_BASE}/api/media/upload`, {
-            method: "POST",
-            credentials: "include",
-            body: formData,
-          });
-          if (!uploadRes.ok) throw new ApiError("Tải file thất bại", uploadRes.status);
-          const uploadJson = await uploadRes.json();
-          mediaUrl = uploadJson.url;
-          setUploading(false);
-        }
-
-        // Find or create a default course for this subject
-        const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubject.id}`);
-        let courseId = courses[0]?.id;
-        if (!courseId) {
-          const c = await api<Course>(`/api/courses`, {
-            method: "POST",
+      if (editing) {
+        // Edit mode — PATCH
+        if (editing.type === "subject") {
+          await api(`/api/subjects/${editing.entity.id}`, {
+            method: "PATCH",
             body: JSON.stringify({
-              id: crypto.randomUUID(), subjectId: selectedSubject.id,
-              title: selectedSubject.name,
-              gradeLevel: selectedSubject.gradeLevel,
-              sortOrder: 0,
+              name: form.name,
+              gradeLevel: parseInt(form.gradeLevel || "0"),
+              sortOrder: parseInt(form.sortOrder || "0"),
             }),
           });
-          courseId = c.id;
-        }
-        await api("/api/lessons", {
-          method: "POST",
-          body: JSON.stringify({
-            id: crypto.randomUUID(), courseId,
+          fetchSubjects();
+        } else {
+          // Upload new PDF if selected
+          let mediaUrl: string | undefined;
+          const file = fileRef.current?.files?.[0];
+          if (file) {
+            setUploading(true);
+            const formData = new FormData();
+            formData.append("file", file);
+            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+            const uploadRes = await fetch(`${API_BASE}/api/media/upload`, {
+              method: "POST",
+              credentials: "include",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new ApiError("Tải file thất bại", uploadRes.status);
+            const uploadJson = await uploadRes.json();
+            mediaUrl = uploadJson.url;
+            setUploading(false);
+          }
+          const body: Record<string, unknown> = {
             title: form.title,
             durationMinutes: parseInt(form.durationMinutes || "0"),
             sortOrder: parseInt(form.sortOrder || "0"),
-            mediaUrl: mediaUrl || undefined,
-          }),
-        });
-        fetchLessonsForSubject(selectedSubject);
+            isPublished: form.isPublished === "true",
+          };
+          if (mediaUrl) body.mediaUrl = mediaUrl;
+          await api(`/api/lessons/${editing.entity.id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          });
+          if (selectedSubject) fetchLessonsForSubject(selectedSubject);
+        }
+      } else {
+        // Create mode — POST
+        if (tab === "subjects") {
+          await api("/api/subjects", {
+            method: "POST",
+            body: JSON.stringify({
+              id: crypto.randomUUID(), name: form.name,
+              gradeLevel: parseInt(form.gradeLevel || "0"),
+              sortOrder: parseInt(form.sortOrder || "0"),
+              icon: "BookOpen", color: "#4F46E5",
+            }),
+          });
+          fetchSubjects();
+        } else {
+          if (!selectedSubject) return;
+
+          // Upload PDF if selected
+          let mediaUrl = "";
+          const file = fileRef.current?.files?.[0];
+          if (file) {
+            setUploading(true);
+            const formData = new FormData();
+            formData.append("file", file);
+            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+            const uploadRes = await fetch(`${API_BASE}/api/media/upload`, {
+              method: "POST",
+              credentials: "include",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new ApiError("Tải file thất bại", uploadRes.status);
+            const uploadJson = await uploadRes.json();
+            mediaUrl = uploadJson.url;
+            setUploading(false);
+          }
+
+          // Find or create a default course for this subject
+          const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubject.id}`);
+          let courseId = courses[0]?.id;
+          if (!courseId) {
+            const c = await api<Course>(`/api/courses`, {
+              method: "POST",
+              body: JSON.stringify({
+                id: crypto.randomUUID(), subjectId: selectedSubject.id,
+                title: selectedSubject.name,
+                gradeLevel: selectedSubject.gradeLevel,
+                sortOrder: 0,
+              }),
+            });
+            courseId = c.id;
+          }
+          await api("/api/lessons", {
+            method: "POST",
+            body: JSON.stringify({
+              id: crypto.randomUUID(), courseId,
+              title: form.title,
+              durationMinutes: parseInt(form.durationMinutes || "0"),
+              sortOrder: parseInt(form.sortOrder || "0"),
+              mediaUrl: mediaUrl || undefined,
+            }),
+          });
+          fetchLessonsForSubject(selectedSubject);
+        }
       }
       setDialogOpen(false);
+      setEditing(null);
+      setForm({});
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Tạo thất bại");
+      setError(err instanceof ApiError ? err.message : editing ? "Cập nhật thất bại" : "Tạo thất bại");
     } finally {
       setSaving(false);
     }
@@ -242,7 +316,9 @@ export default function AdminCoursesPage() {
     }
   };
 
-  const dialogTitle = tab === "subjects" ? "Thêm môn học" : "Thêm bài học";
+  const dialogTitle = editing
+    ? (editing.type === "subject" ? "Sửa môn học" : "Sửa bài học")
+    : (tab === "subjects" ? "Thêm môn học" : "Thêm bài học");
 
   return (
     <div>
@@ -260,10 +336,13 @@ export default function AdminCoursesPage() {
               <UploadCloud className="size-4" /> Tải lên PDF bài học hàng loạt
             </Button>
           )}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditing(null); setForm({}); setError(""); } }}>
             <DialogTrigger
               render={
-                <Button disabled={tab === "lessons" && !selectedSubject}>
+                <Button
+                  disabled={tab === "lessons" && !selectedSubject}
+                  onClick={() => { setEditing(null); setForm({}); setError(""); }}
+                >
                   <Plus className="size-4" />{dialogTitle}
                 </Button>
               }
@@ -279,18 +358,23 @@ export default function AdminCoursesPage() {
                 />
               </div>
               {tab === "subjects" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Khối lớp</Label>
-                    <Input type="number" value={form.gradeLevel || ""} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Thứ tự</Label>
-                    <Input type="number" value={form.sortOrder || ""} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
-                  </div>
+                <div>
+                  <Label>Khối lớp</Label>
+                  <Select value={form.gradeLevel || ""} onValueChange={(value) => setForm({ ...form, gradeLevel: value as string })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Chọn khối lớp" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gradeLevels.map((gl) => (
+                        <SelectItem key={gl.id} value={String(gl.level)}>
+                          {gl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
-              {tab === "lessons" && (
+              {(tab === "lessons" || editing?.type === "lesson") && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Thời lượng (phút)</Label>
@@ -302,9 +386,24 @@ export default function AdminCoursesPage() {
                   </div>
                 </div>
               )}
-              {tab === "lessons" && (
+              {editing?.type === "lesson" && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isPublished"
+                    checked={form.isPublished === "true"}
+                    onChange={(e) => setForm({ ...form, isPublished: String(e.target.checked) })}
+                    className="size-4 rounded border-gray-300"
+                  />
+                  <Label htmlFor="isPublished" className="cursor-pointer">Công khai</Label>
+                </div>
+              )}
+              {(tab === "lessons" || editing?.type === "lesson") && (
                 <div>
-                  <Label>File PDF</Label>
+                  <Label>File PDF {editing && <span className="text-xs text-gray-400">(để trống nếu không đổi)</span>}</Label>
+                  {editing?.type === "lesson" && editing.entity.mediaUrl && (
+                    <p className="text-xs text-gray-400 mb-1">File hiện tại: {editing.entity.mediaUrl.split("/").pop()}</p>
+                  )}
                   <input
                     ref={fileRef}
                     type="file"
@@ -315,8 +414,8 @@ export default function AdminCoursesPage() {
                 </div>
               )}
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button onClick={handleCreate} disabled={saving || uploading} className="w-full">
-                {uploading ? "Đang tải lên..." : saving ? "Đang tạo..." : "Tạo"}
+              <Button onClick={handleSave} disabled={saving || uploading} className="w-full">
+                {uploading ? "Đang tải lên..." : saving ? (editing ? "Đang lưu..." : "Đang tạo...") : (editing ? "Lưu thay đổi" : "Tạo")}
               </Button>
             </div>
           </DialogContent>
@@ -396,23 +495,28 @@ export default function AdminCoursesPage() {
                   <TableRow>
                     <TableHead>Tên môn học</TableHead>
                     <TableHead>Khối</TableHead>
-                    <TableHead>Thứ tự</TableHead>
-                    <TableHead className="w-20"></TableHead>
+                    <TableHead className="w-28"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {subjects.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-gray-400 py-8">Chưa có môn học nào</TableCell>
+                      <TableCell colSpan={3} className="text-center text-gray-400 py-8">Chưa có môn học nào</TableCell>
                     </TableRow>
                   ) : (
                     subjects.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium text-gray-900">{s.name}</TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs">Khối {s.gradeLevel}</Badge></TableCell>
-                        <TableCell className="text-gray-500">{s.sortOrder}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {gradeLevels.find(gl => gl.level === s.gradeLevel)?.name || `Khối ${s.gradeLevel}`}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => handleEditSubject(s)}>
+                              <Pencil className="size-3" />
+                            </Button>
                             <Button variant="outline" size="sm" onClick={() => fetchLessonsForSubject(s)}>
                               <ChevronRight className="size-3" />
                             </Button>
@@ -464,7 +568,7 @@ export default function AdminCoursesPage() {
                       <TableHead>Thời lượng</TableHead>
                       <TableHead>Công khai</TableHead>
                       <TableHead>Thứ tự</TableHead>
-                      <TableHead className="w-16"></TableHead>
+                      <TableHead className="w-24"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -491,9 +595,14 @@ export default function AdminCoursesPage() {
                           </TableCell>
                           <TableCell className="text-gray-500">{l.sortOrder}</TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => handleDeleteLesson(l.id)} className="text-red-500 hover:text-red-700">
-                              <Trash2 className="size-3" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button variant="outline" size="sm" onClick={() => handleEditLesson(l)}>
+                                <Pencil className="size-3" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleDeleteLesson(l.id)} className="text-red-500 hover:text-red-700">
+                                <Trash2 className="size-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))

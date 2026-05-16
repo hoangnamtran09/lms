@@ -15,6 +15,7 @@ import (
 	"github.com/lms/backend/internal/config"
 	"github.com/lms/backend/internal/courses"
 	"github.com/lms/backend/internal/gamification"
+	"github.com/lms/backend/internal/gradelevels"
 	"github.com/lms/backend/internal/lessons"
 	"github.com/lms/backend/internal/media"
 	"github.com/lms/backend/internal/middleware"
@@ -45,6 +46,7 @@ type Handlers struct {
 	Weaknesses   *weaknesses.Handler
 	Teacher      *teacher.Handler
 	Analytics    *analytics.Handler
+	GradeLevels  *gradelevels.Handler
 }
 
 func New(
@@ -56,7 +58,7 @@ func New(
 	// Global middleware
 	r.Use(middleware.Logging)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{cfg.CORSOrigin},
+		AllowedOrigins:   []string{cfg.CORSOrigin, "http://localhost:3001"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -83,7 +85,7 @@ func New(
 	subjectsH := subjects.NewHandler(subjectsSvc, db)
 	coursesH := courses.NewHandler(coursesSvc)
 	lessonsH := lessons.NewHandler(lessonsSvc)
-	aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc)
+	aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc)
 	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
@@ -92,7 +94,7 @@ func New(
 	subjectsH.SetR2Delete(mediaH.DeleteByURL)
 	parentSvc := parent.NewService(db)
 	parentH := parent.NewHandler(parentSvc)
-	progressH := progress.NewHandler(progressSvc)
+	progressH := progress.NewHandler(progressSvc, weaknessSvc)
 	gamificationH := gamification.NewHandler(diamondSvc, streakSvc)
 	achievementsH := achievements.NewHandler(achievementsSvc, db)
 	weaknessH := weaknesses.NewHandler(weaknessSvc)
@@ -100,6 +102,8 @@ func New(
 	analyticsH := analytics.NewHandler(db)
 	chatHistorySvc := ai.NewChatHistoryService(db)
 	chatHistoryH := ai.NewChatHistoryHandler(chatHistorySvc)
+	gradeLevelsSvc := gradelevels.NewService(db)
+	gradeLevelsH := gradelevels.NewHandler(gradeLevelsSvc)
 
 	// Mount
 	h := &Handlers{
@@ -119,6 +123,7 @@ func New(
 		Weaknesses:   weaknessH,
 		Teacher:      teacherH,
 		Analytics:    analyticsH,
+		GradeLevels:  gradeLevelsH,
 	}
 
 	_ = quizzesSvc
@@ -300,16 +305,27 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 		r.Post("/api/weaknesses/{id}/resolve", h.Weaknesses.Resolve)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActGrade)).
 			Patch("/api/weaknesses/{id}/notes", h.Weaknesses.UpdateCoachNotes)
+		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
+			Post("/api/weaknesses/profile", h.Weaknesses.SetProfileWeakness)
+		// Analytics
+		r.Get("/api/analytics/overview", h.Analytics.Overview)
+		r.Get("/api/analytics/study-time", h.Analytics.StudyTime)
+		r.With(middleware.RequirePermission(permissions.ResAnalytics, permissions.ActExport)).
+			Get("/api/analytics/export/users", h.Analytics.ExportUsers)
+		r.With(middleware.RequirePermission(permissions.ResAnalytics, permissions.ActExport)).
+			Get("/api/analytics/export/assignments", h.Analytics.ExportAssignments)
 
-			// Analytics
-			r.Get("/api/analytics/overview", h.Analytics.Overview)
-			r.Get("/api/analytics/study-time", h.Analytics.StudyTime)
-			r.With(middleware.RequirePermission(permissions.ResAnalytics, permissions.ActExport)).
-				Get("/api/analytics/export/users", h.Analytics.ExportUsers)
-			r.With(middleware.RequirePermission(permissions.ResAnalytics, permissions.ActExport)).
-				Get("/api/analytics/export/assignments", h.Analytics.ExportAssignments)
+		// Settings — Grade Levels
+			r.Get("/api/grade-levels", h.GradeLevels.List)
+			r.Get("/api/grade-levels/{id}", h.GradeLevels.Get)
+			r.With(middleware.RequirePermission(permissions.ResGradeLevels, permissions.ActManage)).
+				Post("/api/grade-levels", h.GradeLevels.Create)
+			r.With(middleware.RequirePermission(permissions.ResGradeLevels, permissions.ActManage)).
+				Patch("/api/grade-levels/{id}", h.GradeLevels.Update)
+			r.With(middleware.RequirePermission(permissions.ResGradeLevels, permissions.ActManage)).
+				Delete("/api/grade-levels/{id}", h.GradeLevels.Delete)
 
-		// Teacher dashboard
+			// Teacher dashboard
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)
 
 		// Parent

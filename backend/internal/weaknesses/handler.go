@@ -44,11 +44,33 @@ func (h *Handler) RecordError(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
 		return
 	}
-	if err := h.service.RecordError(r.Context(), claims.UserID, req.LessonID, req.Topic); err != nil {
+	if err := h.service.RecordError(r.Context(), claims.UserID, req.LessonID, req.Topic, "quiz", 1.5); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	jsonOk(w, map[string]string{"status": "recorded"})
+}
+
+// SetProfileWeakness allows teacher/admin to manually set a weakness for a student.
+func (h *Handler) SetProfileWeakness(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID   string `json:"userId"`
+		LessonID string `json:"lessonId"`
+		Topic    string `json:"topic"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
+		return
+	}
+	if req.UserID == "" || req.Topic == "" {
+		jsonErr(w, "userId và topic là bắt buộc", http.StatusBadRequest)
+		return
+	}
+	if err := h.service.RecordError(r.Context(), req.UserID, req.LessonID, req.Topic, "profile", 3); err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOk(w, map[string]string{"status": "created"})
 }
 
 func (h *Handler) Improve(w http.ResponseWriter, r *http.Request) {

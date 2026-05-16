@@ -6,6 +6,7 @@ import (
 	"github.com/lms/backend/internal/assignments"
 	"github.com/lms/backend/internal/courses"
 	"github.com/lms/backend/internal/gamification"
+	"github.com/lms/backend/internal/gradelevels"
 	"github.com/lms/backend/internal/lessons"
 	"github.com/lms/backend/internal/parent"
 	"github.com/lms/backend/internal/progress"
@@ -34,5 +35,6 @@ func migrate(db *gorm.DB) error {
 		&gamification.Streak{},
 		&progress.StudySession{},
 		&ai.ChatMessageRecord{},
+		&gradelevels.GradeLevel{},
 	)
 }

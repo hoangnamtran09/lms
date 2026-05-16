@@ -18,7 +18,10 @@ func main() {
 
 	cfg := config.Load()
 
-	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  cfg.DatabaseURL,
+		PreferSimpleProtocol: true, // PgBouncer does not support prepared statements
+	}), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
@@ -31,7 +34,7 @@ func main() {
 	}
 
 	// Seed initial data
-	if err := seed(db); err != nil {
+	if err := seed(db, cfg); err != nil {
 		log.Printf("Seed warning: %v", err)
 	}
 

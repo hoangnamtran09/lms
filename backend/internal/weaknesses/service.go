@@ -13,7 +13,11 @@ type WeaknessProfile struct {
 	UserID               string     `gorm:"size:36;not null;index" json:"userId"`
 	LessonID             string     `gorm:"size:36" json:"lessonId"`
 	Topic                string     `gorm:"size:500;not null" json:"topic"`
+	Source               string     `gorm:"size:20;default:quiz" json:"source"`
+	Weight               float64    `gorm:"default:1" json:"weight"`
 	ErrorCount           int        `gorm:"default:0" json:"errorCount"`
+	QuizAttempts         int        `gorm:"default:0" json:"quizAttempts"`
+	QuizCorrect          int        `gorm:"default:0" json:"quizCorrect"`
 	LastErrorAt          *time.Time `json:"lastErrorAt"`
 	RemediationExercises string     `gorm:"type:text" json:"remediationExercises"`
 	ImprovementScore     int        `gorm:"default:0" json:"improvementScore"`
@@ -45,24 +49,88 @@ func (s *Service) FindByID(ctx context.Context, id string) (*WeaknessProfile, er
 	return &profile, err
 }
 
-func (s *Service) RecordError(ctx context.Context, userID, lessonID, topic string) error {
+func (s *Service) RecordError(ctx context.Context, userID, lessonID, topic, source string, weight float64) error {
+	now := time.Now()
 	var existing WeaknessProfile
 	err := s.db.WithContext(ctx).Where("user_id = ? AND topic = ?", userID, topic).First(&existing).Error
 	if err != nil {
-		now := time.Now()
-		return s.db.WithContext(ctx).Create(&WeaknessProfile{
+		w := &WeaknessProfile{
 			ID:          uuid.New().String(),
 			UserID:      userID,
 			LessonID:    lessonID,
 			Topic:       topic,
+			Source:      source,
+			Weight:      weight,
 			ErrorCount:  1,
 			LastErrorAt: &now,
-		}).Error
+		}
+		if source == "quiz" {
+			w.QuizAttempts = 1
+		}
+		return s.db.WithContext(ctx).Create(w).Error
 	}
-	now := time.Now()
 	existing.ErrorCount++
+	existing.Weight += weight
 	existing.LastErrorAt = &now
+	// Update source if new weight tier is higher than current source
+	if sourceWeightPriority(source) > sourceWeightPriority(existing.Source) {
+		existing.Source = source
+	}
+	if source == "quiz" {
+		existing.QuizAttempts++
+	}
 	return s.db.WithContext(ctx).Save(&existing).Error
+}
+
+func sourceWeightPriority(source string) int {
+	switch source {
+	case "profile":
+		return 3
+	case "quiz":
+		return 2
+	case "exercise":
+		return 1
+	case "progress":
+		return 0
+	}
+	return -1
+}
+
+// UpdateQuizStats increments quiz tracking counters for the weakness (correct or wrong).
+// Creates the weakness profile lazily if it doesn't exist yet.
+func (s *Service) UpdateQuizStats(ctx context.Context, userID, lessonID, topic string, correct bool) (*WeaknessProfile, error) {
+	now := time.Now()
+	var existing WeaknessProfile
+	err := s.db.WithContext(ctx).Where("user_id = ? AND topic = ?", userID, topic).First(&existing).Error
+	if err != nil {
+		w := &WeaknessProfile{
+			ID:           uuid.New().String(),
+			UserID:       userID,
+			LessonID:     lessonID,
+			Topic:        topic,
+			Source:       "quiz",
+			QuizAttempts: 1,
+		}
+		if correct {
+			w.QuizCorrect = 1
+		}
+		w.LastErrorAt = &now
+		if err2 := s.db.WithContext(ctx).Create(w).Error; err2 != nil {
+			return nil, err2
+		}
+		return w, nil
+	}
+	existing.QuizAttempts++
+	if correct {
+		existing.QuizCorrect++
+	}
+	if !correct {
+		existing.LastErrorAt = &now
+	}
+	if err2 := s.db.WithContext(ctx).Save(&existing).Error; err2 != nil {
+		return nil, err2
+	}
+	return &existing, nil
 }
 
 func (s *Service) AddRemediation(ctx context.Context, id, exercises string) error {

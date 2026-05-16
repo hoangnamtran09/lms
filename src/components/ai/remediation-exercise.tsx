@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, X, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MathText } from "./math-text";
@@ -99,9 +100,11 @@ function McqExercise({
 function ShortAnswerExercise({
   exercise,
   onCorrect,
+  lessonId,
 }: {
   exercise: RemediationShortAnswer;
   onCorrect: () => void;
+  lessonId: string;
 }) {
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -112,20 +115,26 @@ function ShortAnswerExercise({
     if (!answer.trim() || grading) return;
     setGrading(true);
     try {
-      const res = await api<{ score: number; feedback: string; isPassed: boolean }>(
+      const res = await api<{ score: number; feedback: string; isPassed: boolean; weaknessRecorded?: boolean; weaknessWeight?: number }>(
         "/api/ai/grade-exercise",
         {
           method: "POST",
           body: JSON.stringify({
             question: exercise.question,
-            expectedAnswer: exercise.expectedAnswer,
-            studentAnswer: answer.trim(),
+            userAnswer: answer.trim(),
+            lessonId,
           }),
         }
       );
       setFeedback(res.feedback);
       setPassed(res.isPassed);
       if (res.isPassed) onCorrect();
+      if (res.weaknessRecorded) {
+        toast.warning("Điểm yếu đã được ghi nhận", {
+          description: `Bài tập đạt ${res.score} điểm — bạn cần cải thiện thêm (trọng số: ${res.weaknessWeight})`,
+          position: "top-right",
+        });
+      }
     } catch {
       setFeedback("Không thể chấm bài. Hãy thử lại.");
     } finally {
@@ -193,12 +202,14 @@ function ShortAnswerExercise({
 export function RemediationExercise({
   exercise,
   onCorrect,
+  lessonId,
 }: {
   exercise: RemediationQuestion;
   onCorrect: () => void;
+  lessonId: string;
 }) {
   if (exercise.type === "mcq") {
     return <McqExercise exercise={exercise} onCorrect={onCorrect} />;
   }
-  return <ShortAnswerExercise exercise={exercise} onCorrect={onCorrect} />;
+  return <ShortAnswerExercise exercise={exercise} onCorrect={onCorrect} lessonId={lessonId} />;
 }

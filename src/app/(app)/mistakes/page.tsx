@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Sparkles, TrendingUp, RefreshCw, BookOpen, CheckCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, Sparkles, TrendingUp, RefreshCw, BookOpen, CheckCircle, HelpCircle, FileText, UserCheck, Clock } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,12 +12,24 @@ import { RemediationExercise } from "@/components/ai/remediation-exercise";
 import type { RemediationQuestion } from "@/components/ai/remediation-exercise";
 import { MathText } from "@/components/ai/math-text";
 
+interface RemediationResult {
+  exercises: RemediationQuestion[];
+  weaknessId: string;
+  topic: string;
+  subjectId: string;
+  gradeLevel: number;
+}
+
 interface WeaknessProfile {
   id: string;
   userId: string;
   lessonId: string;
   topic: string;
+  source: string;
+  weight: number;
   errorCount: number;
+  quizAttempts: number;
+  quizCorrect: number;
   lastErrorAt: string | null;
   remediationExercises: string;
   improvementScore: number;
@@ -29,7 +43,16 @@ interface LessonInfo {
   title: string;
 }
 
+const sourceConfig: Record<string, { icon: typeof HelpCircle; label: string; color: string }> = {
+  quiz: { icon: HelpCircle, label: "Quiz", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  exercise: { icon: FileText, label: "Bài tập", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  profile: { icon: UserCheck, label: "GV thiết lập", color: "bg-red-50 text-red-700 border-red-200" },
+  progress: { icon: Clock, label: "Kẹt bài", color: "bg-orange-50 text-orange-700 border-orange-200" },
+};
+
 export default function MistakesPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<WeaknessProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,16 +119,40 @@ export default function MistakesPage() {
     if (activeItems.length === 0) return;
     setGeneratingId(lessonId);
     try {
-      await Promise.all(
+      const results = await Promise.all(
         activeItems.map((p) =>
-          api<{ exercises: RemediationQuestion[] }>("/api/ai/remediation", {
+          api<RemediationResult>("/api/ai/remediation", {
             method: "POST",
             body: JSON.stringify({ weaknessId: p.id }),
           }).then((result) => {
             setExercises((prev) => ({ ...prev, [p.id]: result.exercises }));
+            return result;
           })
         )
       );
+
+      // Create a single assignment from all generated exercises
+      if (results.length > 0 && user) {
+        const allExercises = results.flatMap((r) => r.exercises);
+        const topics = results.map((r) => r.topic).filter(Boolean);
+        const firstResult = results[0];
+        const lessonTitle = lessonMap[lessonId] || "bài học";
+
+        await api("/api/assignments", {
+          method: "POST",
+          body: JSON.stringify({
+            title: `Bài tập cải thiện: ${topics.join(", ")}`,
+            description: JSON.stringify(allExercises),
+            source: "weakness",
+            studentIds: JSON.stringify([user.id]),
+            subjectId: firstResult.subjectId,
+            gradeLevel: firstResult.gradeLevel,
+            maxScore: allExercises.length * 10,
+          }),
+        });
+
+        router.push("/assignments");
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi tạo bài tập");
     } finally {
@@ -192,6 +239,17 @@ export default function MistakesPage() {
                           <Badge variant="destructive" className="text-xs">
                             {p.errorCount} lần
                           </Badge>
+                          {p.source && sourceConfig[p.source] && (
+                            <Badge variant="outline" className={`text-xs ${sourceConfig[p.source].color}`}>
+                              {(() => { const Icon = sourceConfig[p.source].icon; return <Icon className="size-3 mr-0.5" />; })()}
+                              {sourceConfig[p.source].label}
+                            </Badge>
+                          )}
+                          {p.weight > 0 && (
+                            <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
+                              {p.weight.toFixed(1)} điểm
+                            </Badge>
+                          )}
                           {p.improvementScore > 0 && (
                             <Badge variant="outline" className="text-xs">
                               <TrendingUp className="size-3 mr-1" />
@@ -240,6 +298,7 @@ export default function MistakesPage() {
                           <RemediationExercise
                             key={i}
                             exercise={ex}
+                            lessonId={p.lessonId}
                             onCorrect={() => handleImprove(p.id)}
                           />
                         ))}
