@@ -130,6 +130,10 @@ func (s *Service) GetChildDetail(ctx context.Context, parentID, childID string) 
 	}, nil
 }
 
+func (s *Service) DeleteLinkByID(ctx context.Context, linkID string) error {
+	return s.db.WithContext(ctx).Where("id = ?", linkID).Delete(&ChildLink{}).Error
+}
+
 func (s *Service) LinkChild(ctx context.Context, parentID, childID string) error {
 	link := ChildLink{
 		ID:        uuid.New().String(),
@@ -137,4 +141,63 @@ func (s *Service) LinkChild(ctx context.Context, parentID, childID string) error
 		ChildID:   childID,
 	}
 	return s.db.WithContext(ctx).Create(&link).Error
+}
+
+func (s *Service) UnlinkChild(ctx context.Context, parentID, childID string) error {
+	return s.db.WithContext(ctx).
+		Where("parent_id = ? AND child_id = ?", parentID, childID).
+		Delete(&ChildLink{}).Error
+}
+
+type LinkWithNames struct {
+	ID         string    `json:"id"`
+	ParentID   string    `json:"parentId"`
+	ParentName string    `json:"parentName"`
+	ChildID    string    `json:"childId"`
+	ChildName  string    `json:"childName"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+func (s *Service) ListAllLinks(ctx context.Context) ([]LinkWithNames, error) {
+	var links []ChildLink
+	if err := s.db.WithContext(ctx).Find(&links).Error; err != nil {
+		return nil, err
+	}
+	if len(links) == 0 {
+		return []LinkWithNames{}, nil
+	}
+
+	userIDs := make(map[string]bool)
+	for _, l := range links {
+		userIDs[l.ParentID] = true
+		userIDs[l.ChildID] = true
+	}
+	ids := make([]string, 0, len(userIDs))
+	for id := range userIDs {
+		ids = append(ids, id)
+	}
+
+	type UserRow struct {
+		ID       string
+		FullName string
+	}
+	var users []UserRow
+	s.db.WithContext(ctx).Table("users").Where("id IN ?", ids).Find(&users)
+	nameMap := make(map[string]string, len(users))
+	for _, u := range users {
+		nameMap[u.ID] = u.FullName
+	}
+
+	result := make([]LinkWithNames, len(links))
+	for i, l := range links {
+		result[i] = LinkWithNames{
+			ID:         l.ID,
+			ParentID:   l.ParentID,
+			ParentName: nameMap[l.ParentID],
+			ChildID:    l.ChildID,
+			ChildName:  nameMap[l.ChildID],
+			CreatedAt:  l.CreatedAt,
+		}
+	}
+	return result, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/lms/backend/internal/parent"
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/quizzes"
+	"github.com/lms/backend/internal/studyplanner"
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/users"
 	"github.com/lms/backend/internal/weaknesses"
@@ -42,5 +43,6 @@ func migrate(db *gorm.DB) error {
 		&flashcards.FlashcardDeck{},
 		&flashcards.Flashcard{},
 		&ai.AICache{},
+		&studyplanner.StudyPlan{},
 	)
 }

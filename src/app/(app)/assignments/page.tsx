@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Clock, FileText } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -45,7 +46,15 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
 };
 
 export default function AssignmentsPage() {
+  const router = useRouter();
   const { user } = useAuth();
+
+  // Students don't have assignments page
+  if (user?.role === "STUDENT") {
+    router.replace("/");
+    return null;
+  }
+
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [myStatuses, setMyStatuses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);

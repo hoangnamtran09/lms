@@ -56,7 +56,7 @@ Khi tạo quiz, phải dùng định dạng JSON trong block :::quiz như sau:
 QUAN TRỌNG:
 - LUÔN có ĐÚNG 4 lựa chọn.
 - CHỈ MỘT đáp án đúng (isCorrect: true).
-- Dùng $...$ cho công thức toán trong question, text của options và explanation.
+- Dùng $...$ cho công thức toán trong question, text của options và explanation. Khi viết lệnh LaTeX bên trong chuỗi JSON, PHẢI escape backslash: viết \\cos, \\alpha, \\frac{}{} (gấp đôi backslash).
 - Viết câu hỏi và đáp án bằng tiếng Việt.
 - KHÔNG thêm bất kỳ text nào ngoài JSON trong block :::quiz.
 

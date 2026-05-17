@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const publicPaths = ["/login"];
 const adminPaths = ["/admin"];
+const parentPaths = ["/parent"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -53,6 +54,12 @@ export async function middleware(request: NextRequest) {
     !isAdmin &&
     !(isTeacher && teacherAllowedPaths.some((p) => pathname.startsWith(p)))
   ) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Parent route protection
+  const isParent = role === "PARENT";
+  if (parentPaths.some((p) => pathname.startsWith(p)) && !isParent) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lms/backend/internal/middleware"
 )
 
 type Handler struct {
@@ -68,6 +69,18 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = "STUDENT"
 	}
+
+	// Teacher scoping: only allow creating STUDENT/PARENT, auto-set ClassID
+	if claims := middleware.GetClaims(r.Context()); claims != nil && claims.Role == "TEACHER" {
+		if req.Role != "STUDENT" && req.Role != "PARENT" {
+			jsonError(w, "Giáo viên chỉ có thể tạo tài khoản Học sinh hoặc Phụ huynh", http.StatusForbidden)
+			return
+		}
+		if claims.ClassID != "" {
+			req.ClassID = claims.ClassID
+		}
+	}
+
 	if req.Email == "" {
 		req.Email = req.Username + "@lms.internal"
 	}

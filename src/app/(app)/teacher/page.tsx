@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Users, ClipboardList, Clock, TrendingUp, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +32,15 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function TeacherDashboardPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Redirect if user is not teacher/admin
+  if (user && user.role !== "TEACHER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    router.replace("/");
+    return null;
+  }
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 

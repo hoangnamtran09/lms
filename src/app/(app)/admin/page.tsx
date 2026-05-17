@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Users, BookOpen, ClipboardList, Clock, Download,
-  TrendingUp, Sparkles, GraduationCap, AlertCircle, ArrowUpRight, FileText, CheckCircle2,
+  TrendingUp, Sparkles, GraduationCap, AlertCircle, ArrowUpRight, FileText, CheckCircle2, Heart,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
@@ -208,6 +208,9 @@ export default function AdminDashboardPage() {
               <Link href="/admin/teachers" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors">
                 Giáo viên
               </Link>
+              <Link href="/admin/parents" className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors">
+                Phụ huynh
+              </Link>
             </div>
           </div>
           <div className="space-y-4">
@@ -350,6 +353,19 @@ export default function AdminDashboardPage() {
             <p className="text-xs text-gray-500">{overview.usersByRole.TEACHER || 0} giáo viên</p>
           </div>
           <ArrowUpRight className="size-4 text-gray-300 group-hover:text-purple-500 ml-auto transition-colors" />
+        </Link>
+        <Link
+          href="/admin/parents"
+          className="group flex items-center gap-4 rounded-2xl border border-gray-200 p-4 hover:border-red-300 hover:shadow-md hover:shadow-red-50 transition-all bg-white"
+        >
+          <div className="flex items-center justify-center size-11 rounded-xl bg-red-50 group-hover:bg-red-100 transition-colors">
+            <Heart className="size-5 text-red-500" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Quản lý Phụ huynh</p>
+            <p className="text-xs text-gray-500">{overview.usersByRole.PARENT || 0} phụ huynh</p>
+          </div>
+          <ArrowUpRight className="size-4 text-gray-300 group-hover:text-red-400 ml-auto transition-colors" />
         </Link>
       </div>
 

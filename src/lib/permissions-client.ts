@@ -19,7 +19,7 @@ const permissionMatrix: Record<Role, Partial<Record<Resource, Action[]>>> = {
     ai: ["manage"], children: ["manage"],
   },
   TEACHER: {
-    users: ["read"], courses: ["read", "write"], lessons: ["manage"],
+    users: ["read", "write"], courses: ["read", "write"], lessons: ["manage"],
     subjects: ["read"], assignments: ["read", "write", "grade"],
     grades: ["grade"], analytics: ["read"], achievements: ["read"],
     ai: ["read"], children: ["read"],

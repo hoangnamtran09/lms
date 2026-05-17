@@ -12,6 +12,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import TeacherDashboardPage from "./teacher/page";
+import ParentDashboardPage from "./parent/page";
 
 interface UserStats {
   totalStudySeconds: number;
@@ -74,7 +76,7 @@ const DAILY_GOAL_SECONDS = 2 * 3600;
 const WEEKLY_GOAL_SECONDS = 10 * 3600;
 const DAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
-export default function DashboardPage() {
+function StudentDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [streak, setStreak] = useState<StreakInfo | null>(null);
@@ -479,4 +481,17 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+
+  if (user && (user.role === "TEACHER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN")) {
+    return <TeacherDashboardPage />;
+  }
+  if (user?.role === "PARENT") {
+    return <ParentDashboardPage />;
+  }
+
+  return <StudentDashboard />;
 }

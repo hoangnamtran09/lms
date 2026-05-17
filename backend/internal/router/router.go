@@ -24,6 +24,7 @@ import (
 	"github.com/lms/backend/internal/permissions"
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/quizzes"
+	"github.com/lms/backend/internal/studyplanner"
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/teacher"
 	"github.com/lms/backend/internal/users"
@@ -51,6 +52,7 @@ type Handlers struct {
 	GradeLevels  *gradelevels.Handler
 	Classes      *classes.Handler
 		Flashcards   *flashcards.Handler
+		StudyPlanner *studyplanner.Handler
 }
 
 func New(
@@ -98,7 +100,7 @@ func New(
 	lessonsH.SetR2Delete(mediaH.DeleteByURL)
 	subjectsH.SetR2Delete(mediaH.DeleteByURL)
 	parentSvc := parent.NewService(db)
-	parentH := parent.NewHandler(parentSvc)
+	parentH := parent.NewHandler(parentSvc, usersSvc)
 	progressH := progress.NewHandler(progressSvc, weaknessSvc)
 	gamificationH := gamification.NewHandler(diamondSvc, streakSvc)
 	achievementsH := achievements.NewHandler(achievementsSvc, db)
@@ -113,7 +115,8 @@ func New(
 	classesH := classes.NewHandler(classesSvc)
 		flashcardsSvc := flashcards.NewService(db)
 		flashcardsH := flashcards.NewHandler(flashcardsSvc)
-
+		studyPlannerSvc := studyplanner.NewService(db)
+		studyPlannerH := studyplanner.NewHandler(studyPlannerSvc, aiSvc, db)
 	// Mount
 	h := &Handlers{
 		Auth:         authH,
@@ -135,7 +138,7 @@ func New(
 		GradeLevels:  gradeLevelsH,
 		Classes:      classesH,
 			Flashcards:   flashcardsH,
-	}
+			StudyPlanner: studyPlannerH,	}
 
 	_ = quizzesSvc
 
@@ -298,7 +301,14 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 			r.Get("/api/flashcards/decks/{id}", h.Flashcards.GetDeck)
 			r.Post("/api/flashcards/review", h.Flashcards.ReviewCard)
 			r.Delete("/api/flashcards/decks/{id}", h.Flashcards.DeleteDeck)
-			// Media
+				// Study Planner
+				r.With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+					Post("/api/study-planner/generate", h.StudyPlanner.Generate)
+				r.Get("/api/study-planner/today", h.StudyPlanner.GetToday)
+				r.Get("/api/study-planner/history", h.StudyPlanner.History)
+				r.Patch("/api/study-planner/{id}/task/{taskId}", h.StudyPlanner.CompleteTask)
+				r.Put("/api/study-planner/{id}/reorder", h.StudyPlanner.Reorder)
+				// Media
 		r.Get("/api/media/pdf", h.Media.PDF)
 			r.With(middleware.RequirePermission(permissions.ResLessons, permissions.ActManage)).
 				Post("/api/media/upload", h.Media.Upload)
@@ -373,14 +383,29 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 			r.With(middleware.RequirePermission(permissions.ResClasses, permissions.ActManage)).
 				Delete("/api/classes/{id}", h.Classes.Delete)
 
-			// Teacher dashboard
+			// Teacher
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)
+		r.Get("/api/teacher/students", h.Teacher.ListStudents)
+		r.Post("/api/teacher/link-parent", h.Teacher.LinkParent)
 
-		// Parent
-		r.Get("/api/parents/children", h.Parent.Children)
-		r.Get("/api/parents/children/{id}", h.Parent.ChildDetail)
-		r.Post("/api/parents/link", h.Parent.LinkChild)
-	})
+		// Parent — self-service (view own children)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActRead)).
+			Get("/api/parents/children", h.Parent.Children)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActRead)).
+			Get("/api/parents/children/{id}", h.Parent.ChildDetail)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActManage)).
+			Post("/api/parents/link", h.Parent.LinkChild)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActManage)).
+			Delete("/api/parents/link/{childId}", h.Parent.UnlinkChild)
+
+		// Parent — admin management
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActManage)).
+			Get("/api/admin/parent-links", h.Parent.ListLinks)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActManage)).
+			Post("/api/admin/parent-links", h.Parent.AdminLinkChild)
+		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActManage)).
+			Delete("/api/admin/parent-links/{id}", h.Parent.AdminUnlinkChild)
+		})
 
 	// Health check
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {

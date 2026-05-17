@@ -450,6 +450,50 @@ Nội dung bài học:
 Tạo đúng %d thẻ học tập và trả về mảng JSON.`, subjectName, lessonTitle, gradeLevel, content, count)
 }
 
+// ---- Study Planner ----
+
+const studyPlannerPrompt = `Bạn là trợ lý lập kế hoạch học tập thông minh cho LMS. Dựa trên dữ liệu học tập của học sinh, hãy tạo một kế hoạch học tập cho HÔM NAY.
+
+**Dữ liệu học sinh:**
+%s
+
+**Yêu cầu kế hoạch:**
+1. Tạo 4-7 nhiệm vụ học tập cho hôm nay, sắp xếp theo thứ tự ưu tiên (quan trọng nhất trước).
+2. Mỗi nhiệm vụ phải có:
+   - "title": tiêu đề ngắn gọn, hấp dẫn (VD: "Ôn tập Phân Số", "Luyện bài tập Hóa trị")
+   - "description": mô tả 1-2 câu về việc cần làm, bằng tiếng Việt
+   - "type": loại nhiệm vụ: "review" (ôn tập), "practice" (luyện tập), "quiz" (kiểm tra), hoặc "assignment" (bài tập có hạn)
+   - "estimatedMinutes": thời gian ước tính (phút), từ 10-45 phút
+   - "subjectName": tên môn học liên quan
+3. Ưu tiên các chủ đề yếu và bài tập sắp đến hạn.
+4. Đa dạng loại nhiệm vụ, không nên toàn bộ là review.
+5. Tổng thời gian ước tính từ 60-120 phút.
+6. Lời văn khích lệ, tích cực, xưng "bạn".
+
+**Định dạng Output (MẢNG JSON):**
+[
+  {
+    "title": "Ôn tập Phân Số",
+    "description": "Xem lại bài học về phép cộng và nhân phân số, tập trung vào các ví dụ trong SGK.",
+    "type": "review",
+    "estimatedMinutes": 20,
+    "subjectName": "Toán"
+  },
+  {
+    "title": "Hoàn thành bài tập Hóa trị",
+    "description": "Làm bài tập về quy tắc hóa trị, chú ý các nguyên tố nhóm IIA.",
+    "type": "practice",
+    "estimatedMinutes": 25,
+    "subjectName": "Hóa học"
+  }
+]
+
+CHỈ trả về mảng JSON, không thêm text hay markdown.`
+
+func BuildStudyPlannerPrompt(contextData string) string {
+	return fmt.Sprintf(studyPlannerPrompt, contextData)
+}
+
 func BuildAssignmentPreGradePrompt(title, description, rubricText, submissionContent string, maxScore int) string {
 	if rubricText == "" {
 		rubricText = "Không có rubric cụ thể. Tự đánh giá theo chất lượng nội dung."

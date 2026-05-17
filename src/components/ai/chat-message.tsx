@@ -17,6 +17,14 @@ function stripWeaknessMarkers(content: string): string {
   return content.replace(/:::weakness topic="[^"]*"/g, "");
 }
 
+// sanitizeLaTeXInJSON fixes common LaTeX backslash issues that break JSON.parse.
+// AI sometimes writes $\cos$ instead of $\\cos$ inside JSON strings.
+function sanitizeLaTeXInJSON(jsonStr: string): string {
+  // Replace single backslashes followed by LaTeX commands with double backslashes.
+  // Uses negative lookbehind to skip already-escaped backslashes.
+  return jsonStr.replace(/(?<!\\)\\([a-zA-Z]+)/g, "\\\\$1");
+}
+
 // Parse ::quiz markers and extract JSON blocks
 function parseQuizBlocks(
   content: string
@@ -32,12 +40,20 @@ function parseQuizBlocks(
     if (match.index > lastIdx) {
       parts.push({ type: "text", content: cleaned.slice(lastIdx, match.index) });
     }
-    // Parse quiz JSON
+    // Parse quiz JSON — try direct parse first, then sanitize LaTeX backslashes and retry
+    let quiz: QuizData | undefined;
     try {
-      const quiz: QuizData = JSON.parse(match[1]);
-      parts.push({ type: "quiz", content: match[0], quiz });
+      quiz = JSON.parse(match[1]);
     } catch {
-      // If JSON is malformed, render as plain text
+      try {
+        quiz = JSON.parse(sanitizeLaTeXInJSON(match[1]));
+      } catch {
+        // Still broken — render as plain text
+      }
+    }
+    if (quiz) {
+      parts.push({ type: "quiz", content: match[0], quiz });
+    } else {
       parts.push({ type: "text", content: match[0] });
     }
     lastIdx = match.index + match[0].length;
@@ -115,7 +131,7 @@ export function ChatMessage({
           if (hideQuizzes) {
             return (
               <div key={i} className="my-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                Bài trắc nghiệm đã được chuyển vào bảng thông tin bên trên. Hãy trả lời tại đó.
+                Bài trắc nghiệm đã được chuyển vào bảng thông tin bên trái. Hãy trả lời tại đó.
               </div>
             );
           }

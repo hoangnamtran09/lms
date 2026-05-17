@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Map,
   Shield,
-  Presentation,
   Heart,
   UserCog,
   ScreenShare,
@@ -24,6 +23,8 @@ import {
   ClipboardCheck,
   Brain,
   Layers,
+  Settings,
+  Presentation,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,21 +39,23 @@ const allNavItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT", "STUDENT"] },
   { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
   { label: "Học sinh", href: "/students", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
-  { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT", "PARENT"] },
+  { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT"] },
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
   { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
   { label: "Lộ trình", href: "/roadmap", icon: Map, roles: ["STUDENT"] },
+	  { label: "Kế hoạch học tập", href: "/study-planner", icon: Calendar, roles: ["STUDENT"] },
   { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
   { label: "Flashcards", href: "/flashcards", icon: Layers, roles: ["STUDENT"] },
-
-  { label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
-  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
+	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+	  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
+  { label: "Cài đặt", href: "/parent/settings", icon: Settings, roles: ["PARENT"] },
   // Admin management
   { label: "Tổng quan", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí lớp học", href: "/admin/classes", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
 
 ];
