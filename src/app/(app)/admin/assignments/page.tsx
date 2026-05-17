@@ -128,12 +128,18 @@ export default function AdminAssignmentsPage() {
       .finally(() => setLoading(false));
   };
 
+  useEffect(() => { fetchAssignments(); }, []);
+
+  // Fetch students filtered by selected class
   useEffect(() => {
-    fetchAssignments();
-    api<StudentBrief[]>("/api/users?role=STUDENT")
-      .then((data) => setStudents(data))
-      .catch(() => {});
-  }, []);
+    setSelectedStudentIds([]);
+    const url = classId
+      ? `/api/users?role=STUDENT&classId=${classId}`
+      : "/api/users?role=STUDENT";
+    api<StudentBrief[]>(url)
+      .then((data) => setStudents(data || []))
+      .catch(() => setStudents([]));
+  }, [classId]);
 
   // Fetch subjects on mount
   useEffect(() => {
@@ -946,7 +952,7 @@ export default function AdminAssignmentsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Link href={`/assignments/${a.id}`}>
+                        <Link href={`/admin/assignments/${a.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="size-3" />
                           </Button>

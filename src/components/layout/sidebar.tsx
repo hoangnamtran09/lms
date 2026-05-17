@@ -22,6 +22,8 @@ import {
   ScreenShare,
   Library,
   ClipboardCheck,
+  Brain,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +42,8 @@ const allNavItems: NavItem[] = [
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
   { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
   { label: "Lộ trình", href: "/roadmap", icon: Map, roles: ["STUDENT"] },
+  { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
+  { label: "Flashcards", href: "/flashcards", icon: Layers, roles: ["STUDENT"] },
 
   { label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
   { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },

@@ -45,8 +45,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin route protection
-  if (adminPaths.some((p) => pathname.startsWith(p)) && !isAdmin) {
+  // Admin route protection — allow teachers on /admin/assignments for grading
+  const isTeacher = role === "TEACHER";
+  const teacherAllowedPaths = ["/admin/assignments"];
+  if (
+    adminPaths.some((p) => pathname.startsWith(p)) &&
+    !isAdmin &&
+    !(isTeacher && teacherAllowedPaths.some((p) => pathname.startsWith(p)))
+  ) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

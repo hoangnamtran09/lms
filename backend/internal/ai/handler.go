@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -23,11 +24,12 @@ type Handler struct {
 	weaknessService *weaknesses.Service
 	diamondService  *gamification.DiamondService
 	courseService   *courses.Service
+	cacheService    *CacheService
 	db              *gorm.DB
 }
 
-func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, db *gorm.DB) *Handler {
-	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, db: db}
+func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, cacheSvc *CacheService, db *gorm.DB) *Handler {
+	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, cacheService: cacheSvc, db: db}
 }
 
 type chatInput struct {
@@ -530,6 +532,34 @@ func (h *Handler) Grade(w http.ResponseWriter, r *http.Request) {
 	jsonOk(w, result)
 }
 
+// normalizeScores scales question scores so their total equals exactly 10.
+func normalizeScores(questions []map[string]interface{}) {
+	var total float64
+	for _, q := range questions {
+		if s, ok := q["score"].(float64); ok {
+			total += s
+		}
+	}
+	if total > 0 && math.Abs(total-10) > 0.01 {
+		scale := 10 / total
+		var roundedTotal float64
+		for i := range questions {
+			if s, ok := questions[i]["score"].(float64); ok {
+				questions[i]["score"] = math.Round(s * scale)
+				roundedTotal += questions[i]["score"].(float64)
+			}
+		}
+		if d := 10 - roundedTotal; d != 0 {
+			for i := range questions {
+				if s, ok := questions[i]["score"].(float64); ok && s+d >= 0 {
+					questions[i]["score"] = s + d
+					break
+				}
+			}
+		}
+	}
+}
+
 // ---- Generate Assignment from Lesson ----
 
 type generateAssignmentInput struct {
@@ -596,6 +626,7 @@ func (h *Handler) GenerateAssignment(w http.ResponseWriter, r *http.Request) {
 			questions[i]["score"] = 10
 		}
 	}
+	normalizeScores(questions)
 
 	jsonOk(w, map[string]interface{}{
 		"questions":    questions,
@@ -843,13 +874,14 @@ func (h *Handler) GenerateRemediationAssignment(w http.ResponseWriter, r *http.R
 Tạo 4-5 bài tập khắc phục, kết hợp trắc nghiệm và câu trả lời ngắn:
 
 - Trắc nghiệm:
-  {"type": "mcq", "question": "...", "options": [{"text": "Đáp án A", "isCorrect": false}, {"text": "Đáp án B", "isCorrect": true}, {"text": "Đáp án C", "isCorrect": false}, {"text": "Đáp án D", "isCorrect": false}], "expectedAnswer": "B", "explanation": "Giải thích ngắn gọn", "score": 10}
+  {"type": "mcq", "question": "...", "options": [{"text": "Đáp án A", "isCorrect": false}, {"text": "Đáp án B", "isCorrect": true}, {"text": "Đáp án C", "isCorrect": false}, {"text": "Đáp án D", "isCorrect": false}], "expectedAnswer": "B", "explanation": "Giải thích ngắn gọn", "score": <điểm từ 1-3>}
 
 - Câu trả lời ngắn:
-  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án chính xác (TỐI ĐA 5 TỪ)", "explanation": "Giải thích ngắn gọn", "score": 10}
+  {"type": "short_answer", "question": "...", "expectedAnswer": "Đáp án chính xác (TỐI ĐA 5 TỪ)", "explanation": "Giải thích ngắn gọn", "score": <điểm từ 1-3>}
 
 Yêu cầu:
 - ÍT NHẤT 1 trắc nghiệm VÀ 1 câu trả lời ngắn
+- TỔNG điểm tất cả câu hỏi = 10
 - Câu hỏi bằng tiếng Việt, NGẮN GỌN, bám sát chủ đề
 - expectedAnswer: đáp án NGẮN, cụ thể (tối đa 5 từ)
 - Dùng $...$ cho công thức toán
@@ -887,14 +919,17 @@ Yêu cầu:
 		}
 	}
 
-	// Add IDs and defaults
-	maxScore := 0
+	// Add IDs and defaults, normalize scores to total=10
 	for i := range questions {
 		questions[i]["id"] = uuid.New().String()
 		if _, ok := questions[i]["score"]; !ok {
 			questions[i]["score"] = 10
 		}
-		if s, ok := questions[i]["score"].(float64); ok {
+	}
+	normalizeScores(questions)
+	maxScore := 0
+	for _, q := range questions {
+		if s, ok := q["score"].(float64); ok {
 			maxScore += int(s)
 		}
 	}
@@ -932,6 +967,331 @@ Yêu cầu:
 		"title":                title,
 		"questions":            questions,
 		"assignedStudentCount": len(studentIDs),
+	})
+}
+
+// ---- Graph types for Mind Map & Knowledge Graph ----
+
+type GraphNode struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Type        string `json:"type"`
+	Mastery     string `json:"mastery"`
+	Description string `json:"description"`
+}
+
+type GraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Label  string `json:"label"`
+}
+
+type GraphResult struct {
+	CentralTopic string      `json:"centralTopic"`
+	Nodes        []GraphNode `json:"nodes"`
+	Edges        []GraphEdge `json:"edges"`
+}
+
+// ---- Mind Map ----
+
+type mindmapInput struct {
+	LessonID string `json:"lessonId"`
+}
+
+func (h *Handler) MindMap(w http.ResponseWriter, r *http.Request) {
+	var req mindmapInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.LessonID == "" {
+		jsonErr(w, "lessonId là bắt buộc", http.StatusBadRequest)
+		return
+	}
+
+	// Check cache first — massive token savings
+	cacheKey := mindmapCacheKey(req.LessonID)
+	if cached, ok := h.cacheService.Get(r.Context(), cacheKey); ok {
+		var result GraphResult
+		if err := json.Unmarshal([]byte(cached), &result); err == nil {
+			claims := middleware.GetClaims(r.Context())
+			if claims != nil {
+				profiles, _ := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+				mergeMastery(result.Nodes, profiles)
+			}
+			jsonOk(w, result)
+			return
+		}
+	}
+
+	ctx_, err := h.lessonService.GetContext(r.Context(), req.LessonID)
+	if err != nil {
+		jsonErr(w, "Không tìm thấy bài học", http.StatusNotFound)
+		return
+	}
+
+	prompt := BuildMindMapPrompt(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, ctx_.GradeLevel)
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là trợ lý tạo sơ đồ tư duy. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var result GraphResult
+	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
+		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Inject central node if not already present
+	hasCentral := false
+	for i := range result.Nodes {
+		if result.Nodes[i].ID == "central" {
+			hasCentral = true
+			result.Nodes[i].Label = result.CentralTopic
+			result.Nodes[i].Type = "concept"
+			result.Nodes[i].Mastery = "mastered"
+			break
+		}
+	}
+	if !hasCentral {
+		result.Nodes = append([]GraphNode{{ID: "central", Label: result.CentralTopic, Type: "concept", Mastery: "mastered"}}, result.Nodes...)
+	}
+
+	// Cache the result (before personalizing with weakness)
+	cachedJSON, _ := json.Marshal(result)
+	h.cacheService.Set(r.Context(), cacheKey, string(cachedJSON))
+
+	// Merge weakness data for color coding
+	claims := middleware.GetClaims(r.Context())
+	if claims != nil {
+		profiles, _ := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+		mergeMastery(result.Nodes, profiles)
+	}
+
+	jsonOk(w, result)
+}
+
+// ---- Knowledge Graph ----
+
+type knowledgeGraphInput struct {
+	SubjectID string `json:"subjectId"`
+}
+
+func (h *Handler) KnowledgeGraph(w http.ResponseWriter, r *http.Request) {
+	var req knowledgeGraphInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.SubjectID == "" {
+		jsonErr(w, "subjectId là bắt buộc", http.StatusBadRequest)
+		return
+	}
+
+	// Check cache first
+	cacheKey := kgCacheKey(req.SubjectID)
+	if cached, ok := h.cacheService.Get(r.Context(), cacheKey); ok {
+		var result GraphResult
+		if err := json.Unmarshal([]byte(cached), &result); err == nil {
+			claims := middleware.GetClaims(r.Context())
+			if claims != nil {
+				profiles, _ := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+				mergeMastery(result.Nodes, profiles)
+			}
+			jsonOk(w, result)
+			return
+		}
+	}
+
+	// Get subject
+	var subject struct {
+		ID         string `gorm:"primaryKey;size:36"`
+		Name       string
+		GradeLevel int
+	}
+	if err := h.db.WithContext(r.Context()).Table("subjects").Where("id = ?", req.SubjectID).First(&subject).Error; err != nil {
+		jsonErr(w, "Không tìm thấy môn học", http.StatusNotFound)
+		return
+	}
+
+	// Get all courses for this subject
+	var courses []struct {
+		ID string
+	}
+	h.db.WithContext(r.Context()).Table("courses").Where("subject_id = ?", req.SubjectID).Find(&courses)
+	courseIDs := make([]string, len(courses))
+	for i, c := range courses {
+		courseIDs[i] = c.ID
+	}
+
+	// Get all lessons for these courses
+	var summaries strings.Builder
+	if len(courseIDs) > 0 {
+		var lessons []struct {
+			Title       string
+			Description string
+		}
+		h.db.WithContext(r.Context()).Table("lessons").Where("course_id IN ?", courseIDs).Find(&lessons)
+		for _, l := range lessons {
+			summaries.WriteString(fmt.Sprintf("Tiêu đề: %s\nMô tả: %s\n\n", l.Title, l.Description))
+		}
+	}
+	summaryStr := summaries.String()
+	if summaryStr == "" {
+		summaryStr = "Chưa có bài học nào trong môn học này"
+	}
+
+	prompt := BuildKnowledgeGraphPrompt(subject.Name, subject.GradeLevel, summaryStr)
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là trợ lý tạo đồ thị tri thức. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var result GraphResult
+	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
+		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Cache the result
+	cachedJSON, _ := json.Marshal(result)
+	h.cacheService.Set(r.Context(), cacheKey, string(cachedJSON))
+
+	// Merge weakness data
+	claims := middleware.GetClaims(r.Context())
+	if claims != nil {
+		profiles, _ := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+		mergeMastery(result.Nodes, profiles)
+	}
+
+	jsonOk(w, result)
+}
+
+// mergeMastery sets mastery field on nodes based on user's weakness data.
+func mergeMastery(nodes []GraphNode, profiles []weaknesses.WeaknessProfile) {
+	for i := range nodes {
+		nodes[i].Mastery = "mastered"
+		for _, p := range profiles {
+			if p.Resolved {
+				continue
+			}
+			match := strings.Contains(strings.ToLower(nodes[i].Label), strings.ToLower(p.Topic)) ||
+				strings.Contains(strings.ToLower(p.Topic), strings.ToLower(nodes[i].Label))
+			if match {
+				if p.ErrorCount > 2 {
+					nodes[i].Mastery = "weak"
+				} else if p.ImprovementScore > 0 {
+					nodes[i].Mastery = "learning"
+				} else {
+					nodes[i].Mastery = "weak"
+				}
+				break
+			}
+		}
+		if nodes[i].Mastery == "mastered" {
+			// Check if any related weakness was resolved (partial mastery)
+			for _, p := range profiles {
+				if p.Resolved {
+					match := strings.Contains(strings.ToLower(nodes[i].Label), strings.ToLower(p.Topic)) ||
+						strings.Contains(strings.ToLower(p.Topic), strings.ToLower(nodes[i].Label))
+					if match {
+						nodes[i].Mastery = "learning"
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+// ---- Generate Flashcards ----
+
+type generateFlashcardsInput struct {
+	LessonID string `json:"lessonId"`
+	Count    int    `json:"count"`
+}
+
+func (h *Handler) GenerateFlashcards(w http.ResponseWriter, r *http.Request) {
+	var req generateFlashcardsInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.LessonID == "" {
+		jsonErr(w, "lessonId là bắt buộc", http.StatusBadRequest)
+		return
+	}
+	if req.Count <= 0 {
+		req.Count = 10
+	}
+	if req.Count > 20 {
+		req.Count = 20
+	}
+
+	ctx_, err := h.lessonService.GetContext(r.Context(), req.LessonID)
+	if err != nil {
+		jsonErr(w, "Không tìm thấy bài học", http.StatusNotFound)
+		return
+	}
+
+	// Check cache first — same cards for all users, personalization comes from SM-2
+	cacheKey := flashcardsCacheKey(req.LessonID, req.Count)
+	if cached, ok := h.cacheService.Get(r.Context(), cacheKey); ok {
+		var cards []map[string]interface{}
+		if err := json.Unmarshal([]byte(cached), &cards); err == nil {
+			for i := range cards {
+				cards[i]["id"] = uuid.New().String()
+			}
+			jsonOk(w, map[string]interface{}{
+				"cards":       cards,
+				"lessonTitle": ctx_.LessonTitle,
+				"subjectName": ctx_.SubjectName,
+			})
+			return
+		}
+	}
+
+	prompt := BuildFlashcardPrompt(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, req.Count, ctx_.GradeLevel)
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tạo thẻ học tập. Chỉ trả về MẢNG JSON, không thêm markdown."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var cards []map[string]interface{}
+	cleaned := extractJSON(response)
+	if err := json.Unmarshal([]byte(cleaned), &cards); err != nil {
+		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Cache cards (without per-user IDs)
+	cachedJSON, _ := json.Marshal(cards)
+	h.cacheService.Set(r.Context(), cacheKey, string(cachedJSON))
+
+	// Add IDs to each card
+	for i := range cards {
+		cards[i]["id"] = uuid.New().String()
+	}
+
+	jsonOk(w, map[string]interface{}{
+		"cards":       cards,
+		"lessonTitle": ctx_.LessonTitle,
+		"subjectName": ctx_.SubjectName,
 	})
 }
 

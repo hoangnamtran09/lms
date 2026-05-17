@@ -71,6 +71,23 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 // --- Submissions ---
 
 func (s *Service) Submit(ctx context.Context, sub *Submission) error {
+	// Check for existing submission from this student for this assignment
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&Submission{}).
+		Where("assignment_id = ? AND student_id = ?", sub.AssignmentID, sub.StudentID).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		// Check if assignment allows resubmission
+		var assignment Assignment
+		if err := s.db.WithContext(ctx).Where("id = ?", sub.AssignmentID).First(&assignment).Error; err != nil {
+			return err
+		}
+		if !assignment.AllowResubmit {
+			return fmt.Errorf("bạn đã nộp bài tập này rồi")
+		}
+	}
 	sub.Status = StatusSubmitted
 	sub.SubmittedAt = time.Now()
 	return s.db.WithContext(ctx).Create(sub).Error

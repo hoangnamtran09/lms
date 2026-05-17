@@ -27,6 +27,7 @@ import (
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/teacher"
 	"github.com/lms/backend/internal/users"
+	"github.com/lms/backend/internal/flashcards"
 	"github.com/lms/backend/internal/weaknesses"
 )
 
@@ -49,6 +50,7 @@ type Handlers struct {
 	Analytics    *analytics.Handler
 	GradeLevels  *gradelevels.Handler
 	Classes      *classes.Handler
+		Flashcards   *flashcards.Handler
 }
 
 func New(
@@ -87,7 +89,8 @@ func New(
 	subjectsH := subjects.NewHandler(subjectsSvc, db)
 	coursesH := courses.NewHandler(coursesSvc)
 	lessonsH := lessons.NewHandler(lessonsSvc)
-	aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, db)
+		cacheSvc := ai.NewCacheService(db)
+		aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, cacheSvc, db)
 	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
@@ -108,6 +111,8 @@ func New(
 	gradeLevelsH := gradelevels.NewHandler(gradeLevelsSvc)
 	classesSvc := classes.NewService(db)
 	classesH := classes.NewHandler(classesSvc)
+		flashcardsSvc := flashcards.NewService(db)
+		flashcardsH := flashcards.NewHandler(flashcardsSvc)
 
 	// Mount
 	h := &Handlers{
@@ -129,6 +134,7 @@ func New(
 		Analytics:    analyticsH,
 		GradeLevels:  gradeLevelsH,
 		Classes:      classesH,
+			Flashcards:   flashcardsH,
 	}
 
 	_ = quizzesSvc
@@ -269,13 +275,30 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
 			Post("/api/ai/lesson-summary", h.AI.LessonSummary)
-		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+			// AI — Mind Map & Knowledge Graph (10 req/min)
+			r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+				With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+				Post("/api/ai/mindmap", h.AI.MindMap)
+			r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+				With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+				Post("/api/ai/knowledge-graph", h.AI.KnowledgeGraph)
+			// AI — Flashcard generation (10 req/min)
+			r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
+				With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+				Post("/api/ai/flashcards/generate", h.AI.GenerateFlashcards)
+			r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			Get("/api/ai/chat-history", h.ChatHistory.Load)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			Post("/api/ai/chat-history", h.ChatHistory.Save)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			Post("/api/ai/chat-history/clear", h.ChatHistory.Clear)
-		// Media
+			// Flashcard decks CRUD
+			r.Post("/api/flashcards/decks", h.Flashcards.CreateDeck)
+			r.Get("/api/flashcards/decks", h.Flashcards.ListDecks)
+			r.Get("/api/flashcards/decks/{id}", h.Flashcards.GetDeck)
+			r.Post("/api/flashcards/review", h.Flashcards.ReviewCard)
+			r.Delete("/api/flashcards/decks/{id}", h.Flashcards.DeleteDeck)
+			// Media
 		r.Get("/api/media/pdf", h.Media.PDF)
 			r.With(middleware.RequirePermission(permissions.ResLessons, permissions.ActManage)).
 				Post("/api/media/upload", h.Media.Upload)

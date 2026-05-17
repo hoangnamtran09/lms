@@ -2,16 +2,17 @@
 
 import { useEffect, useState, use, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Send, Sparkles, RefreshCw, FileText, Check, X } from "lucide-react";
+import { ArrowLeft, Send, FileText, Check, X } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { RemediationExercise } from "@/components/ai/remediation-exercise";
 import type { RemediationQuestion, ExerciseAnswer } from "@/components/ai/remediation-exercise";
+import { MathText } from "@/components/ai/math-text";
 
 interface Assignment {
   id: string;
@@ -27,11 +28,42 @@ interface Assignment {
   createdAt: string;
 }
 
+interface McqOption {
+  text: string;
+  isCorrect: boolean;
+}
+
 interface Question {
   id: string;
   question: string;
   expectedAnswer: string;
   score: number;
+  type?: "mcq" | "short_answer";
+  options?: McqOption[];
+  explanation?: string;
+}
+
+function detectQuestionType(q: Question): "mcq" | "short_answer" {
+  if (q.type === "mcq" || (q.options && q.options.length > 0)) return "mcq";
+  if (q.type === "short_answer") return "short_answer";
+  const letterAnswer = /^[A-D]$/i.test(q.expectedAnswer?.trim() || "");
+  const hasOptionPattern = /[A-D]\.\s/.test(q.question);
+  if (letterAnswer && hasOptionPattern) return "mcq";
+  return "short_answer";
+}
+
+function parseInlineMcqOptions(questionText: string): McqOption[] {
+  const lines = questionText.split(/\n/);
+  const options: McqOption[] = [];
+  const letterRegex = /^([A-D])[.)]\s*(.+)$/;
+  for (const line of lines) {
+    const m = line.trim().match(letterRegex);
+    if (m) {
+      options.push({ text: m[2], isCorrect: false });
+    }
+  }
+  if (options.length >= 2 && options.length <= 6) return options;
+  return [];
 }
 
 interface QuestionResult {
@@ -67,53 +99,6 @@ const statusLabel: Record<string, string> = {
 
 const backLink = "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-4";
 
-function SubmissionContent({ content, questions }: { content: string; questions: Question[] }) {
-  // Try to parse as per-question answers JSON
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed.answers && Array.isArray(parsed.answers)) {
-      const answerMap = new Map(parsed.answers.map((a: { questionId: string; answer: string }) => [a.questionId, a.answer]));
-      return (
-        <div className="space-y-2 mb-2">
-          {questions.map((q, i) => (
-            <div key={q.id} className="text-sm">
-              <span className="font-medium text-gray-700">Câu {i + 1}:</span>{" "}
-              <span className="text-gray-600">{String(answerMap.get(q.id) || "(không trả lời)")}</span>
-            </div>
-          ))}
-          {questions.length === 0 && (
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{(parsed.summary || content)}</p>
-          )}
-        </div>
-      );
-    }
-    if (parsed.summary) {
-      return <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{parsed.summary}</p>;
-    }
-  } catch {}
-  return <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{content}</p>;
-}
-
-function GradingDetails({ feedback }: { feedback: string }) {
-  try {
-    const details: QuestionResult[] = JSON.parse(feedback);
-    if (Array.isArray(details) && details.length > 0) {
-      return (
-        <div className="space-y-1 mt-2">
-          {details.map((d, i) => (
-            <div key={d.questionId} className="text-xs text-gray-500 flex items-center gap-2">
-              <span className="font-medium">C{i + 1}:</span>
-              <Badge variant="outline" className="text-xs">{d.score}/{d.maxScore}</Badge>
-              <span className="truncate">{d.feedback}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-  } catch {}
-  return <p className="text-sm text-gray-600 mt-2 w-full">{feedback}</p>;
-}
-
 export default function AssignmentDetailPage({
   params,
 }: {
@@ -129,17 +114,13 @@ export default function AssignmentDetailPage({
   // Student state
   const [answer, setAnswer] = useState("");
   const [perQuestionAnswers, setPerQuestionAnswers] = useState<Record<string, string>>({});
+  const [mcqSelections, setMcqSelections] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [mySubmitted, setMySubmitted] = useState(false);
+  const [locallyGraded, setLocallyGraded] = useState(false);
+  const [mcqResults, setMcqResults] = useState<Record<string, { isCorrect: boolean }>>({});
 
-  // Teacher grading state
-  const [gradingId, setGradingId] = useState<string | null>(null);
-  const [gradeScore, setGradeScore] = useState("");
-  const [gradeFeedback, setGradeFeedback] = useState("");
-  const [grading, setGrading] = useState(false);
-  const [autoGrading, setAutoGrading] = useState(false);
-
-  const isTeacher = user?.role === "TEACHER" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const mySubmission = submissions.find((s) => s.studentId === user?.id);
 
   // Weakness auto-resolve tracking
@@ -225,15 +206,22 @@ export default function AssignmentDetailPage({
     }
   })();
 
-  // Parse grading details from submission feedback
+  // Parse grading details from submission feedback (handles text prefix + JSON)
   const gradingDetails: QuestionResult[] = (() => {
     if (!mySubmission?.feedback) return [];
     try {
       const parsed = JSON.parse(mySubmission.feedback);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    // Find JSON array in text (e.g. "Tổng điểm: 4/10\n[{...}]")
+    const start = mySubmission.feedback.indexOf("[");
+    if (start > 0) {
+      try {
+        const parsed = JSON.parse(mySubmission.feedback.substring(start));
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
     }
+    return [];
   })();
 
   const loadData = () => {
@@ -252,17 +240,87 @@ export default function AssignmentDetailPage({
 
   useEffect(() => { loadData(); }, [id]);
 
+  // Restore submission state from sessionStorage on mount
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(`submitted-${id}`) === "true") {
+        setMySubmitted(true);
+      }
+    } catch {}
+  }, [id]);
+
+  // Restore previous answers and compute MCQ results from submission
+  useEffect(() => {
+    if (questions.length === 0) return;
+    const content = mySubmission?.content || (() => {
+      try { return sessionStorage.getItem(`submitted-${id}-content`); } catch { return null; }
+    })();
+    if (!content) return;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.answers && Array.isArray(parsed.answers)) {
+        const selections: Record<string, number> = {};
+        const texts: Record<string, string> = {};
+        const results: Record<string, { isCorrect: boolean }> = {};
+        parsed.answers.forEach((a: { questionId: string; answer: string }) => {
+          const q = questions.find((q) => q.id === a.questionId);
+          if (!q) return;
+          if (detectQuestionType(q) === "mcq") {
+            const idx = a.answer ? a.answer.toUpperCase().charCodeAt(0) - 65 : -1;
+            if (idx >= 0 && idx < 4) {
+              selections[q.id] = idx;
+              const correctLetter = q.expectedAnswer?.trim().toUpperCase();
+              results[q.id] = { isCorrect: a.answer.toUpperCase() === correctLetter };
+            }
+          } else {
+            texts[q.id] = a.answer || "";
+          }
+        });
+        setMcqSelections(selections);
+        setPerQuestionAnswers(texts);
+        if (Object.keys(results).length > 0) {
+          setMcqResults(results);
+          setLocallyGraded(true);
+        }
+        setMySubmitted(true);
+        try { sessionStorage.setItem(`submitted-${id}`, "true"); } catch {}
+      }
+    } catch {}
+  }, [mySubmission, questions]);
+
   const handleSubmit = async () => {
+    // Prevent duplicate submissions
+    if (mySubmission || mySubmitted || submitting) return;
     const hasQuestions = questions.length > 0;
     if (!hasQuestions && !answer.trim()) return;
-    if (hasQuestions && Object.values(perQuestionAnswers).every((v) => !v.trim())) return;
+    if (hasQuestions) {
+      const anyMcqAnswered = questions.some((q) => detectQuestionType(q) === "mcq" && mcqSelections[q.id] != null);
+      const anyShortAnswered = questions.some((q) => detectQuestionType(q) !== "mcq" && perQuestionAnswers[q.id]?.trim());
+      if (!anyMcqAnswered && !anyShortAnswered) return;
+    }
     setSubmitting(true);
+
+    // Grade MCQs locally
+    const results: Record<string, { isCorrect: boolean }> = {};
+    questions.forEach((q) => {
+      if (detectQuestionType(q) === "mcq") {
+        const selectedIdx = mcqSelections[q.id];
+        const correctLetter = q.expectedAnswer?.trim().toUpperCase();
+        const selectedLetter = selectedIdx != null ? String.fromCharCode(65 + selectedIdx) : "";
+        results[q.id] = { isCorrect: selectedLetter === correctLetter };
+      }
+    });
+    setMcqResults(results);
+    setLocallyGraded(true);
+
     try {
       const content = hasQuestions
         ? JSON.stringify({
             answers: questions.map((q) => ({
               questionId: q.id,
-              answer: perQuestionAnswers[q.id] || "",
+              answer: detectQuestionType(q) === "mcq"
+                ? String.fromCharCode(65 + (mcqSelections[q.id] ?? 0))
+                : (perQuestionAnswers[q.id] || ""),
             })),
           })
         : answer;
@@ -270,42 +328,35 @@ export default function AssignmentDetailPage({
         method: "POST",
         body: JSON.stringify({ assignmentId: id, content }),
       });
+      // Optimistically add submission so mySubmission is found immediately
+      const optimistic: Submission = {
+        id: "optimistic-" + Date.now(),
+        assignmentId: id,
+        studentId: user?.id || "",
+        studentName: user?.fullName || "",
+        content,
+        fileUrl: "",
+        score: null,
+        feedback: "",
+        status: "SUBMITTED",
+        submittedAt: new Date().toISOString(),
+        gradedAt: null,
+        gradedBy: "",
+      };
+      setSubmissions((prev) => [...prev, optimistic]);
       setSubmitted(true);
+      setMySubmitted(true);
       setAnswer("");
-      setPerQuestionAnswers({});
+      // Persist submission state to survive page reload
+      try {
+        sessionStorage.setItem(`submitted-${id}`, "true");
+        sessionStorage.setItem(`submitted-${id}-content`, content);
+      } catch {}
       loadData();
     } catch (e: any) {
       setError(e.message);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleGrade = async (submissionId: string) => {
-    setGrading(true);
-    try {
-      await api(`/api/submissions/${submissionId}/grade`, {
-        method: "PATCH",
-        body: JSON.stringify({ score: parseInt(gradeScore), feedback: gradeFeedback }),
-      });
-      setGradingId(null);
-      loadData();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setGrading(false);
-    }
-  };
-
-  const handleAutoGrade = async (submissionId: string) => {
-    setAutoGrading(true);
-    try {
-      await api(`/api/submissions/${submissionId}/auto-grade`, { method: "POST" });
-      loadData();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setAutoGrading(false);
     }
   };
 
@@ -345,6 +396,8 @@ export default function AssignmentDetailPage({
               <Badge>
                 {mySubmission
                   ? statusLabel[mySubmission.status] || mySubmission.status
+                  : mySubmitted
+                  ? "Đã nộp"
                   : statusLabel[assignment.status] || assignment.status}
               </Badge>
             </div>
@@ -377,12 +430,133 @@ export default function AssignmentDetailPage({
               </div>
             ) : questions.length > 0 ? (
               <div className="mt-3 space-y-3">
-                {questions.map((q, i) => (
-                  <div key={q.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm font-bold text-purple-600 mb-1">Câu {i + 1} ({q.score || 10}đ)</p>
-                    <p className="text-gray-700 whitespace-pre-wrap">{q.question}</p>
-                  </div>
-                ))}
+                {questions.map((q, i) => {
+                  const isMcq = detectQuestionType(q) === "mcq";
+                  const selection = mcqSelections[q.id];
+                  const result = mcqResults[q.id];
+                  const shortAnswer = perQuestionAnswers[q.id] || "";
+                  return (
+                    <div key={q.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-sm font-bold text-purple-600 shrink-0 mt-0.5">Câu {i + 1}</span>
+                        <span className="text-xs text-gray-400">({q.score || 10}đ)</span>
+                        {result && (
+                          <Badge variant={result.isCorrect ? "default" : "outline"} className="text-xs">
+                            {result.isCorrect ? "Đúng" : "Sai"}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-wrap mb-3"><MathText text={q.question} /></p>
+                      {isMcq ? (
+                        <div className="space-y-1.5">
+                          {(q.options && q.options.length > 0
+                            ? q.options
+                            : parseInlineMcqOptions(q.question)
+                          ).map((opt, idx) => {
+                            const letter = String.fromCharCode(65 + idx);
+                            let btnStyle = "w-full text-left px-3 py-2 rounded-lg text-sm transition border flex items-center gap-2 ";
+                            if (!locallyGraded && !mySubmission && !mySubmitted) {
+                              btnStyle += selection === idx
+                                ? "bg-primary/10 border-primary text-primary"
+                                : "bg-white border-gray-200 hover:border-primary/50 cursor-pointer";
+                            } else {
+                              const correctLetter = q.expectedAnswer?.trim().toUpperCase();
+                              const isCorrectOption = opt.isCorrect || letter === correctLetter;
+                              const isSelected = selection === idx;
+                              if (isCorrectOption) {
+                                btnStyle += "bg-green-50 border-green-300 text-green-800";
+                              } else if (isSelected && !isCorrectOption) {
+                                btnStyle += "bg-red-50 border-red-300 text-red-800";
+                              } else {
+                                btnStyle += "bg-white border-gray-100 text-gray-400";
+                              }
+                            }
+                            return (
+                              <button
+                                key={idx}
+                                className={btnStyle}
+                                onClick={() => {
+                                  if (!locallyGraded && !mySubmission && !mySubmitted) {
+                                    setMcqSelections((prev) => ({ ...prev, [q.id]: idx }));
+                                  }
+                                }}
+                                disabled={locallyGraded || !!mySubmission || mySubmitted}
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
+                                  {letter}
+                                </span>
+                                <span className="flex-1"><MathText text={opt.text} /></span>
+                                {locallyGraded && (() => {
+                                  const correctLetter = q.expectedAnswer?.trim().toUpperCase();
+                                  const isCorrectOption = opt.isCorrect || letter === correctLetter;
+                                  if (isCorrectOption) return <Check className="size-4 text-green-600 shrink-0" />;
+                                  if (selection === idx && !isCorrectOption) return <X className="size-4 text-red-600 shrink-0" />;
+                                  return null;
+                                })()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div>
+                          <Textarea
+                            value={(() => {
+                              const content = mySubmission?.content || (() => {
+                                try { return sessionStorage.getItem(`submitted-${id}-content`); } catch { return null; }
+                              })();
+                              if (content) {
+                                try {
+                                  const parsed = JSON.parse(content);
+                                  const ans = parsed.answers?.find((a: any) => a.questionId === q.id);
+                                  return ans?.answer || "";
+                                } catch { return ""; }
+                              }
+                              return shortAnswer;
+                            })()}
+                            onChange={(e) =>
+                              setPerQuestionAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                            }
+                            placeholder="Nhập câu trả lời của bạn..."
+                            rows={3}
+                            disabled={submitting || !!mySubmission || mySubmitted}
+                          />
+                        </div>
+                      )}
+                      {/* Show result and explanation after submission */}
+                      {(locallyGraded || mySubmission) && (
+                        <div className={`mt-3 p-3 rounded-lg text-sm ${result ? (result.isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200") : "bg-blue-50 border border-blue-200"}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            {result ? (
+                              result.isCorrect ? (
+                                <><Check className="size-4 text-green-600" /><span className="font-medium text-green-700">Đúng</span></>
+                              ) : (
+                                <><X className="size-4 text-red-600" /><span className="font-medium text-red-700">Sai</span></>
+                              )
+                            ) : (
+                              <><FileText className="size-4 text-blue-600" /><span className="font-medium text-blue-700">Đã nộp</span></>
+                            )}
+                          </div>
+                          {isMcq && result && !result.isCorrect && (
+                            <p className="text-xs text-gray-600 mb-1">
+                              Đáp án đúng: <span className="font-medium">{q.expectedAnswer}</span>
+                            </p>
+                          )}
+                          {!isMcq && q.expectedAnswer && (
+                            <p className="text-xs text-gray-600 mb-1">
+                              Đáp án mong đợi: <span className="font-medium"><MathText text={q.expectedAnswer} /></span>
+                            </p>
+                          )}
+                          {q.explanation && (
+                            <p className="text-xs text-gray-600">
+                              <span className="font-medium">Giải thích:</span>{" "}
+                              <MathText text={q.explanation} />
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-600 whitespace-pre-wrap">{assignment.description || "Không có mô tả"}</p>
@@ -403,60 +577,60 @@ export default function AssignmentDetailPage({
         )}
       </div>
 
-      {/* Student: submission form (skip for weakness — exercises auto-submit) */}
-      {!isTeacher && !mySubmission && assignment.source !== "weakness" && (
+      {/* Student: submit button (skip for weakness — exercises auto-submit) */}
+      {!mySubmission && !mySubmitted && assignment.source !== "weakness" && questions.length > 0 && (
+        <div className="bg-white rounded-lg border p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Nộp bài</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Kiểm tra lại câu trả lời trước khi nộp
+              </p>
+            </div>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                submitting ||
+                questions.every((q) =>
+                  detectQuestionType(q) === "mcq"
+                    ? mcqSelections[q.id] == null
+                    : !perQuestionAnswers[q.id]?.trim()
+                )
+              }
+            >
+              {submitting ? "Đang nộp..." : "Nộp bài"}
+              <Send className="size-4 ml-2" />
+            </Button>
+          </div>
+          {locallyGraded && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+              <Check className="size-4" />
+              Đã nộp bài. Kết quả hiển thị bên trên.
+            </div>
+          )}
+        </div>
+      )}
+      {/* Student: submit for plain text assignments */}
+      {!mySubmission && !mySubmitted && assignment.source !== "weakness" && questions.length === 0 && (
         <div className="bg-white rounded-lg border p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-3">Nộp bài</h2>
-          {questions.length > 0 ? (
-            <div className="space-y-4">
-              {questions.map((q, i) => (
-                <div key={q.id}>
-                  <Label className="text-sm font-medium text-gray-700">
-                    Câu {i + 1} ({q.score || 10}đ)
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">{q.question}</p>
-                  <Textarea
-                    value={perQuestionAnswers[q.id] || ""}
-                    onChange={(e) =>
-                      setPerQuestionAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                    }
-                    placeholder="Nhập câu trả lời của bạn..."
-                    rows={3}
-                    disabled={submitting}
-                  />
-                </div>
-              ))}
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  Object.values(perQuestionAnswers).every((v) => !v.trim()) || submitting
-                }
-              >
-                {submitting ? "Đang nộp..." : "Nộp bài"}
-                <Send className="size-4 ml-2" />
-              </Button>
-            </div>
-          ) : (
-            <>
-              <Textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Nhập câu trả lời của bạn..."
-                rows={6}
-                className="mb-3"
-                disabled={submitting}
-              />
-              <Button onClick={handleSubmit} disabled={!answer.trim() || submitting}>
-                {submitting ? "Đang nộp..." : "Nộp bài"}
-                <Send className="size-4 ml-2" />
-              </Button>
-            </>
-          )}
+          <Textarea
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder="Nhập câu trả lời của bạn..."
+            rows={6}
+            className="mb-3"
+            disabled={submitting}
+          />
+          <Button onClick={handleSubmit} disabled={!answer.trim() || submitting}>
+            {submitting ? "Đang nộp..." : "Nộp bài"}
+            <Send className="size-4 ml-2" />
+          </Button>
         </div>
       )}
 
       {/* Student: my graded submission */}
-      {!isTeacher && mySubmission && (
+      {mySubmission && (
         <div className="bg-white rounded-lg border p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-3">Bài nộp của bạn</h2>
 
@@ -476,6 +650,30 @@ export default function AssignmentDetailPage({
                   <p className="text-xs text-gray-500">{detail.feedback}</p>
                 </div>
               ))}
+            </div>
+          ) : questions.length > 0 ? (
+            <div className="space-y-2 mb-4">
+              {questions.map((q, i) => {
+                const isMcq = detectQuestionType(q) === "mcq";
+                const ans = (() => {
+                  try {
+                    const parsed = JSON.parse(mySubmission.content);
+                    return parsed.answers?.find((a: any) => a.questionId === q.id)?.answer || "";
+                  } catch { return ""; }
+                })();
+                const mcqResult = mcqResults[q.id];
+                return (
+                  <div key={q.id} className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-700">Câu {i + 1}:</span>
+                    <span className="text-gray-600">{ans || "(không trả lời)"}</span>
+                    {mcqResult && (
+                      mcqResult.isCorrect
+                        ? <Check className="size-3.5 text-green-600" />
+                        : <X className="size-3.5 text-red-500" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="p-3 bg-gray-50 rounded-lg mb-3">
@@ -513,105 +711,6 @@ export default function AssignmentDetailPage({
         </div>
       )}
 
-      {/* Teacher: submissions list */}
-      {isTeacher && (
-        <div className="bg-white rounded-lg border">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold text-gray-900">
-              Bài nộp của học sinh ({submissions.length})
-            </h2>
-          </div>
-          {submissions.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="size-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">Chưa có học sinh nào nộp bài</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {submissions.map((sub) => (
-                <div key={sub.id} className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <span className="font-medium text-gray-900">{sub.studentName}</span>
-                      <span className="text-sm text-gray-400 ml-2">
-                        {new Date(sub.submittedAt).toLocaleString("vi-VN")}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {sub.score != null && (
-                        <Badge variant="default">{sub.score}/{assignment.maxScore}</Badge>
-                      )}
-                      <Badge>{statusLabel[sub.status] || sub.status}</Badge>
-                    </div>
-                  </div>
-                  <SubmissionContent content={sub.content} questions={questions} />
-                  {sub.feedback && (
-                    <GradingDetails feedback={sub.feedback} />
-                  )}
-
-                  {gradingId === sub.id ? (
-                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={gradeScore}
-                          onChange={(e) => setGradeScore(e.target.value)}
-                          placeholder="Điểm"
-                          className="w-20 rounded-md border px-2 py-1 text-sm"
-                          min={0}
-                          max={assignment.maxScore}
-                        />
-                        <span className="text-sm text-gray-400">/ {assignment.maxScore}</span>
-                      </div>
-                      <Textarea
-                        value={gradeFeedback}
-                        onChange={(e) => setGradeFeedback(e.target.value)}
-                        placeholder="Nhận xét..."
-                        rows={3}
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleGrade(sub.id)} disabled={grading}>
-                          {grading ? "Đang chấm..." : "Chấm điểm"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setGradingId(null)}>
-                          Huỷ
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      {sub.score == null && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setGradingId(sub.id);
-                              setGradeScore("");
-                              setGradeFeedback("");
-                            }}
-                          >
-                            Chấm điểm
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAutoGrade(sub.id)}
-                            disabled={autoGrading}
-                          >
-                            <Sparkles className="size-3 mr-1" />
-                            {autoGrading ? "Đang chấm..." : "Chấm AI"}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -195,8 +195,9 @@ Trả về JSON với 3 trường: score (số nguyên), feedback (nhận xét t
 	}
 
 	var result GradingResult
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
-		return nil, fmt.Errorf("parse grade result: %w (response: %s)", err, response)
+	cleaned := extractJSON(response)
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		return nil, fmt.Errorf("parse grade result: %w (response: %s)", err, cleaned)
 	}
 	return &result, nil
 }
