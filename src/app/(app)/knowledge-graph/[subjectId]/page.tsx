@@ -22,6 +22,7 @@ interface GraphNode {
   label: string;
   type: string;
   mastery: string;
+  description: string;
 }
 
 interface GraphEdge {
@@ -281,11 +282,12 @@ export default function KnowledgeGraphPage({ params }: { params: Promise<{ subje
             </span>
           </div>
           <p className="text-sm text-gray-500">
-            {selectedNode.mastery === "weak"
-              ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
-              : selectedNode.mastery === "learning"
-              ? "Bạn đang trong quá trình học khái niệm này."
-              : "Bạn đã nắm vững khái niệm này."}
+            {selectedNode.description ||
+              (selectedNode.mastery === "weak"
+                ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
+                : selectedNode.mastery === "learning"
+                ? "Bạn đang trong quá trình học khái niệm này."
+                : "Bạn đã nắm vững khái niệm này.")}
           </p>
         </div>
       )}

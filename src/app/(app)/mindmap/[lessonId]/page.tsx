@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { Loader2, AlertCircle, Brain, ArrowLeft } from "lucide-react";
+import { Loader2, AlertCircle, Brain, ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -23,6 +23,7 @@ interface GraphNode {
   label: string;
   type: string;
   mastery: string;
+  description: string;
 }
 
 interface GraphEdge {
@@ -37,162 +38,96 @@ interface GraphResult {
   edges: GraphEdge[];
 }
 
-// Vibrant branch color palette
 const branchPalette = [
-  { bg: "#fef3c7", border: "#f59e0b", text: "#92400e" },  // amber
-  { bg: "#dbeafe", border: "#3b82f6", text: "#1e40af" },  // blue
-  { bg: "#dcfce7", border: "#22c55e", text: "#166534" },  // green
-  { bg: "#fce7f3", border: "#ec4899", text: "#9d174d" },  // pink
-  { bg: "#ede9fe", border: "#8b5cf6", text: "#5b21b6" },  // violet
-  { bg: "#cffafe", border: "#06b6d4", text: "#155e75" },  // cyan
-  { bg: "#fee2e2", border: "#ef4444", text: "#991b1b" },  // red
-  { bg: "#ffedd5", border: "#f97316", text: "#9a3412" },  // orange
+  { bg: "#fef3c7", border: "#f59e0b", text: "#92400e" },
+  { bg: "#dbeafe", border: "#3b82f6", text: "#1e40af" },
+  { bg: "#dcfce7", border: "#22c55e", text: "#166534" },
+  { bg: "#fce7f3", border: "#ec4899", text: "#9d174d" },
+  { bg: "#ede9fe", border: "#8b5cf6", text: "#5b21b6" },
+  { bg: "#cffafe", border: "#06b6d4", text: "#155e75" },
+  { bg: "#fee2e2", border: "#ef4444", text: "#991b1b" },
+  { bg: "#ffedd5", border: "#f97316", text: "#9a3412" },
 ];
 
-const masteryOverlay: Record<string, { shadow?: string }> = {
-  weak: { shadow: "0 0 0 3px #ef4444" },
-  learning: { shadow: "0 0 0 3px #3b82f6" },
-  mastered: {},
+const masteryShadow: Record<string, string> = {
+  weak: "0 0 0 3px #ef4444",
+  learning: "0 0 0 3px #3b82f6",
+  mastered: "",
 };
 
-function computeMindMapLayout(result: GraphResult) {
+// Pre-compute positions for ALL nodes once
+function precomputePositions(result: GraphResult): Record<string, { x: number; y: number }> {
   const central = { x: 500, y: 350 };
-  const mainBranches = result.nodes.filter((n) => n.type === "concept" && n.id !== "central");
+  const positions: Record<string, { x: number; y: number }> = { central };
+
+  // Build adjacency
+  const parentMap: Record<string, string> = {};
+  const childrenMap: Record<string, string[]> = {};
+  for (const e of result.edges) {
+    parentMap[e.target] = e.source;
+    if (!childrenMap[e.source]) childrenMap[e.source] = [];
+    childrenMap[e.source].push(e.target);
+  }
+
+  const mainBranches = (childrenMap["central"] || []).filter((id) =>
+    result.nodes.some((n) => n.id === id)
+  );
   const numBranches = mainBranches.length || 1;
 
-  const nodePositions: Record<string, { x: number; y: number }> = {};
-  // Central node
-  nodePositions["central"] = central;
-
-  // Position main branch nodes around the center
+  // Position main branches around center
   const mainRadius = 220;
-  mainBranches.forEach((branch, i) => {
+  mainBranches.forEach((id, i) => {
     const angle = (i / numBranches) * 2 * Math.PI - Math.PI / 2;
-    nodePositions[branch.id] = {
+    positions[id] = {
       x: central.x + Math.cos(angle) * mainRadius,
       y: central.y + Math.sin(angle) * mainRadius,
     };
   });
 
-  // Build adjacency: child -> parent
-  const parentMap: Record<string, string> = {};
-  for (const e of result.edges) {
-    parentMap[e.target] = e.source;
-  }
+  // Recursively fan out children
+  function layoutDescendants(parentId: string) {
+    const kids = childrenMap[parentId];
+    if (!kids || kids.length === 0) return;
+    const parentPos = positions[parentId];
+    if (!parentPos) return;
 
-  // Group children by their parent
-  const childrenMap: Record<string, string[]> = {};
-  for (const n of result.nodes) {
-    const parent = parentMap[n.id];
-    if (parent) {
-      if (!childrenMap[parent]) childrenMap[parent] = [];
-      childrenMap[parent].push(n.id);
-    }
-  }
+    const dx = parentPos.x - central.x;
+    const dy = parentPos.y - central.y;
+    const distToCenter = Math.sqrt(dx * dx + dy * dy);
+    const parentAngle = Math.atan2(dy, dx);
 
-  // Recursively position children in a fan-out from their parent
-  function layoutChildren(parentId: string, parentPos: { x: number; y: number }, angleRange: [number, number], radius: number, depth: number) {
-    const children = childrenMap[parentId] || [];
-    if (children.length === 0) return;
-
-    // Sort children to ensure consistent layout
-    children.sort();
-    const [angleStart, angleEnd] = angleRange;
-    const angleSpan = angleEnd - angleStart;
-
-    children.forEach((childId, i) => {
-      const t = children.length === 1 ? 0.5 : i / (children.length - 1);
-      const angle = angleStart + t * angleSpan;
-      const r = radius + depth * 110;
-      const pos = {
-        x: parentPos.x + Math.cos(angle) * r,
-        y: parentPos.y + Math.sin(angle) * r,
-      };
-      // Actually, for a mind map look, children should be farther from center than parent
-      // Angle from center to parent
-      const dx = parentPos.x - central.x;
-      const dy = parentPos.y - central.y;
-      const distToCenter = Math.sqrt(dx * dx + dy * dy);
-      const parentAngle = Math.atan2(dy, dx);
-
-      // Fan out children starting from parent angle
-      const fanAngle = parentAngle + (i - (children.length - 1) / 2) * 0.35;
-      const childDist = distToCenter + 130 + depth * 90;
-      nodePositions[childId] = {
+    kids.forEach((childId, i) => {
+      if (positions[childId]) return; // already positioned
+      const fanAngle = parentAngle + (i - (kids.length - 1) / 2) * 0.35;
+      const childDist = distToCenter + 130;
+      positions[childId] = {
         x: central.x + Math.cos(fanAngle) * childDist,
         y: central.y + Math.sin(fanAngle) * childDist,
       };
-      // Recurse
-      layoutChildren(childId, nodePositions[childId], [(fanAngle - 0.3), (fanAngle + 0.3)], childDist, depth + 1);
+      layoutDescendants(childId);
     });
   }
 
-  // Layout each main branch's children
-  mainBranches.forEach((branch, i) => {
-    const angle = (i / numBranches) * 2 * Math.PI - Math.PI / 2;
-    const pos = nodePositions[branch.id];
-    layoutChildren(branch.id, pos, [angle - 0.5, angle + 0.5], 150, 1);
-  });
+  mainBranches.forEach((id) => layoutDescendants(id));
 
-  // Assign branch colors
-  const branchColorMap: Record<string, number> = {};
-  mainBranches.forEach((b, i) => { branchColorMap[b.id] = i; });
-  // Propagate branch color to descendants
-  function assignBranchColor(nodeId: string, branchIdx: number) {
-    for (const childId of (childrenMap[nodeId] || [])) {
-      branchColorMap[childId] = branchIdx;
-      assignBranchColor(childId, branchIdx);
+  // Fill any remaining unpositioned nodes
+  for (const n of result.nodes) {
+    if (!positions[n.id]) {
+      positions[n.id] = { x: central.x + 300, y: central.y };
     }
   }
-  mainBranches.forEach((b, i) => assignBranchColor(b.id, i));
 
-  // Build React Flow nodes
-  const rfNodes: Node[] = result.nodes.map((n) => {
-    const pos = nodePositions[n.id] || { x: 500, y: 350 };
-    const isCentral = n.id === "central";
-    const branchIdx = branchColorMap[n.id] ?? 0;
-    const colors = branchPalette[branchIdx % branchPalette.length];
-    const masteryShadow = masteryOverlay[n.mastery]?.shadow;
+  return positions;
+}
 
-    return {
-      id: n.id,
-      position: pos,
-      data: { label: n.label, mastery: n.mastery, type: n.type, branchIdx },
-      type: "default",
-      style: {
-        background: isCentral ? "linear-gradient(135deg, #1e40af, #3b82f6)" : colors.bg,
-        border: `2px solid ${isCentral ? "#1e40af" : colors.border}`,
-        borderRadius: isCentral ? "50%" : n.type === "concept" ? "16px" : n.type === "subtopic" ? "12px" : "10px",
-        padding: isCentral ? "28px" : n.type === "concept" ? "14px 20px" : n.type === "subtopic" ? "10px 16px" : "8px 14px",
-        fontSize: isCentral ? "16px" : n.type === "concept" ? "14px" : n.type === "subtopic" ? "12px" : "11px",
-        fontWeight: isCentral ? 800 : n.type === "concept" ? 700 : 500,
-        color: isCentral ? "#fff" : colors.text,
-        maxWidth: isCentral ? 180 : n.type === "concept" ? 170 : n.type === "subtopic" ? 150 : 130,
-        textAlign: "center" as const,
-        boxShadow: masteryShadow,
-        lineHeight: 1.3,
-        cursor: "pointer",
-      },
-      sourcePosition: isCentral ? undefined : Position.Right,
-      targetPosition: isCentral ? undefined : Position.Left,
-    };
-  });
-
-  // Build edges with smooth curves
-  const rfEdges: Edge[] = result.edges.map((e, i) => ({
-    id: `e${i}`,
-    source: e.source,
-    target: e.target,
-    label: e.label || undefined,
-    type: "smoothstep",
-    style: { stroke: "#cbd5e1", strokeWidth: 2 },
-    labelStyle: { fontSize: 10, fill: "#94a3b8" },
-    labelBgStyle: { fill: "#fff", fillOpacity: 0.9 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#cbd5e1" },
-    pathOptions: { borderRadius: 20 },
-  }));
-
-  return { nodes: rfNodes, edges: rfEdges };
+// Build children map from edges
+function buildChildrenMap(edges: GraphEdge[]): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const e of edges) {
+    if (!map[e.source]) map[e.source] = [];
+    map[e.source].push(e.target);
+  }
+  return map;
 }
 
 export default function MindMapDetailPage({ params }: { params: Promise<{ lessonId: string }> }) {
@@ -201,10 +136,85 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(["central"]));
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node>([]);
+  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  // Build children map from result
+  const childrenMap = useMemo(
+    () => (result ? buildChildrenMap(result.edges) : {}),
+    [result]
+  );
+
+  // Pre-compute all node positions
+  const nodePositions = useMemo(
+    () => (result ? precomputePositions(result) : {}),
+    [result]
+  );
+
+  // Build branch color map
+  const branchColorMap = useMemo(() => {
+    if (!result) return {};
+    const map: Record<string, number> = {};
+    const mainBranches = (childrenMap["central"] || []).filter((id) =>
+      result.nodes.some((n) => n.id === id)
+    );
+    mainBranches.forEach((id, i) => {
+      map[id] = i;
+      // Propagate to descendants
+      const queue = [...(childrenMap[id] || [])];
+      while (queue.length > 0) {
+        const child = queue.shift()!;
+        map[child] = i;
+        queue.push(...(childrenMap[child] || []));
+      }
+    });
+    return map;
+  }, [result, childrenMap]);
+
+  // Compute which nodes are visible based on expandedIds
+  const visibleNodeIds = useMemo(() => {
+    const visible = new Set<string>();
+    const queue = ["central"];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      visible.add(id);
+      if (expandedIds.has(id)) {
+        for (const child of childrenMap[id] || []) {
+          if (!visible.has(child)) queue.push(child);
+        }
+      }
+    }
+    return visible;
+  }, [expandedIds, childrenMap]);
+
+  // Toggle node expansion
+  const toggleNode = useCallback(
+    (nodeId: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) {
+          // Collapse: remove this node and all descendants
+          const toRemove = new Set<string>();
+          const queue = [...(childrenMap[nodeId] || [])];
+          while (queue.length > 0) {
+            const id = queue.shift()!;
+            toRemove.add(id);
+            queue.push(...(childrenMap[id] || []));
+          }
+          next.delete(nodeId);
+          for (const id of toRemove) next.delete(id);
+        } else {
+          next.add(nodeId);
+        }
+        return next;
+      });
+    },
+    [childrenMap]
+  );
+
+  // Fetch data
   useEffect(() => {
     async function fetchMindMap() {
       try {
@@ -213,9 +223,8 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
           body: JSON.stringify({ lessonId }),
         });
         setResult(data);
-        const { nodes: rfNodes, edges: rfEdges } = computeMindMapLayout(data);
-        setNodes(rfNodes);
-        setEdges(rfEdges);
+        // Start with only central expanded
+        setExpandedIds(new Set(["central"]));
       } catch (err: any) {
         setError(err.message || "Không thể tạo sơ đồ tư duy");
       } finally {
@@ -224,6 +233,120 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
     }
     fetchMindMap();
   }, [lessonId]);
+
+  // Rebuild React Flow nodes/edges when visibility changes
+  useEffect(() => {
+    if (!result) return;
+
+    const visibleNodes = result.nodes.filter((n) => visibleNodeIds.has(n.id));
+    const visibleEdges = result.edges.filter(
+      (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
+    );
+
+    const nodes: Node[] = visibleNodes.map((n) => {
+      const pos = nodePositions[n.id] || { x: 500, y: 350 };
+      const isCentral = n.id === "central";
+      const branchIdx = branchColorMap[n.id] ?? 0;
+      const colors = branchPalette[branchIdx % branchPalette.length];
+      const hasChildren = (childrenMap[n.id] || []).length > 0;
+      const isExpanded = expandedIds.has(n.id);
+      const canExpand = hasChildren && !isExpanded;
+
+      return {
+        id: n.id,
+        position: pos,
+        data: {
+          label: n.label,
+          mastery: n.mastery,
+          type: n.type,
+          canExpand,
+          childCount: hasChildren ? (childrenMap[n.id] || []).length : 0,
+        },
+        type: "default",
+        style: {
+          background: isCentral
+            ? "linear-gradient(135deg, #1e40af, #3b82f6)"
+            : colors.bg,
+          border: `2px solid ${isCentral ? "#1e40af" : canExpand ? colors.border : "#d1d5db"}`,
+          borderStyle: canExpand ? "dashed" : "solid",
+          borderRadius: isCentral
+            ? "50%"
+            : n.type === "concept"
+            ? "16px"
+            : n.type === "subtopic"
+            ? "12px"
+            : "10px",
+          padding: isCentral
+            ? "28px"
+            : n.type === "concept"
+            ? "14px 20px"
+            : n.type === "subtopic"
+            ? "10px 16px"
+            : "8px 14px",
+          fontSize: isCentral
+            ? "16px"
+            : n.type === "concept"
+            ? "14px"
+            : n.type === "subtopic"
+            ? "12px"
+            : "11px",
+          fontWeight: isCentral ? 800 : n.type === "concept" ? 700 : 500,
+          color: isCentral ? "#fff" : colors.text,
+          maxWidth: isCentral ? 180 : n.type === "concept" ? 170 : n.type === "subtopic" ? 150 : 130,
+          textAlign: "center" as const,
+          boxShadow: masteryShadow[n.mastery],
+          lineHeight: 1.3,
+          cursor: "pointer",
+          transition: "all 0.3s ease",
+        },
+        sourcePosition: isCentral ? undefined : Position.Right,
+        targetPosition: isCentral ? undefined : Position.Left,
+      };
+    });
+
+    const edges: Edge[] = visibleEdges.map((e, i) => ({
+      id: `e${i}`,
+      source: e.source,
+      target: e.target,
+      label: e.label || undefined,
+      type: "smoothstep",
+      style: { stroke: "#cbd5e1", strokeWidth: 2 },
+      labelStyle: { fontSize: 10, fill: "#94a3b8" },
+      labelBgStyle: { fill: "#fff", fillOpacity: 0.9 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: "#cbd5e1" },
+      pathOptions: { borderRadius: 20 },
+    }));
+
+    setRfNodes(nodes);
+    setRfEdges(edges);
+  }, [result, visibleNodeIds, expandedIds, nodePositions, branchColorMap, childrenMap, setRfNodes, setRfEdges]);
+
+  const handleNodeClick = useCallback(
+    (_: any, node: Node) => {
+      const graphNode = result?.nodes.find((n) => n.id === node.id);
+      if (graphNode) {
+        setSelectedNode(graphNode);
+        // Auto-expand if this node has hidden children
+        const hasKids = (childrenMap[node.id] || []).length > 0;
+        if (hasKids && !expandedIds.has(node.id)) {
+          toggleNode(node.id);
+        }
+      }
+    },
+    [result, childrenMap, expandedIds, toggleNode]
+  );
+
+  const expandAll = useCallback(() => {
+    if (!result) return;
+    const all = new Set(result.nodes.map((n) => n.id));
+    setExpandedIds(all);
+  }, [result]);
+
+  const collapseAll = useCallback(() => {
+    setExpandedIds(new Set(["central"]));
+  }, []);
+
+  const allExpanded = result && expandedIds.size >= result.nodes.length;
 
   if (loading) {
     return (
@@ -270,29 +393,55 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
           </Link>
           <h1 className="text-xl font-bold text-gray-900">{result.centralTopic}</h1>
           <p className="text-sm text-gray-500">
-            {result.nodes.length} khái niệm · {result.edges.length} liên kết · AI tạo
+            {visibleNodeIds.size}/{result.nodes.length} khái niệm · {result.edges.length} liên kết · AI tạo
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-full bg-red-500" /> Yếu
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-full bg-blue-500" /> Đang học
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-full bg-green-500" /> Thành thạo
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <span className="flex items-center gap-1">
+              <span className="size-2.5 rounded-full bg-red-500" /> Yếu
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-2.5 rounded-full bg-blue-500" /> Đang học
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="size-2.5 rounded-full bg-green-500" /> Thành thạo
+            </span>
+          </div>
+          <div className="flex items-center gap-1 ml-3">
+            {allExpanded ? (
+              <button
+                onClick={collapseAll}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <Minimize2 className="size-3" />
+                Thu gọn
+              </button>
+            ) : (
+              <button
+                onClick={expandAll}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <Maximize2 className="size-3" />
+                Mở rộng hết
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="h-[650px] rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-blue-50/30 overflow-hidden">
+        {visibleNodeIds.size <= 1 && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none text-center">
+            <p className="text-sm text-gray-400">Nhấn vào nút trung tâm để khám phá</p>
+          </div>
+        )}
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={rfNodes}
+          edges={rfEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => setSelectedNode(result.nodes.find((n) => n.id === node.id) || null)}
+          onNodeClick={handleNodeClick}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           minZoom={0.3}
@@ -330,13 +479,19 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
             <span className="text-xs text-gray-400 px-2 py-0.5 rounded-full bg-gray-100">
               {selectedNode.type === "concept" ? "Nhánh chính" : selectedNode.type === "subtopic" ? "Ý phụ" : "Chi tiết"}
             </span>
+            {(childrenMap[selectedNode.id] || []).length > 0 && !expandedIds.has(selectedNode.id) && (
+              <span className="text-xs text-blue-500">
+                +{(childrenMap[selectedNode.id] || []).length} ý — nhấn để mở
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500">
-            {selectedNode.mastery === "weak"
-              ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
-              : selectedNode.mastery === "learning"
-              ? "Bạn đang trong quá trình học khái niệm này."
-              : "Bạn đã nắm vững khái niệm này."}
+            {selectedNode.description ||
+              (selectedNode.mastery === "weak"
+                ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
+                : selectedNode.mastery === "learning"
+                ? "Bạn đang trong quá trình học khái niệm này."
+                : "Bạn đã nắm vững khái niệm này.")}
           </p>
         </div>
       )}

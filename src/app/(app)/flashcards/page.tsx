@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Layers, Plus, ChevronRight, Loader2, BookOpen, Trash2 } from "lucide-react";
+import { Layers, Plus, ChevronRight, Loader2, Trash2 } from "lucide-react";
 
 interface Deck {
   id: string;
