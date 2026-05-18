@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
 
   // If on login page and already logged in, redirect
   if (pathname.startsWith("/login")) {
-    if (session) {
+    if (session?.user?.aud === "authenticated") {
       return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", request.url));
     }
     return NextResponse.next();
