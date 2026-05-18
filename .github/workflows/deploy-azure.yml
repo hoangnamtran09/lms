@@ -1,0 +1,63 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "!backend/.env*"
+
+env:
+  AZURE_RESOURCE_GROUP: lms-rg
+  AZURE_CONTAINER_APP: lms-backend
+  ACR_NAME: lmsacr
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: azure/docker-login@v2
+        with:
+          login-server: ${{ env.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build & push Docker image
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/lms-backend:${{ github.sha }} -t ${{ env.ACR_NAME }}.azurecr.io/lms-backend:latest .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/lms-backend --all-tags
+
+      - name: Deploy to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: backend
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+          containerAppName: ${{ env.AZURE_CONTAINER_APP }}
+          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/lms-backend:${{ github.sha }}
+          environmentVariables: |
+            PORT=8080
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            AI_API_URL=${{ secrets.AI_API_URL }}
+            AI_API_KEY=${{ secrets.AI_API_KEY }}
+            AI_MODEL=${{ secrets.AI_MODEL }}
+            CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+            R2_BASE_URL=${{ secrets.R2_BASE_URL }}
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+            R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+            R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+            R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+            R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
