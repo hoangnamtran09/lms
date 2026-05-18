@@ -20,20 +20,15 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: azure/docker-login@v2
-        with:
-          login-server: ${{ env.ACR_NAME }}.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build & push Docker image
+      - name: Login to ACR & push Docker image
         run: |
+          az acr login -n ${{ env.ACR_NAME }}
           docker build -t ${{ env.ACR_NAME }}.azurecr.io/lms-backend:${{ github.sha }} -t ${{ env.ACR_NAME }}.azurecr.io/lms-backend:latest .
           docker push ${{ env.ACR_NAME }}.azurecr.io/lms-backend --all-tags
 
