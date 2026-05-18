@@ -231,8 +231,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                     <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} unit="ph" />
                     <Tooltip
-                      formatter={(value: number) => [`${value} phút`, "Học tập"]}
-                      labelFormatter={(label: string) => `Ngày ${label}`}
+                      formatter={(value) => [`${value ?? 0} phút`, "Học tập"]}
+                      labelFormatter={(label) => `Ngày ${label}`}
                     />
                     <Bar dataKey="minutes" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
