@@ -146,16 +146,16 @@ func New(
 	if jwtSecret == "" {
 		jwtSecret = cfg.JWTSecret
 	}
-	mountRoutes(r, h, jwtSecret, cfg.SupabaseURL)
+	mountRoutes(r, h, jwtSecret, cfg.SupabaseURL, db)
 	return r
 }
 
-func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string) {
+func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *gorm.DB) {
 	// Public routes (login/logout handled by Supabase)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(jwtSecret, supabaseURL))
+		r.Use(middleware.Auth(jwtSecret, supabaseURL, db))
 
 		// Auth
 		r.Get("/api/auth/me", h.Auth.Me)

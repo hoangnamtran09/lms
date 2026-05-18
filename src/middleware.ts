@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
 
   // Admin route protection — allow teachers on /admin/assignments for grading
   const isTeacher = role === "TEACHER";
-  const teacherAllowedPaths = ["/admin/assignments"];
+  const teacherAllowedPaths = ["/admin/assignments", "/admin/students", "/admin/parents"];
   if (
     adminPaths.some((p) => pathname.startsWith(p)) &&
     !isAdmin &&

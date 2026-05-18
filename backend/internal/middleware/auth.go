@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -26,7 +27,7 @@ type Claims struct {
 	UserName string `json:"name"`
 }
 
-func Auth(jwtSecret, supabaseURL string) func(http.Handler) http.Handler {
+func Auth(jwtSecret, supabaseURL string, db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tokenStr := extractToken(r)
@@ -39,6 +40,15 @@ func Auth(jwtSecret, supabaseURL string) func(http.Handler) http.Handler {
 			if err != nil {
 				http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 				return
+			}
+
+			// Enrich claims with local DB user data (ClassID)
+			if db != nil {
+				var localUser struct {
+					ClassID string
+				}
+				db.Table("users").Where("supabase_id = ?", claims.UserID).Select("class_id").Scan(&localUser)
+				claims.ClassID = localUser.ClassID
 			}
 
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
