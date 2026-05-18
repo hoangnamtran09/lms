@@ -15,6 +15,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { useStudyTimer, MIN_TOTAL_TIME, MIN_PAGES, MIN_PAGE_TIME } from "@/hooks/use-study-timer";
 import { bridge } from "@/lib/study-session-bridge";
 import { useActiveQuiz, type QuizData } from "@/lib/active-quiz-context";
+import { playAIResponseSound, playCorrectAnswerSound } from "@/lib/notification-sound";
 import { CompletionQuizDialog } from "@/components/ai/completion-quiz-dialog";
 import type { QuizQuestion } from "@/components/ai/completion-quiz-dialog";
 
@@ -109,7 +110,10 @@ export default function LessonViewerPage({
             return next;
           });
         },
-        () => setStreaming(false),
+        () => {
+          setStreaming(false);
+          playAIResponseSound();
+        },
         (err) => {
           setChatError(err.message);
           setStreaming(false);
@@ -247,7 +251,10 @@ export default function LessonViewerPage({
           return next;
         });
       },
-      () => setStreaming(false),
+      () => {
+        setStreaming(false);
+        playAIResponseSound();
+      },
       (err) => {
         setChatError(err.message);
         setStreaming(false);
@@ -271,6 +278,7 @@ export default function LessonViewerPage({
       const msg = isCorrect
         ? `Mình vừa trả lời đúng câu hỏi "${shortQuestion}".`
         : `Mình vừa trả lời sai câu hỏi "${shortQuestion}". Hãy giải thích giúp mình nhé.`;
+      if (isCorrect) playCorrectAnswerSound();
       clearLastQuizResult();
       sendMessage(msg);
     }

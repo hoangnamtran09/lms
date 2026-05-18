@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MathText } from "@/components/ai/math-text";
 import { Layers, ArrowLeft, CheckCircle2, Loader2, AlertCircle, Sparkles } from "lucide-react";
 
 interface Deck {
@@ -188,9 +189,9 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
             style={{ backfaceVisibility: "hidden" }}
           >
             <span className="text-xs font-medium text-blue-500 uppercase tracking-wide mb-4">Câu hỏi</span>
-            <p className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
-              {card.question}
-            </p>
+            <div className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
+              <MathText text={card.question} />
+            </div>
             <p className="absolute bottom-4 text-xs text-gray-400">Nhấn để lật thẻ</p>
           </div>
 
@@ -203,9 +204,9 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
             }}
           >
             <span className="text-xs font-medium text-green-500 uppercase tracking-wide mb-4">Đáp án</span>
-            <p className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
-              {card.answer}
-            </p>
+            <div className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
+              <MathText text={card.answer} />
+            </div>
           </div>
         </div>
       </div>

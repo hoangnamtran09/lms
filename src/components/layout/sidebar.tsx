@@ -38,7 +38,6 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT", "STUDENT"] },
   { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
-  { label: "Học sinh", href: "/students", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
   { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT"] },
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
   { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, FileVideo } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, FileText, FileVideo } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,6 +23,7 @@ interface Lesson {
   title: string;
   description?: string;
   mediaUrl?: string;
+  studied?: boolean;
 }
 
 export default function LessonListPage({ params }: { params: Promise<{ subjectId: string }> }) {
@@ -92,9 +93,24 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">
-                  {lesson.title}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900">
+                    {lesson.title}
+                  </p>
+                  {lesson.studied !== undefined && (
+                    lesson.studied ? (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="size-3" />
+                        Đã học
+                      </span>
+                    ) : (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                        <Circle className="size-3" />
+                        Chưa học
+                      </span>
+                    )
+                  )}
+                </div>
                 {lesson.description && (
                   <p className="text-xs text-gray-500 line-clamp-1">{lesson.description}</p>
                 )}

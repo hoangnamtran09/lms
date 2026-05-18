@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, FileText } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -90,13 +90,17 @@ export default function LessonListPage({
                     {lesson.title}
                   </p>
                   {lesson.studied !== undefined && (
-                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                      lesson.studied
-                        ? "bg-green-50 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}>
-                      {lesson.studied ? "Đã học" : "Chưa học"}
-                    </span>
+                    lesson.studied ? (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="size-3" />
+                        Đã học
+                      </span>
+                    ) : (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                        <Circle className="size-3" />
+                        Chưa học
+                      </span>
+                    )
                   )}
                 </div>
                 {lesson.description && (
