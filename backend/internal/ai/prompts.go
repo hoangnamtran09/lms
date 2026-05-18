@@ -498,6 +498,31 @@ func BuildStudyPlannerPrompt(contextData string) string {
 	return fmt.Sprintf(studyPlannerPrompt, contextData)
 }
 
+// ---- Weekly Report ----
+
+const weeklyReportPrompt = `Bạn là chuyên gia phân tích học tập tại LMS. Dựa trên dữ liệu học tập trong tuần của học sinh, hãy tạo báo cáo tiến độ cá nhân hóa.
+
+**Dữ liệu học sinh tuần này:**
+%s
+
+**Dữ liệu tuần trước (để so sánh):**
+%s
+
+**Yêu cầu output (JSON, không thêm text khác):**
+{
+  "title": "Tiêu đề báo cáo ngắn gọn, hấp dẫn (VD: 'Tuần 20: Tiến bộ vượt bậc!')",
+  "overallAssessment": "positive" | "neutral" | "needsImprovement",
+  "highlights": ["Danh sách 2-3 điểm nổi bật trong tuần"],
+  "weaknessAnalysis": "Phân tích 1-2 câu về điểm yếu và xu hướng cải thiện",
+  "trendComparison": "So sánh với tuần trước: tăng/giảm bao nhiêu % thời gian học, điểm số, kim cương",
+  "recommendations": ["2-3 đề xuất cụ thể cho tuần tới"],
+  "coachMessage": "Lời nhắn tích cực, động viên, xưng 'mình' gọi 'bạn', 2-3 đoạn ngắn. Dùng **bold** cho số liệu quan trọng."
+}`
+
+func BuildWeeklyReportPrompt(currentWeekData, previousWeekData string) string {
+	return fmt.Sprintf(weeklyReportPrompt, currentWeekData, previousWeekData)
+}
+
 func BuildAssignmentPreGradePrompt(title, description, rubricText, submissionContent string, maxScore int) string {
 	if rubricText == "" {
 		rubricText = "Không có rubric cụ thể. Tự đánh giá theo chất lượng nội dung."

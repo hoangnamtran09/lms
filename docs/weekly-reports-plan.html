@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Weekly Progress Reports — Plan chi tiết</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .phase-card { transition: all 0.2s; }
+    .phase-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.1); }
+    .file-tag { @apply inline-block px-2 py-0.5 rounded text-xs font-mono font-medium; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+
+  <!-- Hero -->
+  <header class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white">
+    <div class="max-w-5xl mx-auto px-6 py-16">
+      <span class="inline-block px-3 py-1 bg-white/20 rounded-full text-sm font-medium mb-4">
+        Tính năng #5 &middot; Công sức thấp-trung bình &middot; 2-3 ngày
+      </span>
+      <h1 class="text-4xl font-extrabold tracking-tight">📊 AI Weekly Progress Reports</h1>
+      <p class="mt-3 text-lg text-indigo-100 max-w-2xl">
+        Mỗi tuần AI tự động sinh báo cáo tiến độ cá nhân hóa cho từng học sinh.
+        Phân tích thời gian học, bài hoàn thành, điểm yếu, kim cương &mdash; kèm nhận xét từ AI Coach.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3 text-sm">
+        <span class="px-3 py-1.5 bg-white/15 rounded-lg">✅ Backend: Go + Chi + GORM</span>
+        <span class="px-3 py-1.5 bg-white/15 rounded-lg">✅ Frontend: Next.js + recharts</span>
+        <span class="px-3 py-1.5 bg-white/15 rounded-lg">✅ AI: OpenAI-compatible + Prompt</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tổng quan kiến trúc -->
+  <section class="max-w-5xl mx-auto px-6 -mt-8">
+    <div class="bg-white rounded-2xl shadow-sm border p-6">
+      <h2 class="text-lg font-bold mb-4">🏗️ Tổng quan kiến trúc</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="border rounded-xl p-4 bg-gray-50/50">
+          <div class="font-semibold text-indigo-600 mb-1">Backend</div>
+          <code class="text-xs text-gray-600">backend/internal/reports/</code>
+          <ul class="mt-2 space-y-1 text-gray-600">
+            <li>&bull; <code>model.go</code> — WeeklyReport model</li>
+            <li>&bull; <code>service.go</code> — Business logic</li>
+            <li>&bull; <code>handler.go</code> — HTTP handlers</li>
+          </ul>
+        </div>
+        <div class="border rounded-xl p-4 bg-gray-50/50">
+          <div class="font-semibold text-indigo-600 mb-1">AI Prompt</div>
+          <code class="text-xs text-gray-600">backend/internal/ai/prompts.go</code>
+          <ul class="mt-2 space-y-1 text-gray-600">
+            <li>&bull; <code>BuildWeeklyReportPrompt()</code></li>
+            <li>&bull; Input: study, submissions, weaknesses</li>
+            <li>&bull; Output: insights + recommendations</li>
+          </ul>
+        </div>
+        <div class="border rounded-xl p-4 bg-gray-50/50">
+          <div class="font-semibold text-indigo-600 mb-1">Frontend</div>
+          <code class="text-xs text-gray-600">src/app/(app)/reports/</code>
+          <ul class="mt-2 space-y-1 text-gray-600">
+            <li>&bull; <code>page.tsx</code> — List reports</li>
+            <li>&bull; <code>[id]/page.tsx</code> — Report detail</li>
+            <li>&bull; recharts BarChart</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Danh sách Phase -->
+  <main class="max-w-5xl mx-auto px-6 py-10 space-y-6">
+
+    <!-- Phase 1 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-500 to-teal-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold mb-2">Phase 1</span>
+            <h3 class="text-xl font-bold">Model &amp; Migration</h3>
+            <p class="text-sm text-gray-500 mt-1">Bảng <code>weekly_reports</code> trong PostgreSQL + AutoMigrate</p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~15 phút</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">📄 <code>backend/internal/reports/model.go</code></h4>
+            <pre class="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-x-auto">
+<span class="text-gray-500">type</span> <span class="text-blue-600">WeeklyReport</span> <span class="text-gray-500">struct</span> {
+    ID          <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"primaryKey;size:36" json:"id"`</span>
+    UserID      <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"size:36;not null;index:idx_user_week" json:"userId"`</span>
+    WeekStart   <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"size:10;not null;index:idx_user_week" json:"weekStart"`</span>
+    WeekEnd     <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"size:10;not null" json:"weekEnd"`</span>
+    ReportJSON  <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"type:jsonb" json:"reportJson"`</span>
+    AIMessage   <span class="text-purple-600">string</span>    <span class="text-green-600">`gorm:"type:text" json:"aiMessage"`</span>
+    CreatedAt   <span class="text-purple-600">time.Time</span> <span class="text-green-600">`json:"createdAt"`</span>
+}</pre>
+          </div>
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">🔧 <code>backend/cmd/server/migrate.go</code></h4>
+            <p class="text-sm text-gray-600">Thêm <code>&amp;reports.WeeklyReport{}</code> vào danh sách AutoMigrate.</p>
+            <pre class="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-x-auto mt-2">
+<span class="text-gray-500">func</span> <span class="text-blue-600">migrate</span>(db <span class="text-purple-600">*gorm.DB</span>) <span class="text-purple-600">error</span> {
+    <span class="text-gray-500">return</span> db.AutoMigrate(
+        <span class="text-gray-500">// ... existing models ...</span>
+        <span class="text-green-600">&amp;reports.WeeklyReport{}</span>,  <span class="text-gray-500">&lt;-- THÊM</span>
+    )
+}</pre>
+            <p class="text-xs text-gray-400 mt-2">Unique composite index <code>(user_id, week_start)</code> tránh trùng report.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-500 to-cyan-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold mb-2">Phase 2</span>
+            <h3 class="text-xl font-bold">AI Prompt — Weekly Report</h3>
+            <p class="text-sm text-gray-500 mt-1">Thêm prompt mới vào <code>backend/internal/ai/prompts.go</code></p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~20 phút</span>
+        </div>
+
+        <div class="bg-gray-50 border rounded-xl p-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-3">📝 Prompt structure</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="font-medium text-gray-700 mb-1">System prompt:</p>
+              <p class="text-gray-600 italic">"Bạn là chuyên gia phân tích học tập. Phân tích dữ liệu tuần của học sinh và đưa ra nhận xét chi tiết bằng tiếng Việt, giọng tích cực, xưng 'mình' gọi 'bạn'."</p>
+            </div>
+            <div>
+              <p class="font-medium text-gray-700 mb-1">User prompt — input data:</p>
+              <ul class="text-gray-600 space-y-1">
+                <li>• Tổng giờ học (tuần này vs tuần trước)</li>
+                <li>• Daily breakdown (7 ngày)</li>
+                <li>• Bài tập đã hoàn thành + điểm TB</li>
+                <li>• Top 3 điểm yếu + trend</li>
+                <li>• Kim cương kiếm được</li>
+                <li>• Streak hiện tại</li>
+              </ul>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t">
+            <p class="font-medium text-gray-700 mb-1">Output JSON yêu cầu:</p>
+            <pre class="bg-white border rounded-lg p-3 text-xs font-mono overflow-x-auto">
+{
+  "title": "Tuần 20: Tiến bộ vượt bậc!",
+  "overallAssessment": "positive" | "neutral" | "needsImprovement",
+  "highlights": ["Hoàn thành 3/3 bài tập", "Streak 7 ngày"],
+  "weaknessAnalysis": "Phân số vẫn là điểm yếu cần cải thiện...",
+  "trendComparison": "Tăng 40% thời gian học so với tuần trước",
+  "recommendations": [
+    "Dành thêm 30 phút ôn Phân số",
+    "Tiếp tục giữ streak hàng ngày"
+  ],
+  "coachMessage": "Chào bạn! Tuần này bạn đã học được 5 giờ... ✨"
+}</pre>
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Khác với Coach prompt (chỉ output text), prompt này yêu cầu JSON có cấu trúc để frontend hiển thị chart.</p>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-violet-500 to-purple-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs font-semibold mb-2">Phase 3</span>
+            <h3 class="text-xl font-bold">Service Layer</h3>
+            <p class="text-sm text-gray-500 mt-1"><code>backend/internal/reports/service.go</code> — Gather + Gen + Cache</p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~45 phút</span>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Data gathering -->
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">📥 Data gathering — 5 nguồn</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div class="border rounded-lg p-3 text-sm">
+                <div class="font-medium text-emerald-700">⏱ Study Sessions</div>
+                <code class="text-xs text-gray-500">study_sessions</code>
+                <p class="text-xs text-gray-600 mt-1">SUM duration_seconds GROUP BY DATE, so sánh với tuần trước</p>
+              </div>
+              <div class="border rounded-lg p-3 text-sm">
+                <div class="font-medium text-blue-700">📝 Submissions</div>
+                <code class="text-xs text-gray-500">submissions</code>
+                <p class="text-xs text-gray-600 mt-1">COUNT + AVG(score) WHERE status = 'GRADED'</p>
+              </div>
+              <div class="border rounded-lg p-3 text-sm">
+                <div class="font-medium text-red-700">🔴 Weaknesses</div>
+                <code class="text-xs text-gray-500">weakness_profiles</code>
+                <p class="text-xs text-gray-600 mt-1">Top 5 unresolved, error_count, improvement_score</p>
+              </div>
+              <div class="border rounded-lg p-3 text-sm">
+                <div class="font-medium text-yellow-700">💎 Diamonds</div>
+                <code class="text-xs text-gray-500">diamond_transactions</code>
+                <p class="text-xs text-gray-600 mt-1">SUM(amount) WHERE created_at IN week</p>
+              </div>
+              <div class="border rounded-lg p-3 text-sm">
+                <div class="font-medium text-orange-700">🔥 Streak</div>
+                <code class="text-xs text-gray-500">streaks</code>
+                <p class="text-xs text-gray-600 mt-1">current_streak, last_study_date</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Methods -->
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">🧩 Service methods</h4>
+            <pre class="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-x-auto">
+<span class="text-gray-500">type</span> <span class="text-blue-600">Service</span> <span class="text-gray-500">struct</span> {
+    db    <span class="text-purple-600">*gorm.DB</span>
+    aiSvc <span class="text-purple-600">*ai.Service</span>
+}
+
+<span class="text-gray-500">func</span> (s <span class="text-purple-600">*Service</span>) <span class="text-blue-600">GetOrGenerate</span>(ctx, userID, weekStart, weekEnd)  <span class="text-gray-500">→ cache-check + gen</span>
+<span class="text-gray-500">func</span> (s <span class="text-purple-600">*Service</span>) <span class="text-blue-600">Generate</span>(ctx, userID, weekStart, weekEnd)        <span class="text-gray-500">→ gatherData + callAI + save</span>
+<span class="text-gray-500">func</span> (s <span class="text-purple-600">*Service</span>) <span class="text-blue-600">List</span>(ctx, userID, limit)                         <span class="text-gray-500">→ list DESC by created_at</span>
+<span class="text-gray-500">func</span> (s <span class="text-purple-600">*Service</span>) <span class="text-blue-600">GetByID</span>(ctx, id)                              <span class="text-gray-500">→ single report</span></pre>
+          </div>
+
+          <!-- Flow -->
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+            <span class="font-semibold text-amber-800">⚙️ Generate flow:</span>
+            <ol class="mt-2 space-y-1 text-amber-900 list-decimal list-inside">
+              <li>Tính <code>weekStart</code> = Monday, <code>weekEnd</code> = Sunday</li>
+              <li>Check DB: đã có report cho <code>(userID, weekStart)</code>? → return luôn (cache)</li>
+              <li>Chưa có: gather 5 nguồn dữ liệu + dữ liệu tuần trước để so sánh</li>
+              <li>Build prompt → gọi <code>aiSvc.Chat()</code> → parse JSON response</li>
+              <li>Lưu <code>WeeklyReport</code> vào DB</li>
+              <li>Return report</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-orange-500 to-red-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold mb-2">Phase 4</span>
+            <h3 class="text-xl font-bold">Handler &amp; Router</h3>
+            <p class="text-sm text-gray-500 mt-1">HTTP endpoints + Chi router registration</p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~30 phút</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">📡 API Endpoints</h4>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded-lg">
+                <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold">POST</span>
+                <code class="text-xs">/api/reports/generate</code>
+                <span class="text-xs text-gray-500 ml-auto">Gen report tuần này</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded-lg">
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">GET</span>
+                <code class="text-xs">/api/reports/list</code>
+                <span class="text-xs text-gray-500 ml-auto">?limit=10</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded-lg">
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">GET</span>
+                <code class="text-xs">/api/reports/{id}</code>
+                <span class="text-xs text-gray-500 ml-auto">Chi tiết report</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded-lg">
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">GET</span>
+                <code class="text-xs">/api/reports/student/{studentId}</code>
+                <span class="text-xs text-gray-500 ml-auto">Teacher/Parent xem của HS</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">🔌 Router wiring (<code>router.go</code>)</h4>
+            <pre class="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-x-auto">
+<span class="text-gray-500">// Handlers struct</span>
+Reports <span class="text-purple-600">*reports.Handler</span>
+
+<span class="text-gray-500">// Init</span>
+reportsSvc := reports.NewService(db, aiSvc)
+reportsH := reports.NewHandler(reportsSvc, db)
+
+<span class="text-gray-500">// Routes</span>
+r.Post(<span class="text-green-600">"/api/reports/generate"</span>, h.Reports.Generate)
+r.Get(<span class="text-green-600">"/api/reports/list"</span>, h.Reports.List)
+r.Get(<span class="text-green-600">"/api/reports/{id}"</span>, h.Reports.Get)
+r.With(permission(ResAnalytics, ActRead)).
+    Get(<span class="text-green-600">"/api/reports/student/{studentId}"</span>, h.Reports.GetForStudent)</pre>
+          </div>
+        </div>
+
+        <div class="mt-4 bg-gray-50 border rounded-xl p-3 text-sm">
+          <span class="font-semibold">🧠 Permission handling:</span>
+          <ul class="mt-1 text-gray-600 space-y-1">
+            <li>• <b>STUDENT</b>: chỉ xem report của chính mình (check <code>claims.UserID</code>)</li>
+            <li>• <b>TEACHER</b>: xem report của học sinh trong class (dùng <code>classes</code> + <code>users.class_id</code>)</li>
+            <li>• <b>PARENT</b>: xem report của con (dùng <code>child_links</code>)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-pink-500 to-rose-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-pink-100 text-pink-700 rounded text-xs font-semibold mb-2">Phase 5</span>
+            <h3 class="text-xl font-bold">Frontend — List Page</h3>
+            <p class="text-sm text-gray-500 mt-1"><code>src/app/(app)/reports/page.tsx</code></p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~45 phút</span>
+        </div>
+
+        <div class="bg-gray-50 border rounded-xl p-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-3">🖼️ UI States (pattern: study-planner/page.tsx)</h4>
+          <div class="space-y-3">
+            <div>
+              <span class="inline-block px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs font-medium">Loading</span>
+              <div class="mt-1 flex gap-3">
+                <div class="h-32 w-full bg-gray-100 rounded-xl animate-pulse"></div>
+                <div class="h-32 w-full bg-gray-100 rounded-xl animate-pulse"></div>
+              </div>
+              <p class="text-xs text-gray-400 mt-1">Skeleton cards × 3 với animate-pulse</p>
+            </div>
+            <div>
+              <span class="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">Empty</span>
+              <div class="mt-1 bg-white border-2 border-dashed rounded-xl p-8 text-center">
+                <p class="text-gray-400 text-lg mb-2">📋</p>
+                <p class="text-gray-600 font-medium">Chưa có báo cáo nào</p>
+                <p class="text-xs text-gray-400 mt-1">Tạo báo cáo tuần này để theo dõi tiến độ học tập</p>
+                <button class="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">✨ Tạo báo cáo tuần này</button>
+              </div>
+            </div>
+            <div>
+              <span class="inline-block px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">Error</span>
+              <div class="mt-1 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                <span>⚠️ Không thể tải báo cáo. Vui lòng thử lại.</span>
+                <button class="underline ml-auto">Thử lại</button>
+              </div>
+            </div>
+            <div>
+              <span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">Success</span>
+              <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="border rounded-xl p-4">
+                  <div class="text-xs text-gray-400">Tuần 20</div>
+                  <div class="text-sm font-semibold">11/05 - 17/05</div>
+                  <div class="mt-2 flex gap-4 text-xs text-gray-600">
+                    <span>⏱ 5.2h</span>
+                    <span>📝 3 bài</span>
+                    <span>💎 25</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2 line-clamp-2">Tuần này bạn đã tiến bộ rõ ở môn Toán...</p>
+                </div>
+                <div class="border rounded-xl p-4">
+                  <div class="text-xs text-gray-400">Tuần 19</div>
+                  <div class="text-sm font-semibold">04/05 - 10/05</div>
+                  <div class="mt-2 flex gap-4 text-xs text-gray-600">
+                    <span>⏱ 3.8h</span>
+                    <span>📝 2 bài</span>
+                    <span>💎 18</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2 line-clamp-2">Cần cố gắng hơn ở môn Vật lý...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-sm">
+          <p class="font-semibold mb-1">API calls:</p>
+          <ul class="text-gray-600 space-y-1">
+            <li><code>GET /api/reports/list?limit=20</code> — list reports</li>
+            <li><code>POST /api/reports/generate</code> — generate khi bấm "Tạo báo cáo"</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-indigo-500 to-blue-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-semibold mb-2">Phase 6</span>
+            <h3 class="text-xl font-bold">Frontend — Report Detail</h3>
+            <p class="text-sm text-gray-500 mt-1"><code>src/app/(app)/reports/[id]/page.tsx</code> + recharts</p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~1h</span>
+        </div>
+
+        <!-- Layout mock -->
+        <div class="bg-white border-2 rounded-xl p-5 space-y-5">
+          <!-- Header -->
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-lg font-bold">Báo cáo tuần 20</h4>
+              <p class="text-sm text-gray-500">11/05/2026 - 17/05/2026</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border rounded-lg">⬅ Tuần trước</button>
+              <button class="px-3 py-1.5 text-sm border rounded-lg">Tuần sau ➡</button>
+            </div>
+          </div>
+
+          <!-- Stats cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
+              <p class="text-xs text-blue-600 font-medium">Thời gian học</p>
+              <p class="text-2xl font-bold text-blue-900">5.2h</p>
+              <p class="text-xs text-blue-600">▲ 37% so với tuần trước</p>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
+              <p class="text-xs text-green-600 font-medium">Bài hoàn thành</p>
+              <p class="text-2xl font-bold text-green-900">3</p>
+              <p class="text-xs text-green-600">Điểm TB: 85.5</p>
+            </div>
+            <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4">
+              <p class="text-xs text-yellow-600 font-medium">Kim cương</p>
+              <p class="text-2xl font-bold text-yellow-900">+25</p>
+              <p class="text-xs text-yellow-600">▲ 39% so với tuần trước</p>
+            </div>
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4">
+              <p class="text-xs text-orange-600 font-medium">Streak</p>
+              <p class="text-2xl font-bold text-orange-900">7 ngày</p>
+              <p class="text-xs text-orange-600">🔥 Đang cháy!</p>
+            </div>
+          </div>
+
+          <!-- Chart + Weaknesses -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Chart -->
+            <div class="lg:col-span-2 border rounded-xl p-4">
+              <p class="text-sm font-semibold mb-3">📊 Thời gian học theo ngày</p>
+              <div class="h-48 bg-gray-50 rounded-lg flex items-end gap-2 p-4">
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-400 rounded-t" style="height: 60%"></div>
+                  <span class="text-xs text-gray-400">T2</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-400 rounded-t" style="height: 80%"></div>
+                  <span class="text-xs text-gray-400">T3</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-400 rounded-t" style="height: 45%"></div>
+                  <span class="text-xs text-gray-400">T4</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-400 rounded-t" style="height: 90%"></div>
+                  <span class="text-xs text-gray-400">T5</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-400 rounded-t" style="height: 100%"></div>
+                  <span class="text-xs text-gray-400">T6</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-300 rounded-t" style="height: 30%"></div>
+                  <span class="text-xs text-gray-400">T7</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full bg-indigo-300 rounded-t" style="height: 20%"></div>
+                  <span class="text-xs text-gray-400">CN</span>
+                </div>
+              </div>
+              <p class="text-xs text-gray-400 mt-2">Dùng <code>recharts &lt;BarChart&gt;</code> (đã có trong package.json)</p>
+            </div>
+
+            <!-- Weaknesses -->
+            <div class="border rounded-xl p-4">
+              <p class="text-sm font-semibold mb-3">🔴 Điểm yếu cần cải thiện</p>
+              <div class="space-y-3">
+                <div>
+                  <div class="flex justify-between text-sm">
+                    <span>Phân số</span>
+                    <span class="text-green-600 text-xs">▲ đang cải thiện</span>
+                  </div>
+                  <div class="h-1.5 bg-gray-100 rounded-full mt-1">
+                    <div class="h-full bg-green-500 rounded-full" style="width: 60%"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-sm">
+                    <span>Định luật Ohm</span>
+                    <span class="text-red-600 text-xs">▼ cần chú ý</span>
+                  </div>
+                  <div class="h-1.5 bg-gray-100 rounded-full mt-1">
+                    <div class="h-full bg-red-500 rounded-full" style="width: 25%"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-sm">
+                    <span>Phép nhân</span>
+                    <span class="text-yellow-600 text-xs">➔ không đổi</span>
+                  </div>
+                  <div class="h-1.5 bg-gray-100 rounded-full mt-1">
+                    <div class="h-full bg-yellow-500 rounded-full" style="width: 40%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Coach Message -->
+          <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-lg">🤖</span>
+              <span class="font-semibold text-indigo-800">AI Coach nhận xét</span>
+            </div>
+            <div class="text-sm text-indigo-900 leading-relaxed prose prose-sm">
+              <p>Chào bạn! Tuần này bạn đã học được <strong>5.2 giờ</strong>, tăng 37% so với tuần trước — một tiến bộ rất đáng khen! 🎉</p>
+              <p class="mt-2">Bạn đã hoàn thành <strong>3/3 bài tập</strong> với điểm trung bình 85.5. Đặc biệt, bạn đã duy trì streak <strong>7 ngày</strong> liên tục!</p>
+              <p class="mt-2">Tuy nhiên, <strong>Định luật Ohm</strong> vẫn là điểm yếu cần cải thiện. Mình đề xuất dành thêm 30 phút mỗi ngày để ôn chủ đề này.</p>
+              <p class="mt-2">Tiếp tục phát huy nhé! ✨</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 7 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-teal-500 to-emerald-600 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-semibold mb-2">Phase 7</span>
+            <h3 class="text-xl font-bold">Sidebar Navigation</h3>
+            <p class="text-sm text-gray-500 mt-1">Thêm nav item vào <code>src/components/layout/sidebar.tsx</code></p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~5 phút</span>
+        </div>
+
+        <pre class="bg-gray-50 border rounded-lg p-4 text-xs font-mono overflow-x-auto">
+<span class="text-gray-500">// Import icon</span>
+<span class="text-gray-500">import</span> { <span class="text-blue-600">BarChart3</span> } <span class="text-gray-500">from</span> <span class="text-green-600">"lucide-react"</span>;
+
+<span class="text-gray-500">// Thêm vào allNavItems (sau Lộ trình, trước Sơ đồ tư duy)</span>
+{ <span class="text-blue-600">label</span>: <span class="text-green-600">"Báo cáo tuần"</span>, <span class="text-blue-600">href</span>: <span class="text-green-600">"/reports"</span>, <span class="text-blue-600">icon</span>: BarChart3, <span class="text-blue-600">roles</span>: [<span class="text-green-600">"STUDENT"</span>, <span class="text-green-600">"PARENT"</span>, <span class="text-green-600">"TEACHER"</span>] },</pre>
+
+        <div class="mt-3 text-sm text-gray-600 bg-gray-50 border rounded-xl p-3">
+          <p><strong>Phân quyền hiển thị:</strong></p>
+          <ul class="mt-1 space-y-1">
+            <li>• <b>STUDENT</b>: thấy mục — xem report của bản thân</li>
+            <li>• <b>PARENT</b>: thấy mục — xem report của con</li>
+            <li>• <b>TEACHER</b>: thấy mục — xem report của học sinh trong lớp</li>
+            <li>• <b>ADMIN / SUPER_ADMIN</b>: không thấy (dùng admin dashboard)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 8 -->
+    <div class="phase-card bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-gray-500 to-gray-700 h-1.5"></div>
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <span class="inline-block px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs font-semibold mb-2">Phase 8</span>
+            <h3 class="text-xl font-bold">PDF Export &amp; Email (Optional)</h3>
+            <p class="text-sm text-gray-500 mt-1">Nâng cao — làm nếu còn thời gian</p>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">~2-3 ngày</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div class="border rounded-xl p-4 bg-gray-50">
+            <div class="font-semibold mb-1">📄 PDF Export</div>
+            <ul class="text-gray-600 space-y-1">
+              <li>• Tạo component <code>ReportPDF</code> với print-friendly CSS</li>
+              <li>• Dùng <code>window.print()</code> hoặc thư viện <code>html2canvas</code> + <code>jspdf</code></li>
+              <li>• Hoặc backend: render HTML → PDF với <code>chromedp</code></li>
+            </ul>
+          </div>
+          <div class="border rounded-xl p-4 bg-gray-50">
+            <div class="font-semibold mb-1">📧 Email tự động</div>
+            <ul class="text-gray-600 space-y-1">
+              <li>• SMTP integration hoặc Supabase email</li>
+              <li>• Cron job: Chủ nhật hàng tuần generate + gửi</li>
+              <li>• Template email: HTML với summary + link xem chi tiết</li>
+              <li class="text-yellow-600">⚠️ Cần Supabase email add-on hoặc SMTP server</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Tổng kết -->
+  <footer class="max-w-5xl mx-auto px-6 pb-10">
+    <div class="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-6">
+      <h3 class="text-lg font-bold mb-4">📋 Tổng kết</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div class="bg-white/10 rounded-xl p-3">
+          <div class="text-2xl font-bold">8</div>
+          <div class="text-xs text-gray-300">Phases</div>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3">
+          <div class="text-2xl font-bold">4</div>
+          <div class="text-xs text-gray-300">API Endpoints</div>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3">
+          <div class="text-2xl font-bold">5</div>
+          <div class="text-xs text-gray-300">Nguồn dữ liệu</div>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3">
+          <div class="text-2xl font-bold">1-2</div>
+          <div class="text-xs text-gray-300">Ngày TH</div>
+        </div>
+      </div>
+      <div class="mt-6 text-sm text-gray-300 flex flex-wrap gap-2 items-center">
+        <span>✅ Tận dụng:</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">ai.Service.Chat()</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">Progress.WeeklyChart</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">Weaknesses.ListByUser</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">DiamondService.History</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">recharts</span>
+        <span class="px-2 py-0.5 bg-white/10 rounded-full">react-markdown</span>
+      </div>
+      <p class="mt-4 text-xs text-gray-400">Cập nhật lần cuối: 18/05/2026 &middot; Dành cho LMS Project</p>
+    </div>
+  </footer>
+
+</body>
+</html>

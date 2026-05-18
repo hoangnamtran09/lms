@@ -25,6 +25,7 @@ import (
 	"github.com/lms/backend/internal/permissions"
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/quizzes"
+	"github.com/lms/backend/internal/reports"
 	"github.com/lms/backend/internal/studyplanner"
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/teacher"
@@ -54,6 +55,7 @@ type Handlers struct {
 	Classes      *classes.Handler
 		Flashcards   *flashcards.Handler
 		StudyPlanner *studyplanner.Handler
+		Reports      *reports.Handler
 }
 
 func New(
@@ -118,6 +120,8 @@ func New(
 		flashcardsH := flashcards.NewHandler(flashcardsSvc)
 		studyPlannerSvc := studyplanner.NewService(db)
 		studyPlannerH := studyplanner.NewHandler(studyPlannerSvc, aiSvc, db)
+		reportsSvc := reports.NewService(db, aiSvc)
+		reportsH := reports.NewHandler(reportsSvc, db)
 	// Mount
 	h := &Handlers{
 		Auth:         authH,
@@ -139,7 +143,8 @@ func New(
 		GradeLevels:  gradeLevelsH,
 		Classes:      classesH,
 			Flashcards:   flashcardsH,
-			StudyPlanner: studyPlannerH,	}
+			StudyPlanner: studyPlannerH,
+			Reports:      reportsH,	}
 
 	_ = quizzesSvc
 
@@ -310,6 +315,13 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 				r.Get("/api/study-planner/history", h.StudyPlanner.History)
 				r.Patch("/api/study-planner/{id}/task/{taskId}", h.StudyPlanner.CompleteTask)
 				r.Put("/api/study-planner/{id}/reorder", h.StudyPlanner.Reorder)
+				// Reports
+				r.With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
+					Post("/api/reports/generate", h.Reports.Generate)
+				r.Get("/api/reports/list", h.Reports.List)
+				r.Get("/api/reports/{id}", h.Reports.Get)
+				r.With(middleware.RequirePermission(permissions.ResAnalytics, permissions.ActRead)).
+					Get("/api/reports/student/{studentId}", h.Reports.GetForStudent)
 				// Media
 			r.With(middleware.RequirePermission(permissions.ResLessons, permissions.ActManage)).
 				Post("/api/media/upload", h.Media.Upload)
