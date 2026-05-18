@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Trash2, Plus, ChevronDown, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Plus, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain } from "lucide-react";
 import { api, ApiError, uploadFile } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,13 +132,15 @@ export default function AdminAssignmentsPage() {
 
   // Fetch students filtered by selected class
   useEffect(() => {
-    setSelectedStudentIds([]);
     const url = classId
       ? `/api/users?role=STUDENT&classId=${classId}`
       : "/api/users?role=STUDENT";
     api<StudentBrief[]>(url)
-      .then((data) => setStudents(data || []))
-      .catch(() => setStudents([]));
+      .then((data) => {
+        setSelectedStudentIds([]);
+        setStudents(data || []);
+      })
+      .catch(() => { setSelectedStudentIds([]); setStudents([]); });
   }, [classId]);
 
   // Fetch subjects on mount
@@ -157,9 +159,13 @@ export default function AdminAssignmentsPage() {
 
   // Fetch lessons — same logic as admin/courses page
   useEffect(() => {
-    if (!selectedSubjectId) { setLessons([]); setSelectedLessonId(""); return; }
-    setSelectedLessonId("");
+    if (!selectedSubjectId) {
+      if (lessons.length) setLessons([]);
+      if (selectedLessonId) setSelectedLessonId("");
+      return;
+    }
     (async () => {
+      setSelectedLessonId("");
       const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubjectId}`);
       const all: Lesson[] = [];
       for (const c of courses) {
@@ -177,12 +183,11 @@ export default function AdminAssignmentsPage() {
 
   // Fetch weakness topics when class changes
   useEffect(() => {
-    if (!selectedClassId) { setTopics([]); return; }
+    if (!selectedClassId) { if (topics.length) setTopics([]); return; }
     setLoadingTopics(true);
-    setSelectedTopic(null);
     api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${selectedClassId}`)
-      .then((data) => setTopics(data || []))
-      .catch(() => setTopics([]))
+      .then((data) => { setSelectedTopic(null); setTopics(data || []); })
+      .catch(() => { setSelectedTopic(null); setTopics([]); })
       .finally(() => setLoadingTopics(false));
   }, [selectedClassId]);
 

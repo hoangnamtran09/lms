@@ -284,7 +284,7 @@ export default function LessonViewerPage({
       clearLastQuizResult();
       sendMessage(msg);
     }
-  }, [lastQuizResult, streaming, chatUnlocked, sendMessage, clearLastQuizResult]);
+  }, [lastQuizResult, streaming, chatUnlocked]);
 
   if (loading) {
     return (

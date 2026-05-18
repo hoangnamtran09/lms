@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
-import { hasPermission } from "@/lib/permissions-client";
 import {
   LayoutDashboard,
   GraduationCap,

@@ -44,9 +44,6 @@ export function CompletionQuizDialog({
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
-    setCurrentIndex(0);
-    setCorrectCount(0);
 
     if (preloadedQuestions?.length) {
       setQuestions(preloadedQuestions);
@@ -88,6 +85,7 @@ export function CompletionQuizDialog({
   return (
     <Dialog open={open}>
       <DialogContent
+        key={open ? "open" : "closed"}
         showCloseButton={false}
         className="sm:max-w-lg max-h-[90vh] overflow-y-auto"
       >

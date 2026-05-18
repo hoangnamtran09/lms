@@ -91,7 +91,11 @@ export default function AdminCoursesPage() {
     setLessonLoading(false);
   };
 
-  useEffect(() => { fetchSubjects(); fetchGradeLevels(); }, []);
+  useEffect(() => {
+    api<Subject[]>("/api/subjects").then(setSubjects).catch(() => {});
+    api<GradeLevel[]>("/api/grade-levels").then(setGradeLevels).catch(() => {});
+    setSubLoading(false);
+  }, []);
 
   const handleEditSubject = (s: Subject) => {
     setEditing({ type: "subject", entity: s });
