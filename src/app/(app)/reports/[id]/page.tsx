@@ -50,7 +50,7 @@ function parseAIMessage(msg: AIMessage | string | null): AIMessage | null {
     try {
       return JSON.parse(msg);
     } catch {
-      return { title: "", overallAssessment: "neutral", highlights: [], coachMessage: msg } as AIMessage;
+      return { title: "", overallAssessment: "neutral", highlights: [], weaknessAnalysis: "", trendComparison: "", recommendations: [], coachMessage: msg } as AIMessage;
     }
   }
   return msg;
