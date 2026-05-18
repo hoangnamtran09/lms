@@ -6,7 +6,7 @@ import { ArrowLeft, Plus, Trash2, ChevronRight, BookOpen, FileText, UploadCloud,
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { api, ApiError } from "@/lib/api-client";
+import { api, ApiError, uploadFile } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,17 +128,8 @@ export default function AdminCoursesPage() {
           const file = fileRef.current?.files?.[0];
           if (file) {
             setUploading(true);
-            const formData = new FormData();
-            formData.append("file", file);
-            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-            const uploadRes = await fetch(`${API_BASE}/api/media/upload`, {
-              method: "POST",
-              credentials: "include",
-              body: formData,
-            });
-            if (!uploadRes.ok) throw new ApiError("Tải file thất bại", uploadRes.status);
-            const uploadJson = await uploadRes.json();
-            mediaUrl = uploadJson.url;
+            const { url } = await uploadFile("/api/media/upload", file);
+            mediaUrl = url;
             setUploading(false);
           }
           const body: Record<string, unknown> = {
@@ -175,17 +166,8 @@ export default function AdminCoursesPage() {
           const file = fileRef.current?.files?.[0];
           if (file) {
             setUploading(true);
-            const formData = new FormData();
-            formData.append("file", file);
-            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-            const uploadRes = await fetch(`${API_BASE}/api/media/upload`, {
-              method: "POST",
-              credentials: "include",
-              body: formData,
-            });
-            if (!uploadRes.ok) throw new ApiError("Tải file thất bại", uploadRes.status);
-            const uploadJson = await uploadRes.json();
-            mediaUrl = uploadJson.url;
+            const { url } = await uploadFile("/api/media/upload", file);
+            mediaUrl = url;
             setUploading(false);
           }
 
@@ -261,9 +243,11 @@ export default function AdminCoursesPage() {
       for (let i = 0; i < bulkFiles.length; i++) {
         formData.append("files", bulkFiles[i]);
       }
+      const supabase = (await import("@/lib/supabase/client")).createClient();
+      const { data: { session } } = await supabase.auth.getSession();
       const uploadRes = await fetch(`${API_BASE}/api/media/upload-bulk`, {
         method: "POST",
-        credentials: "include",
+        headers: session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {},
         body: formData,
       });
       if (!uploadRes.ok) throw new ApiError("Upload thất bại", uploadRes.status);
