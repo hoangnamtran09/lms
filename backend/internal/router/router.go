@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -64,7 +65,7 @@ func New(
 	// Global middleware
 	r.Use(middleware.Logging)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{cfg.CORSOrigin, "http://localhost:3001"},
+		AllowedOrigins:   append(strings.Split(cfg.CORSOrigin, ","), "http://localhost:3001"),
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
