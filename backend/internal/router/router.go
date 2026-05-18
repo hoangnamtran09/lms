@@ -153,6 +153,7 @@ func New(
 
 func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *gorm.DB) {
 	// Public routes (login/logout handled by Supabase)
+	r.Get("/api/media/pdf", h.Media.PDF)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -310,7 +311,6 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 				r.Patch("/api/study-planner/{id}/task/{taskId}", h.StudyPlanner.CompleteTask)
 				r.Put("/api/study-planner/{id}/reorder", h.StudyPlanner.Reorder)
 				// Media
-		r.Get("/api/media/pdf", h.Media.PDF)
 			r.With(middleware.RequirePermission(permissions.ResLessons, permissions.ActManage)).
 				Post("/api/media/upload", h.Media.Upload)
 			r.With(middleware.RequirePermission(permissions.ResLessons, permissions.ActManage)).
