@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function PDFViewer({ url, title }: Props) {
-  const proxyUrl = `/api/media/pdf?url=${encodeURIComponent(url)}`;
+  const proxyUrl = `${process.env.NEXT_PUBLIC_API_URL || ""}/api/media/pdf?url=${encodeURIComponent(url)}`;
 
   return (
     <div className="flex flex-col h-full">

@@ -59,8 +59,9 @@ export default function LessonViewerPage({
   const [numPages, setNumPages] = useState(0);
   const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
   const proxyUrl = lesson?.mediaUrl
-    ? `/api/media/pdf?url=${encodeURIComponent(lesson.mediaUrl)}`
+    ? `${API_BASE}/api/media/pdf?url=${encodeURIComponent(lesson.mediaUrl)}`
     : null;
 
   // Study timer
