@@ -43,6 +43,7 @@ jobs:
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
           containerAppName: ${{ env.AZURE_CONTAINER_APP }}
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/lms-backend:${{ github.sha }}
+          acrName: ${{ env.ACR_NAME }}
           environmentVariables: |
             PORT=8080
             DATABASE_URL=${{ secrets.DATABASE_URL }}
