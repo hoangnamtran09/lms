@@ -98,7 +98,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
   }, [id]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReport();
   }, [fetchReport]);
 
