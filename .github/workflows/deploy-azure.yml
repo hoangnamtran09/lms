@@ -40,7 +40,6 @@ jobs:
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
-          appSourcePath: backend
           resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
           containerAppName: ${{ env.AZURE_CONTAINER_APP }}
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/lms-backend:${{ github.sha }}
