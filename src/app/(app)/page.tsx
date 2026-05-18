@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Clock, Trophy, Gem, Flame, BookOpen, TrendingUp, Target,
   Star, ArrowUpRight, Medal, Activity, Sparkles, Play,
@@ -486,7 +487,11 @@ function StudentDashboard() {
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  if (user && (user.role === "TEACHER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN")) {
+  if (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN")) {
+    redirect("/admin");
+  }
+
+  if (user && user.role === "TEACHER") {
     return <TeacherDashboardPage />;
   }
   if (user?.role === "PARENT") {

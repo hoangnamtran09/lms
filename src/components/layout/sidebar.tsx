@@ -36,8 +36,8 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "PARENT", "STUDENT"] },
-  { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER", "STUDENT"] },
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "TEACHER", "PARENT", "STUDENT"] },
+  { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["SUPER_ADMIN", "TEACHER", "STUDENT"] },
   { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["TEACHER", "PARENT"] },
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["TEACHER", "STUDENT"] },
   { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
@@ -46,7 +46,7 @@ const allNavItems: NavItem[] = [
   { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
   { label: "Flashcards", href: "/flashcards", icon: Layers, roles: ["STUDENT"] },
   { label: "Báo cáo tuần", href: "/reports", icon: BarChart3, roles: ["STUDENT", "PARENT", "TEACHER"] },
-	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["SUPER_ADMIN", "TEACHER"] },
 	  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
   { label: "Cài đặt", href: "/parent/settings", icon: Settings, roles: ["PARENT"] },
   // Admin management
