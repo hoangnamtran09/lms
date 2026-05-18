@@ -52,3 +52,4 @@ az containerapp create \
 
 URL=$(az containerapp show --name $APP_NAME --resource-group $RESOURCE_GROUP --query properties.configuration.ingress.fqdn -o tsv)
 echo "=== Deployed! URL: https://$URL ==="
+
