@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock } from "lucide-react";
+import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock, Play, StopCircle } from "lucide-react";
 import { api, apiStream } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ export default function LessonViewerPage({
   // PDF state
   const [numPages, setNumPages] = useState(0);
   const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
+  const [studying, setStudying] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
   const proxyUrl = lesson?.mediaUrl
@@ -70,7 +71,7 @@ export default function LessonViewerPage({
     qualifiedPages,
     chatUnlocked,
     endSession,
-  } = useStudyTimer(!!proxyUrl, visiblePages, lessonId);
+  } = useStudyTimer(studying, visiblePages, lessonId);
 
   const elapsedRef = useRef(elapsedSeconds);
   useEffect(() => {
@@ -331,12 +332,35 @@ export default function LessonViewerPage({
             className="overflow-hidden bg-white min-h-0 relative lg:border-r flex flex-col"
             style={{ flexBasis: `${splitRatio}%` }}
           >
-            <Link
-              href={`/courses/${subjectId}`}
-              className="absolute top-3 left-3 z-10 inline-flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-black/5 hover:bg-white hover:text-gray-900 transition"
-            >
-              <ArrowLeft className="size-4" /> Quay lại
-            </Link>
+            <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+              <Link
+                href={`/courses/${subjectId}`}
+                className="inline-flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-black/5 hover:bg-white hover:text-gray-900 transition"
+              >
+                <ArrowLeft className="size-4" /> Quay lại
+              </Link>
+              {!studying ? (
+                <Button
+                  size="sm"
+                  onClick={() => setStudying(true)}
+                  className="gap-1.5"
+                >
+                  <Play className="size-4" /> Bắt đầu học
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={async () => {
+                    await endSession();
+                    setStudying(false);
+                  }}
+                  className="gap-1.5"
+                >
+                  <StopCircle className="size-4" /> Kết thúc học
+                </Button>
+              )}
+            </div>
 
             <div
               ref={scrollRef}

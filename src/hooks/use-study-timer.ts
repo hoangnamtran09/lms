@@ -92,12 +92,16 @@ export function useStudyTimer(
   useEffect(() => {
     if (!active) {
       stopTimer();
+      endSession();
       return;
     }
     startTimer();
     startSession();
-    return () => { stopTimer(); };
-  }, [active, startTimer, stopTimer, startSession]);
+    return () => {
+      stopTimer();
+      endSession();
+    };
+  }, [active, startTimer, stopTimer, startSession, endSession]);
 
   // Pause on tab hidden
   useEffect(() => {
