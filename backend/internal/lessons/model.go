@@ -64,7 +64,7 @@ func (s *Service) ListWithStudyStatus(ctx context.Context, courseID, userID stri
 	var lessons []LessonWithStatus
 	q := s.db.WithContext(ctx).
 		Table("lessons l").
-		Select("l.*, EXISTS(SELECT 1 FROM study_sessions ss WHERE ss.lesson_id = l.id AND ss.user_id = ?) AS studied", userID)
+		Select("l.*, EXISTS(SELECT 1 FROM study_sessions ss WHERE ss.lesson_id = l.id AND ss.user_id = ? AND ss.ended_at IS NOT NULL) AS studied", userID)
 	if courseID != "" {
 		q = q.Where("l.course_id = ?", courseID)
 	}
