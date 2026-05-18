@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/lms/backend/internal/middleware"
 )
 
 type Handler struct {
@@ -21,7 +22,20 @@ func (h *Handler) SetR2Delete(fn func(ctx context.Context, url string) error) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	lessons, err := h.service.List(r.Context(), r.URL.Query().Get("courseId"))
+	courseID := r.URL.Query().Get("courseId")
+
+	// If user is authenticated, return lessons with study status
+	if claims := middleware.GetClaims(r.Context()); claims != nil {
+		lessons, err := h.service.ListWithStudyStatus(r.Context(), courseID, claims.UserID)
+		if err != nil {
+			jsonErr(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		jsonOk(w, lessons)
+		return
+	}
+
+	lessons, err := h.service.List(r.Context(), courseID)
 	if err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return

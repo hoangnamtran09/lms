@@ -17,6 +17,7 @@ interface Lesson {
   title: string;
   description?: string;
   mediaUrl?: string;
+  studied?: boolean;
 }
 
 export default function LessonListPage({
@@ -84,9 +85,20 @@ export default function LessonListPage({
                 <FileText className="size-5 text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">
-                  {lesson.title}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900">
+                    {lesson.title}
+                  </p>
+                  {lesson.studied !== undefined && (
+                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                      lesson.studied
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {lesson.studied ? "Đã học" : "Chưa học"}
+                    </span>
+                  )}
+                </div>
                 {lesson.description && (
                   <p className="text-xs text-gray-500 line-clamp-1">{lesson.description}</p>
                 )}

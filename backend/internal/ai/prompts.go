@@ -458,16 +458,20 @@ const studyPlannerPrompt = `Bạn là trợ lý lập kế hoạch học tập t
 %s
 
 **Yêu cầu kế hoạch:**
-1. Tạo 4-7 nhiệm vụ học tập cho hôm nay, sắp xếp theo thứ tự ưu tiên (quan trọng nhất trước).
+1. Tạo 3-5 nhiệm vụ học tập cho hôm nay, sắp xếp theo thứ tự ưu tiên (quan trọng nhất trước).
 2. Mỗi nhiệm vụ phải có:
-   - "title": tiêu đề ngắn gọn, hấp dẫn (VD: "Ôn tập Phân Số", "Luyện bài tập Hóa trị")
+   - "title": tiêu đề ngắn gọn, hấp dẫn (VD: "Ôn tập Phân Số", "Học bài Định luật Ohm")
    - "description": mô tả 1-2 câu về việc cần làm, bằng tiếng Việt
-   - "type": loại nhiệm vụ: "review" (ôn tập), "practice" (luyện tập), "quiz" (kiểm tra), hoặc "assignment" (bài tập có hạn)
+   - "type": loại nhiệm vụ: "review" (ôn tập), "practice" (luyện tập), hoặc "assignment" (bài tập có hạn)
    - "estimatedMinutes": thời gian ước tính (phút), từ 10-45 phút
-   - "subjectName": tên môn học liên quan
-3. Ưu tiên các chủ đề yếu và bài tập sắp đến hạn.
+   - "subjectName": tên môn học liên quan, PHẢI trùng khớp với tên môn trong "Môn học và bài học có sẵn"
+3. QUAN TRỌNG:
+   - Nếu có điểm yếu: ưu tiên tạo nhiệm vụ ôn tập các chủ đề yếu đó trước.
+   - Nếu có bài tập sắp hạn: ưu tiên hoàn thành bài tập đó.
+   - Nếu KHÔNG có điểm yếu và KHÔNG có bài tập: HÃY TẠO NHIỆM VỤ HỌC BÀI MỚI từ danh sách "Môn học và bài học có sẵn", ưu tiên các bài "chưa học". Mỗi nhiệm vụ là một bài học cụ thể từ danh sách.
+   - Nếu không có cả dữ liệu môn học: tạo nhiệm vụ ôn tập chung nhẹ nhàng.
 4. Đa dạng loại nhiệm vụ, không nên toàn bộ là review.
-5. Tổng thời gian ước tính từ 60-120 phút.
+5. Tổng thời gian ước tính từ 45-90 phút.
 6. Lời văn khích lệ, tích cực, xưng "bạn".
 
 **Định dạng Output (MẢNG JSON):**
@@ -480,11 +484,11 @@ const studyPlannerPrompt = `Bạn là trợ lý lập kế hoạch học tập t
     "subjectName": "Toán"
   },
   {
-    "title": "Hoàn thành bài tập Hóa trị",
-    "description": "Làm bài tập về quy tắc hóa trị, chú ý các nguyên tố nhóm IIA.",
-    "type": "practice",
+    "title": "Học bài Định luật Ohm",
+    "description": "Đọc hiểu khái niệm và công thức Định luật Ohm, ghi chú các ý chính.",
+    "type": "review",
     "estimatedMinutes": 25,
-    "subjectName": "Hóa học"
+    "subjectName": "Vật lý"
   }
 ]
 

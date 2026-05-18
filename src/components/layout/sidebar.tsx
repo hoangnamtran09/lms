@@ -51,12 +51,12 @@ const allNavItems: NavItem[] = [
   { label: "Cài đặt", href: "/parent/settings", icon: Settings, roles: ["PARENT"] },
   // Admin management
   { label: "Tổng quan", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
   { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí lớp học", href: "/admin/classes", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
 
 ];
 

@@ -46,6 +46,32 @@ func (s *Service) List(ctx context.Context, courseID string) ([]Lesson, error) {
 	return lessons, err
 }
 
+type LessonWithStatus struct {
+	ID              string `json:"id"`
+	CourseID        string `json:"courseId"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	Summary         string `json:"summary"`
+	Objectives      string `json:"objectives"`
+	MediaURL        string `json:"mediaUrl"`
+	DurationMinutes int    `json:"durationMinutes"`
+	SortOrder       int    `json:"sortOrder"`
+	IsPublished     bool   `json:"isPublished"`
+	Studied         bool   `json:"studied"`
+}
+
+func (s *Service) ListWithStudyStatus(ctx context.Context, courseID, userID string) ([]LessonWithStatus, error) {
+	var lessons []LessonWithStatus
+	q := s.db.WithContext(ctx).
+		Table("lessons l").
+		Select("l.*, EXISTS(SELECT 1 FROM study_sessions ss WHERE ss.lesson_id = l.id AND ss.user_id = ?) AS studied", userID)
+	if courseID != "" {
+		q = q.Where("l.course_id = ?", courseID)
+	}
+	err := q.Order("l.sort_order ASC").Find(&lessons).Error
+	return lessons, err
+}
+
 func (s *Service) FindByID(ctx context.Context, id string) (*Lesson, error) {
 	var lesson Lesson
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&lesson).Error
