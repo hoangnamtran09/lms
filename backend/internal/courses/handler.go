@@ -15,12 +15,26 @@ func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	grade, _ := strconv.Atoi(r.URL.Query().Get("gradeLevel"))
-	courses, _, err := h.service.List(r.Context(), r.URL.Query().Get("subjectId"), grade, 1, 10000)
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	courses, total, err := h.service.List(r.Context(), r.URL.Query().Get("subjectId"), grade, page, limit)
 	if err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonOk(w, courses)
+	jsonOk(w, map[string]interface{}{
+		"data":  courses,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
