@@ -34,17 +34,20 @@ func (c *Course) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func (s *Service) List(ctx context.Context, subjectID string, gradeLevel int) ([]Course, error) {
-	var courses []Course
-	q := s.db.WithContext(ctx)
+func (s *Service) List(ctx context.Context, subjectID string, gradeLevel int, page, limit int) ([]Course, int64, error) {
+	var total int64
+	q := s.db.WithContext(ctx).Model(&Course{})
 	if subjectID != "" {
 		q = q.Where("subject_id = ?", subjectID)
 	}
 	if gradeLevel > 0 {
 		q = q.Where("grade_level = ?", gradeLevel)
 	}
-	err := q.Order("sort_order ASC").Find(&courses).Error
-	return courses, err
+	q.Count(&total)
+
+	var courses []Course
+	err := q.Order("sort_order ASC").Limit(limit).Offset((page-1)*limit).Find(&courses).Error
+	return courses, total, err
 }
 
 func (s *Service) FindByID(ctx context.Context, id string) (*Course, error) {

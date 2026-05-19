@@ -41,6 +41,19 @@ func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(session)
 }
 
+func (h *Handler) CancelSession(w http.ResponseWriter, r *http.Request) {
+	parts := splitPath(r.URL.Path)
+	sessionID := ""
+	if len(parts) >= 2 {
+		sessionID = parts[len(parts)-2]
+	}
+	if err := h.service.Cancel(r.Context(), sessionID); err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOk(w, map[string]string{"status": "cancelled"})
+}
+
 func (h *Handler) EndSession(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	// Path: /api/study-sessions/{id}/end → extract second-to-last segment

@@ -12,6 +12,7 @@ interface StudyProgress {
   qualifiedPages: Set<number>;
   chatUnlocked: boolean;
   endSession: () => Promise<void>;
+  cancelSession: () => Promise<void>;
 }
 
 export function useStudyTimer(
@@ -55,6 +56,16 @@ export function useStudyTimer(
     if (!sid) return;
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
+      sessionIdRef.current = null;
+    } catch {}
+  }, [stopTimer]);
+
+  const cancelSession = useCallback(async () => {
+    stopTimer();
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
       sessionIdRef.current = null;
     } catch {}
   }, [stopTimer]);
@@ -140,5 +151,6 @@ export function useStudyTimer(
     qualifiedPages,
     chatUnlocked,
     endSession,
+    cancelSession,
   };
 }

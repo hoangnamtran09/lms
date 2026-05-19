@@ -10,6 +10,7 @@ import (
 	"github.com/lms/backend/internal/gamification"
 	"github.com/lms/backend/internal/gradelevels"
 	"github.com/lms/backend/internal/lessons"
+	"github.com/lms/backend/internal/notifications"
 	"github.com/lms/backend/internal/parent"
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/quizzes"
@@ -41,6 +42,7 @@ func migrate(db *gorm.DB) error {
 		&ai.ChatMessageRecord{},
 		&gradelevels.GradeLevel{},
 		&classes.Class{},
+		&notifications.Notification{},
 		&flashcards.FlashcardDeck{},
 		&flashcards.Flashcard{},
 		&ai.AICache{},

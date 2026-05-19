@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, GraduationCap, Bell, Clock, LogOut } from "lucide-react";
+import { Menu, GraduationCap, Clock, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,6 +14,8 @@ import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 import { bridge } from "@/lib/study-session-bridge";
 import { ActiveQuizProvider, useActiveQuiz } from "@/lib/active-quiz-context";
 import { useAuth } from "@/components/auth/auth-provider";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
+import { SearchBar } from "@/components/search/search-bar";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -92,10 +94,9 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
         </Link>
       </div>
       <div className="flex items-center gap-2">
+        <SearchBar />
         <StreakBadge />
-        <Button variant="ghost" size="sm" aria-label="Notifications">
-          <Bell className="size-4" />
-        </Button>
+        <NotificationDropdown />
         <Separator orientation="vertical" className="h-6" />
         {isLessonViewer && (
           <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1">
@@ -127,6 +128,11 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.location.href = "/profile"}>
+              <User className="size-4" />
+              Trang cá nhân
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>
               <LogOut className="size-4" />

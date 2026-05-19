@@ -28,6 +28,10 @@ func (s *Service) Start(ctx context.Context, session *StudySession) error {
 	return s.db.WithContext(ctx).Create(session).Error
 }
 
+func (s *Service) Cancel(ctx context.Context, sessionID string) error {
+	return s.db.WithContext(ctx).Delete(&StudySession{}, "id = ?", sessionID).Error
+}
+
 func (s *Service) End(ctx context.Context, sessionID string) (*StudySession, error) {
 	now := time.Now()
 	var session StudySession

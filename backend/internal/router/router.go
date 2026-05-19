@@ -15,6 +15,7 @@ import (
 	"github.com/lms/backend/internal/auth"
 	"github.com/lms/backend/internal/classes"
 	"github.com/lms/backend/internal/config"
+	"github.com/lms/backend/internal/notifications"
 	"github.com/lms/backend/internal/courses"
 	"github.com/lms/backend/internal/gamification"
 	"github.com/lms/backend/internal/gradelevels"
@@ -26,6 +27,7 @@ import (
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/quizzes"
 	"github.com/lms/backend/internal/reports"
+	"github.com/lms/backend/internal/search"
 	"github.com/lms/backend/internal/studyplanner"
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/teacher"
@@ -52,10 +54,12 @@ type Handlers struct {
 	Teacher      *teacher.Handler
 	Analytics    *analytics.Handler
 	GradeLevels  *gradelevels.Handler
-	Classes      *classes.Handler
-		Flashcards   *flashcards.Handler
-		StudyPlanner *studyplanner.Handler
-		Reports      *reports.Handler
+	Classes        *classes.Handler
+	Notifications  *notifications.Handler
+	Flashcards     *flashcards.Handler
+	Search         *search.Handler
+	StudyPlanner   *studyplanner.Handler
+	Reports        *reports.Handler
 }
 
 func New(
@@ -116,12 +120,15 @@ func New(
 	gradeLevelsH := gradelevels.NewHandler(gradeLevelsSvc)
 	classesSvc := classes.NewService(db)
 	classesH := classes.NewHandler(classesSvc)
-		flashcardsSvc := flashcards.NewService(db)
+	notificationsSvc := notifications.NewService(db)
+	notificationsH := notifications.NewHandler(notificationsSvc)
+	flashcardsSvc := flashcards.NewService(db)
 		flashcardsH := flashcards.NewHandler(flashcardsSvc)
 		studyPlannerSvc := studyplanner.NewService(db)
 		studyPlannerH := studyplanner.NewHandler(studyPlannerSvc, aiSvc, db)
 		reportsSvc := reports.NewService(db, aiSvc)
 		reportsH := reports.NewHandler(reportsSvc, db)
+	searchH := search.NewHandler(db)
 	// Mount
 	h := &Handlers{
 		Auth:         authH,
@@ -141,10 +148,13 @@ func New(
 		Teacher:      teacherH,
 		Analytics:    analyticsH,
 		GradeLevels:  gradeLevelsH,
-		Classes:      classesH,
-			Flashcards:   flashcardsH,
-			StudyPlanner: studyPlannerH,
-			Reports:      reportsH,	}
+		Classes:        classesH,
+		Notifications:  notificationsH,
+		Flashcards:     flashcardsH,
+		Search:         searchH,
+		StudyPlanner:   studyPlannerH,
+		Reports:        reportsH,
+	}
 
 	_ = quizzesSvc
 
@@ -170,6 +180,15 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Get("/api/auth/me", h.Auth.Me)
 		r.Put("/api/auth/profile", h.Auth.UpdateProfile)
 		r.Post("/api/auth/change-password", h.Auth.ChangePassword)
+
+		// Search
+		r.Get("/api/search", h.Search.Search)
+
+		// Notifications
+		r.Get("/api/notifications", h.Notifications.List)
+		r.Get("/api/notifications/unread-count", h.Notifications.UnreadCount)
+		r.Post("/api/notifications/{id}/read", h.Notifications.MarkRead)
+		r.Post("/api/notifications/read-all", h.Notifications.MarkAllRead)
 
 		// Subjects
 		r.Get("/api/subjects", h.Subjects.List)
@@ -335,6 +354,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		// Progress — study sessions
 		r.Post("/api/study-sessions/start", h.Progress.StartSession)
 		r.Post("/api/study-sessions/{id}/end", h.Progress.EndSession)
+		r.Delete("/api/study-sessions/{id}", h.Progress.CancelSession)
 		r.Get("/api/study-sessions/leaderboard", h.Progress.Leaderboard)
 		r.Get("/api/study-sessions/stats", h.Progress.UserStats)
 		r.Get("/api/study-sessions/weekly-chart", h.Progress.WeeklyChart)

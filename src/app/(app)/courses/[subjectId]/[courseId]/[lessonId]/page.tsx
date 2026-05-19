@@ -54,6 +54,41 @@ export default function LessonViewerPage({
   const { activeQuiz, setActiveQuiz, lastQuizResult, clearLastQuizResult } = useActiveQuiz();
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const savedCountRef = useRef(0);
+
+  // Sync ref with state for saveHistory
+  const messagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const saveHistory = useCallback(async () => {
+    const msgs = messagesRef.current;
+    const newMessages = msgs.slice(savedCountRef.current);
+    if (newMessages.length === 0) return;
+    try {
+      await api("/api/ai/chat-history", {
+        method: "POST",
+        body: JSON.stringify({ lessonId, messages: newMessages }),
+      });
+      savedCountRef.current = msgs.length;
+    } catch {}
+  }, [lessonId]);
+
+  // Load chat history on mount
+  useEffect(() => {
+    api<{ messages: { role: string; content: string }[] }>(
+      `/api/ai/chat-history?lessonId=${lessonId}`
+    ).then((data) => {
+      const msgs: Message[] = data.messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      if (msgs.length > 0) {
+        setMessages(msgs);
+        savedCountRef.current = msgs.length;
+      }
+    }).catch(() => {});
+  }, [lessonId]);
 
   // PDF state
   const [numPages, setNumPages] = useState(0);
@@ -69,6 +104,7 @@ export default function LessonViewerPage({
     qualifiedPages,
     chatUnlocked,
     endSession,
+    cancelSession,
   } = useStudyTimer(true, visiblePages, lessonId);
 
   const elapsedRef = useRef(elapsedSeconds);
@@ -113,6 +149,11 @@ export default function LessonViewerPage({
         () => {
           setStreaming(false);
           playAIResponseSound();
+          // save greeting after stream finishes
+          setMessages((prev) => {
+            saveHistory(prev);
+            return prev;
+          });
         },
         (err) => {
           setChatError(err.message);
@@ -120,7 +161,7 @@ export default function LessonViewerPage({
         }
       );
     }
-  }, [chatUnlocked, streaming, lessonId]);
+  }, [chatUnlocked, streaming, lessonId, saveHistory]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -254,13 +295,17 @@ export default function LessonViewerPage({
       () => {
         setStreaming(false);
         playAIResponseSound();
+        setMessages((prev) => {
+          saveHistory(prev);
+          return prev;
+        });
       },
       (err) => {
         setChatError(err.message);
         setStreaming(false);
       }
     );
-  }, [lessonId]);
+  }, [lessonId, saveHistory]);
 
   const send = () => {
     const text = input.trim();
@@ -331,20 +376,16 @@ export default function LessonViewerPage({
             style={{ flexBasis: `${splitRatio}%` }}
           >
             <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-              <Link
-                href={`/courses/${subjectId}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-black/5 hover:bg-white hover:text-gray-900 transition"
+              <button
+                onClick={() => {
+                  cancelSession();
+                  router.push(`/courses/${subjectId}`);
+                }}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-white/90 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-black/5 hover:bg-white hover:text-gray-900 transition"
               >
                 <ArrowLeft className="size-4" /> Quay lại
-              </Link>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setShowQuiz(true)}
-                className="gap-1.5"
-              >
-                <StopCircle className="size-4" /> Kết thúc học
-              </Button>
+              </button>
+
             </div>
 
             <div
