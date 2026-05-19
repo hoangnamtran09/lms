@@ -101,10 +101,10 @@ function StudentDashboard() {
       setStats(s);
       setStreak(st);
       setDiamondBalance(d.balance);
-      setLeaderboard(lb);
-      setWeeklyChart(wc || []);
-      setAchievements(ach || []);
-      setCourses(cs || []);
+      setLeaderboard(Array.isArray(lb) ? lb : []);
+      setWeeklyChart(Array.isArray(wc) ? wc : []);
+      setAchievements(Array.isArray(ach) ? ach : []);
+      setCourses(Array.isArray(cs) ? cs : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -131,16 +131,16 @@ function StudentDashboard() {
   const weekPct = stats ? Math.min(100, Math.round((stats.weekSeconds / WEEKLY_GOAL_SECONDS) * 100)) : 0;
   const avgScoreVal = stats?.avgScore ? stats.avgScore.toFixed(1) : "0.0";
 
-  const maxWeekSeconds = Math.max(...weeklyChart.map((d) => d.seconds), 1);
-  const weekTotalSeconds = weeklyChart.reduce((sum, d) => sum + d.seconds, 0);
+  const maxWeekSeconds = Array.isArray(weeklyChart) ? Math.max(...weeklyChart.map((d) => d.seconds), 1) : 1;
+  const weekTotalSeconds = Array.isArray(weeklyChart) ? weeklyChart.reduce((sum, d) => sum + d.seconds, 0) : 0;
 
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3, 10);
+  const top3 = Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : [];
+  const rest = Array.isArray(leaderboard) ? leaderboard.slice(3, 10) : [];
 
   // Latest achievements — up to 4
-  const latestAchievements = achievements.slice(0, 4);
+  const latestAchievements = Array.isArray(achievements) ? achievements.slice(0, 4) : [];
   // Courses — up to 3
-  const recentCourses = courses.slice(0, 3);
+  const recentCourses = Array.isArray(courses) ? courses.slice(0, 3) : [];
 
   return (
     <div className="animate-fade-in max-w-6xl">
