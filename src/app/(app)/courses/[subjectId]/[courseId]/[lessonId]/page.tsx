@@ -149,11 +149,7 @@ export default function LessonViewerPage({
         () => {
           setStreaming(false);
           playAIResponseSound();
-          // save greeting after stream finishes
-          setMessages((prev) => {
-            saveHistory(prev);
-            return prev;
-          });
+          saveHistory();
         },
         (err) => {
           setChatError(err.message);
@@ -295,10 +291,7 @@ export default function LessonViewerPage({
       () => {
         setStreaming(false);
         playAIResponseSound();
-        setMessages((prev) => {
-          saveHistory(prev);
-          return prev;
-        });
+        saveHistory();
       },
       (err) => {
         setChatError(err.message);
