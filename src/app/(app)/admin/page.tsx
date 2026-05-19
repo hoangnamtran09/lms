@@ -151,7 +151,7 @@ export default function AdminDashboardPage() {
             </div>
             <p className="text-4xl font-extrabold tracking-tight mb-1">{overview.totalLessons}</p>
             <div className="flex items-center gap-1 text-emerald-100 text-xs">
-              <span>{overview.totalSubjects} môn học · {overview.totalCourses} khoá học</span>
+              <span>{overview.totalSubjects} môn học · {overview.totalLessons} bài học</span>
             </div>
           </div>
         </Card>
@@ -323,8 +323,8 @@ export default function AdminDashboardPage() {
             <BookOpen className="size-5 text-emerald-600" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900 text-sm">Môn &amp; Khoá học</p>
-            <p className="text-xs text-gray-500">{overview.totalSubjects} môn, {overview.totalCourses} khoá</p>
+            <p className="font-semibold text-gray-900 text-sm">Môn học</p>
+            <p className="text-xs text-gray-500">{overview.totalSubjects} môn, {overview.totalLessons} bài</p>
           </div>
           <ArrowUpRight className="size-4 text-gray-300 group-hover:text-emerald-500 ml-auto transition-colors" />
         </Link>
