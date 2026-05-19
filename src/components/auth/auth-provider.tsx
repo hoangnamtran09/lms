@@ -10,6 +10,8 @@ interface User {
   fullName: string;
   role: string;
   classId?: string;
+  email?: string;
+  avatarUrl?: string;
 }
 
 interface AuthContextValue {
@@ -40,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch local user profile from backend after Supabase session is established
   const fetchLocalUser = useCallback(async (token?: string) => {
     try {
-      const u = await api<{ id: string; supabaseId: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
+      const u = await api<User>("/api/auth/me");
       setUser(u);
       if (token) setTokenCookie(token);
     } catch {
@@ -75,14 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<User> => {
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
-      setError(signInError.message);
-      throw signInError;
+    try {
+      const { error: signInError } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        30000,
+        "Kết nối đến máy chủ xác thực bị timeout. Vui lòng thử lại."
+      );
+      if (signInError) {
+        setError(signInError.message);
+        throw signInError;
+      }
+      const me = await api<User>("/api/auth/me");
+      setUser(me);
+      return me;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
+      setError(message);
+      throw err;
     }
-    const me = await api<{ id: string; supabaseId: string; fullName: string; role: string; classId?: string }>("/api/auth/me");
-    setUser(me);
-    return me;
   };
 
   const logout = async () => {
@@ -96,6 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
 }
 
 export function useAuth() {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
 const adminPaths = ["/admin"];
 const parentPaths = ["/parent"];
 
@@ -30,9 +31,10 @@ export async function middleware(request: NextRequest) {
   const role = session?.user?.app_metadata?.role as string | undefined;
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
 
-  // If on login page and already logged in, redirect
-  if (pathname.startsWith("/login")) {
-    if (session?.user?.aud === "authenticated") {
+  // Public pages — allow access whether logged in or not
+  if (publicPaths.some((p) => pathname.startsWith(p))) {
+    // If already logged in, redirect away from public pages
+    if (session?.user?.aud === "authenticated" && pathname.startsWith("/login")) {
       return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", request.url));
     }
     return NextResponse.next();

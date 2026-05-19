@@ -10,6 +10,8 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
@@ -57,8 +59,26 @@ func Auth(jwtSecret, supabaseURL string, db *gorm.DB) func(http.Handler) http.Ha
 	}
 }
 
+// JWKS cache
+type jwksEntry struct {
+	keys   map[string]*ecdsa.PublicKey
+	expiry time.Time
+}
+
+var (
+	jwksCache sync.Map
+	jwksMu    sync.Mutex
+)
+
 func parseJWT(tokenStr, jwtSecret, supabaseURL string) (*Claims, error) {
-	// Try legacy HS256 with Claims struct
+	// Peek at the JWT header to determine the signing algorithm
+	alg := peekAlg(tokenStr)
+
+	if alg == "ES256" {
+		return parseES256(tokenStr, supabaseURL)
+	}
+
+	// Fallback: try legacy HS256 with Claims struct
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(jwtSecret), nil
@@ -76,7 +96,7 @@ func parseJWT(tokenStr, jwtSecret, supabaseURL string) (*Claims, error) {
 		return extractSupabaseClaims(mapClaims)
 	}
 
-	// Try ES256 via Supabase JWKS
+	// Final fallback: ES256 via JWKS
 	if supabaseURL != "" {
 		if claims, err := parseES256(tokenStr, supabaseURL); err == nil {
 			return claims, nil
@@ -86,9 +106,39 @@ func parseJWT(tokenStr, jwtSecret, supabaseURL string) (*Claims, error) {
 	return nil, err2
 }
 
-func parseES256(tokenStr, supabaseURL string) (*Claims, error) {
+func peekAlg(tokenStr string) string {
+	parser := jwt.Parser{}
+	unverified, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return ""
+	}
+	alg, _ := unverified.Header["alg"].(string)
+	return alg
+}
+
+func fetchJWKS(supabaseURL string) (map[string]*ecdsa.PublicKey, error) {
+	// Check cache
+	if cached, ok := jwksCache.Load(supabaseURL); ok {
+		entry := cached.(jwksEntry)
+		if time.Now().Before(entry.expiry) {
+			return entry.keys, nil
+		}
+	}
+
+	// Thundering-herd protection
+	jwksMu.Lock()
+	defer jwksMu.Unlock()
+
+	if cached, ok := jwksCache.Load(supabaseURL); ok {
+		entry := cached.(jwksEntry)
+		if time.Now().Before(entry.expiry) {
+			return entry.keys, nil
+		}
+	}
+
 	jwksURL := strings.TrimRight(supabaseURL, "/") + "/auth/v1/.well-known/jwks.json"
-	resp, err := http.Get(jwksURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(jwksURL)
 	if err != nil {
 		return nil, err
 	}
@@ -108,46 +158,46 @@ func parseES256(tokenStr, supabaseURL string) (*Claims, error) {
 		return nil, err
 	}
 
-	// Parse token header to get kid
-	parser := jwt.Parser{}
-	unverified, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
-	if err != nil {
-		return nil, err
-	}
-	kid, _ := unverified.Header["kid"].(string)
-
-	// Find matching key
-	var matched *struct {
-		KID string `json:"kid"`
-		KTY string `json:"kty"`
-		CRV string `json:"crv"`
-		X   string `json:"x"`
-		Y   string `json:"y"`
-		ALG string `json:"alg"`
-	}
-	for i := range jwks.Keys {
-		if jwks.Keys[i].KID == kid {
-			matched = &jwks.Keys[i]
-			break
+	keys := make(map[string]*ecdsa.PublicKey, len(jwks.Keys))
+	for _, k := range jwks.Keys {
+		if k.KTY != "EC" {
+			continue
+		}
+		xBytes, err := base64.RawURLEncoding.DecodeString(k.X)
+		if err != nil {
+			continue
+		}
+		yBytes, err := base64.RawURLEncoding.DecodeString(k.Y)
+		if err != nil {
+			continue
+		}
+		keys[k.KID] = &ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+			X:     new(big.Int).SetBytes(xBytes),
+			Y:     new(big.Int).SetBytes(yBytes),
 		}
 	}
-	if matched == nil {
+
+	jwksCache.Store(supabaseURL, jwksEntry{keys: keys, expiry: time.Now().Add(1 * time.Hour)})
+	return keys, nil
+}
+
+func parseES256(tokenStr, supabaseURL string) (*Claims, error) {
+	if supabaseURL == "" {
+		return nil, fmt.Errorf("supabase URL not configured")
+	}
+
+	keys, err := fetchJWKS(supabaseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get kid from token header
+	kid := extractKID(tokenStr)
+
+	pubKey, ok := keys[kid]
+	if !ok {
 		return nil, fmt.Errorf("no matching JWK for kid: %s", kid)
-	}
-
-	xBytes, err := base64.RawURLEncoding.DecodeString(matched.X)
-	if err != nil {
-		return nil, err
-	}
-	yBytes, err := base64.RawURLEncoding.DecodeString(matched.Y)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey := &ecdsa.PublicKey{
-		Curve: elliptic.P256(),
-		X:     new(big.Int).SetBytes(xBytes),
-		Y:     new(big.Int).SetBytes(yBytes),
 	}
 
 	mapClaims := jwt.MapClaims{}
@@ -162,6 +212,16 @@ func parseES256(tokenStr, supabaseURL string) (*Claims, error) {
 	}
 
 	return extractSupabaseClaims(mapClaims)
+}
+
+func extractKID(tokenStr string) string {
+	parser := jwt.Parser{}
+	unverified, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return ""
+	}
+	kid, _ := unverified.Header["kid"].(string)
+	return kid
 }
 
 func extractSupabaseClaims(mapClaims jwt.MapClaims) (*Claims, error) {

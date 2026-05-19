@@ -89,7 +89,7 @@ func New(
 	progressSvc := progress.NewService(db)
 
 	// Handlers
-	authH := auth.NewHandler(usersSvc)
+	authH := auth.NewHandler(usersSvc, cfg.SupabaseURL, cfg.SupabaseServiceRole)
 	usersH := users.NewHandler(usersSvc, cfg.SupabaseURL, cfg.SupabaseServiceRole)
 	subjectsH := subjects.NewHandler(subjectsSvc, db)
 	coursesH := courses.NewHandler(coursesSvc)
@@ -159,6 +159,8 @@ func New(
 func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *gorm.DB) {
 	// Public routes (login/logout handled by Supabase)
 	r.Get("/api/media/pdf", h.Media.PDF)
+	r.Post("/api/auth/register", h.Auth.Register)
+	r.Post("/api/auth/forgot-password", h.Auth.ForgotPassword)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -166,6 +168,8 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 
 		// Auth
 		r.Get("/api/auth/me", h.Auth.Me)
+		r.Put("/api/auth/profile", h.Auth.UpdateProfile)
+		r.Post("/api/auth/change-password", h.Auth.ChangePassword)
 
 		// Subjects
 		r.Get("/api/subjects", h.Subjects.List)

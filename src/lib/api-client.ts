@@ -69,15 +69,21 @@ export async function uploadFile(path: string, file: File): Promise<{ url: strin
   return res.json();
 }
 
+const REQUEST_TIMEOUT = 30000;
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    signal: controller.signal,
     headers: {
       ...authHeaders,
       ...options?.headers,
     },
   });
+  clearTimeout(timeoutId);
 
   if (res.status === 401) {
     await handle401();

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,14 @@ export function LoginForm() {
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
+            <div className="flex items-center justify-between text-sm">
+              <Link href="/register" className="font-medium text-primary hover:underline">
+                Đăng ký tài khoản
+              </Link>
+              <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+                Quên mật khẩu?
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
