@@ -68,7 +68,7 @@ export default function AdminStudentsPage() {
 
   const fetchStudents = () => {
     api<StudentRow[]>("/api/users?role=STUDENT")
-      .then(setStudents)
+      .then((data) => setStudents(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -79,8 +79,8 @@ export default function AdminStudentsPage() {
       api<ClassItem[]>("/api/classes"),
       api<GradeLevel[]>("/api/grade-levels"),
     ]).then(([cls, gl]) => {
-      setClasses(cls);
-      setGradeLevels(gl);
+      setClasses(Array.isArray(cls) ? cls : []);
+      setGradeLevels(Array.isArray(gl) ? gl : []);
     }).catch(() => {});
   }, []);
 
