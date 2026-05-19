@@ -15,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="h-full antialiased">
-      <body className="min-h-full bg-gray-50 flex flex-col">
+      <body className="min-h-full bg-gray-50 flex flex-col" suppressHydrationWarning>
         <AuthProvider>
           {children}
         </AuthProvider>

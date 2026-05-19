@@ -25,6 +25,7 @@ import {
   Layers,
   Settings,
   Presentation,
+  Award,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ const allNavItems: NavItem[] = [
 	  { label: "Kế hoạch học tập", href: "/study-planner", icon: Calendar, roles: ["STUDENT"] },
   { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
   { label: "Flashcards", href: "/flashcards", icon: Layers, roles: ["STUDENT"] },
+  { label: "Thành tựu", href: "/achievements", icon: Award, roles: ["STUDENT"] },
   { label: "Báo cáo tuần", href: "/reports", icon: BarChart3, roles: ["STUDENT", "PARENT", "TEACHER"] },
 	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["TEACHER"] },
 	  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
@@ -57,6 +59,7 @@ const allNavItems: NavItem[] = [
   { label: "Quản lí lớp học", href: "/admin/classes", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
   { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Quản lí thành tựu", href: "/admin/achievements", icon: Award, roles: ["SUPER_ADMIN", "ADMIN"] },
 
 ];
 

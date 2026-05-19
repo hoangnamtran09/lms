@@ -65,7 +65,15 @@ func (s *Service) Update(ctx context.Context, id string, updates map[string]inte
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
-	return s.db.WithContext(ctx).Where("id = ?", id).Delete(&Assignment{}).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("assignment_id = ?", id).Delete(&AuditLog{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("assignment_id = ?", id).Delete(&Submission{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", id).Delete(&Assignment{}).Error
+	})
 }
 
 // --- Submissions ---
