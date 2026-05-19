@@ -99,7 +99,10 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	key, fileURL, err := h.uploadToR2(r, file, header.Filename)
+	folder := r.FormValue("folder")
+	fileName := r.FormValue("fileName")
+
+	key, fileURL, err := h.uploadToR2(r, file, header.Filename, folder, fileName)
 	if err != nil {
 		jsonErr(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -130,6 +133,8 @@ func (h *Handler) BulkUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	folder := r.FormValue("folder")
+
 	results := make([]bulkResult, len(files))
 	type idxResult struct {
 		idx  int
@@ -146,7 +151,11 @@ func (h *Handler) BulkUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 
-			key, fileURL, err := h.uploadToR2(r, file, header.Filename)
+			var fileName string
+			if folder != "" {
+				fileName = header.Filename
+			}
+			key, fileURL, err := h.uploadToR2(r, file, header.Filename, folder, fileName)
 			r := bulkResult{Filename: header.Filename, Title: titleFromFilename(header.Filename), URL: fileURL, Key: key}
 			if err != nil {
 				r.Error = err.Error()
@@ -164,14 +173,21 @@ func (h *Handler) BulkUpload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"results": results})
 }
 
-func (h *Handler) uploadToR2(r *http.Request, file io.Reader, filename string) (key string, url string, err error) {
+func (h *Handler) uploadToR2(r *http.Request, file io.Reader, filename string, folder, fileName string) (key string, url string, err error) {
 	buf := new(bytes.Buffer)
 	if _, err := io.Copy(buf, file); err != nil {
 		return "", "", err
 	}
 
 	ext := filepath.Ext(filename)
-	key = fmt.Sprintf("uploads/%d_%s%s", time.Now().UnixNano(), randomString(8), ext)
+
+	if folder != "" && fileName != "" {
+		sanitizedFolder := sanitizePath(folder)
+		sanitizedName := sanitizePath(strings.TrimSuffix(fileName, filepath.Ext(fileName))) + ext
+		key = fmt.Sprintf("%s/%s", sanitizedFolder, sanitizedName)
+	} else {
+		key = fmt.Sprintf("uploads/%d_%s%s", time.Now().UnixNano(), randomString(8), ext)
+	}
 
 	_, err = h.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      aws.String(h.bucketName),
@@ -211,6 +227,14 @@ func (h *Handler) DeleteByURL(ctx context.Context, rawURL string) error {
 		return nil // Not our URL, skip
 	}
 	return h.DeleteObject(ctx, key)
+}
+
+func sanitizePath(name string) string {
+	s := strings.TrimSpace(name)
+	s = strings.ReplaceAll(s, "/", "-")
+	s = strings.ReplaceAll(s, "\\", "-")
+	s = strings.ReplaceAll(s, " ", "_")
+	return s
 }
 
 func titleFromFilename(filename string) string {

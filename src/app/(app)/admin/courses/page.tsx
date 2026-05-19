@@ -132,7 +132,8 @@ export default function AdminCoursesPage() {
           const file = fileRef.current?.files?.[0];
           if (file) {
             setUploading(true);
-            const { url } = await uploadFile("/api/media/upload", file);
+            const extra = selectedSubject ? { folder: `FILEPDF/${selectedSubject.name}`, fileName: `${form.title}.pdf` } : undefined;
+            const { url } = await uploadFile("/api/media/upload", file, extra);
             mediaUrl = url;
             setUploading(false);
           }
@@ -170,7 +171,8 @@ export default function AdminCoursesPage() {
           const file = fileRef.current?.files?.[0];
           if (file) {
             setUploading(true);
-            const { url } = await uploadFile("/api/media/upload", file);
+            const extra = selectedSubject ? { folder: `FILEPDF/${selectedSubject.name}`, fileName: `${form.title}.pdf` } : undefined;
+            const { url } = await uploadFile("/api/media/upload", file, extra);
             mediaUrl = url;
             setUploading(false);
           }
@@ -247,6 +249,7 @@ export default function AdminCoursesPage() {
       for (let i = 0; i < bulkFiles.length; i++) {
         formData.append("files", bulkFiles[i]);
       }
+      formData.append("folder", `FILEPDF/${selectedSubject.name}`);
       const supabase = (await import("@/lib/supabase/client")).createClient();
       const { data: { session } } = await supabase.auth.getSession();
       const uploadRes = await fetch(`${API_BASE}/api/media/upload-bulk`, {

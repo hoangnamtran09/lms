@@ -36,9 +36,14 @@ async function handle401() {
   window.location.href = "/login";
 }
 
-export async function uploadFile(path: string, file: File): Promise<{ url: string; key: string }> {
+export async function uploadFile(path: string, file: File, extraFields?: Record<string, string>): Promise<{ url: string; key: string }> {
   const formData = new FormData();
   formData.append("file", file);
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) {
+      formData.append(k, v);
+    }
+  }
   const headers: Record<string, string> = {};
   try {
     const supabase = createClient();
