@@ -6,7 +6,7 @@ import { ArrowLeft, Plus, Trash2, ChevronRight, BookOpen, FileText, UploadCloud,
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { api, ApiError, uploadFile } from "@/lib/api-client";
+import { api, ApiError, uploadFile, fetchList } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,9 +75,8 @@ export default function AdminCoursesPage() {
     setTab("lessons");
     setLessonLoading(true);
     try {
-      const courses = await api<Course[]>(`/api/courses?subjectId=${subject.id}`);
       const allLessons: Lesson[] = [];
-      for (const c of courses) {
+      for (const c of await fetchList<Course>(`/api/courses?subjectId=${subject.id}`)) {
         const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
         allLessons.push(...l);
       }
@@ -178,7 +177,7 @@ export default function AdminCoursesPage() {
           }
 
           // Find or create a default course for this subject
-          const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubject.id}`);
+          const courses = await fetchList<Course>(`/api/courses?subjectId=${selectedSubject.id}`);
           let courseId = courses[0]?.id;
           if (!courseId) {
             const c = await api<Course>(`/api/courses`, {
@@ -264,7 +263,7 @@ export default function AdminCoursesPage() {
 
       // Step 2: Create lessons for successful uploads
       // Find or create course for this subject
-      const courses = await api<Course[]>(`/api/courses?subjectId=${selectedSubject.id}`);
+      const courses = await fetchList<Course>(`/api/courses?subjectId=${selectedSubject.id}`);
       let courseId = courses[0]?.id;
       if (!courseId) {
         const c = await api<Course>(`/api/courses`, {

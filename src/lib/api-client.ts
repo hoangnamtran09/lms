@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+export async function fetchList<T>(path: string): Promise<T[]> {
+  const res = await api<T[] | { data: T[] }>(path);
+  return Array.isArray(res) ? res : res.data;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
