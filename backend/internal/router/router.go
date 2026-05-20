@@ -245,6 +245,9 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActWrite)).
 			Post("/api/assignments/upload", h.Media.Upload)
 
+		// Submission file upload (any authenticated user, e.g. students)
+		r.Post("/api/submissions/upload", h.Media.Upload)
+
 		// Submissions
 		r.Post("/api/assignments/{id}/submit", h.Assignments.Submit)
 		r.Get("/api/assignments/{id}/submissions", h.Assignments.ListSubmissions)

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, use, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Send, FileText, Check, X } from "lucide-react";
-import { api } from "@/lib/api-client";
+import { ArrowLeft, Send, FileText, Check, X, Upload, Loader2 } from "lucide-react";
+import { api, uploadFile } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,9 +39,22 @@ interface Question {
   expectedAnswer: string;
   score: number;
   type?: "mcq" | "short_answer";
+  difficulty?: string;
   options?: McqOption[];
   explanation?: string;
 }
+
+const difficultyLabels: Record<string, string> = {
+  nhan_biet: "Nhận biết",
+  thong_hieu: "Thông hiểu",
+  van_dung: "Vận dụng",
+};
+
+const difficultyColors: Record<string, string> = {
+  nhan_biet: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  thong_hieu: "bg-blue-100 text-blue-700 border-blue-200",
+  van_dung: "bg-orange-100 text-orange-700 border-orange-200",
+};
 
 function detectQuestionType(q: Question): "mcq" | "short_answer" {
   if (q.type === "mcq" || (q.options && q.options.length > 0)) return "mcq";
@@ -120,6 +133,12 @@ export default function AssignmentDetailPage({
   const [mySubmitted, setMySubmitted] = useState(false);
   const [locallyGraded, setLocallyGraded] = useState(false);
   const [mcqResults, setMcqResults] = useState<Record<string, { isCorrect: boolean }>>({});
+
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [fileUrl, setFileUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mySubmission = submissions.find((s) => s.studentId === user?.id);
 
@@ -288,17 +307,39 @@ export default function AssignmentDetailPage({
     } catch {}
   }, [mySubmission, questions]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+  };
+
   const handleSubmit = async () => {
     // Prevent duplicate submissions
     if (mySubmission || mySubmitted || submitting) return;
     const hasQuestions = questions.length > 0;
-    if (!hasQuestions && !answer.trim()) return;
+    if (!hasQuestions && !answer.trim() && !selectedFile) return;
     if (hasQuestions) {
       const anyMcqAnswered = questions.some((q) => detectQuestionType(q) === "mcq" && mcqSelections[q.id] != null);
       const anyShortAnswered = questions.some((q) => detectQuestionType(q) !== "mcq" && perQuestionAnswers[q.id]?.trim());
-      if (!anyMcqAnswered && !anyShortAnswered) return;
+      if (!anyMcqAnswered && !anyShortAnswered && !selectedFile) return;
     }
     setSubmitting(true);
+
+    // Upload file if selected
+    let uploadedUrl = "";
+    if (selectedFile) {
+      setUploading(true);
+      try {
+        const result = await uploadFile("/api/submissions/upload", selectedFile);
+        uploadedUrl = result.url;
+        setFileUrl(uploadedUrl);
+      } catch (e: any) {
+        setError("Tải file thất bại: " + e.message);
+        setSubmitting(false);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
 
     // Grade MCQs locally
     const results: Record<string, { isCorrect: boolean }> = {};
@@ -326,7 +367,7 @@ export default function AssignmentDetailPage({
         : answer;
       await api(`/api/assignments/${id}/submit`, {
         method: "POST",
-        body: JSON.stringify({ assignmentId: id, content }),
+        body: JSON.stringify({ assignmentId: id, content, fileUrl: uploadedUrl }),
       });
       // Optimistically add submission so mySubmission is found immediately
       const optimistic: Submission = {
@@ -335,7 +376,7 @@ export default function AssignmentDetailPage({
         studentId: user?.id || "",
         studentName: user?.fullName || "",
         content,
-        fileUrl: "",
+        fileUrl: uploadedUrl,
         score: null,
         feedback: "",
         status: "SUBMITTED",
@@ -347,6 +388,7 @@ export default function AssignmentDetailPage({
       setSubmitted(true);
       setMySubmitted(true);
       setAnswer("");
+      setSelectedFile(null);
       // Persist submission state to survive page reload
       try {
         sessionStorage.setItem(`submitted-${id}`, "true");
@@ -440,6 +482,11 @@ export default function AssignmentDetailPage({
                       <div className="flex items-start gap-2 mb-2">
                         <span className="text-sm font-bold text-purple-600 shrink-0 mt-0.5">Câu {i + 1}</span>
                         <span className="text-xs text-gray-400">({q.score || 10}đ)</span>
+                        {q.difficulty && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                            {difficultyLabels[q.difficulty] || q.difficulty}
+                          </span>
+                        )}
                         {result && (
                           <Badge variant={result.isCorrect ? "default" : "outline"} className="text-xs">
                             {result.isCorrect ? "Đúng" : "Sai"}
@@ -591,17 +638,56 @@ export default function AssignmentDetailPage({
               onClick={handleSubmit}
               disabled={
                 submitting ||
-                questions.every((q) =>
+                uploading ||
+                (questions.every((q) =>
                   detectQuestionType(q) === "mcq"
                     ? mcqSelections[q.id] == null
                     : !perQuestionAnswers[q.id]?.trim()
-                )
+                ) && !selectedFile)
               }
             >
-              {submitting ? "Đang nộp..." : "Nộp bài"}
-              <Send className="size-4 ml-2" />
+              {uploading ? "Đang tải ảnh..." : submitting ? "Đang nộp..." : "Nộp bài"}
+              {uploading ? <Loader2 className="size-4 ml-2 animate-spin" /> : <Send className="size-4 ml-2" />}
             </Button>
           </div>
+
+          {/* File upload */}
+          <div className="mt-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition"
+            >
+              <Upload className="size-4" />
+              {selectedFile ? selectedFile.name : "Tải lên ảnh bài làm (tuỳ chọn)"}
+            </button>
+            {selectedFile && (
+              <button
+                type="button"
+                onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                className="ml-2 text-xs text-red-500 hover:text-red-700"
+              >
+                Xoá
+              </button>
+            )}
+            {selectedFile && (
+              <div className="mt-2 max-w-xs rounded-lg overflow-hidden border">
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt="Preview"
+                  className="w-full h-auto max-h-48 object-contain bg-gray-50"
+                />
+              </div>
+            )}
+          </div>
+
           {locallyGraded && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex items-center gap-2">
               <Check className="size-4" />
@@ -620,11 +706,47 @@ export default function AssignmentDetailPage({
             placeholder="Nhập câu trả lời của bạn..."
             rows={6}
             className="mb-3"
-            disabled={submitting}
+            disabled={submitting || uploading}
           />
-          <Button onClick={handleSubmit} disabled={!answer.trim() || submitting}>
-            {submitting ? "Đang nộp..." : "Nộp bài"}
-            <Send className="size-4 ml-2" />
+          {/* File upload */}
+          <div className="mb-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition"
+            >
+              <Upload className="size-4" />
+              {selectedFile ? selectedFile.name : "Tải lên ảnh bài làm (tuỳ chọn)"}
+            </button>
+            {selectedFile && (
+              <button
+                type="button"
+                onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                className="ml-2 text-xs text-red-500 hover:text-red-700"
+              >
+                Xoá
+              </button>
+            )}
+            {selectedFile && (
+              <div className="mt-2 max-w-xs rounded-lg overflow-hidden border">
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt="Preview"
+                  className="w-full h-auto max-h-48 object-contain bg-gray-50"
+                />
+              </div>
+            )}
+          </div>
+          <Button onClick={handleSubmit} disabled={(!answer.trim() && !selectedFile) || submitting || uploading}>
+            {uploading ? "Đang tải ảnh..." : submitting ? "Đang nộp..." : "Nộp bài"}
+            {uploading ? <Loader2 className="size-4 ml-2 animate-spin" /> : <Send className="size-4 ml-2" />}
           </Button>
         </div>
       )}
@@ -688,6 +810,23 @@ export default function AssignmentDetailPage({
                   return mySubmission.content;
                 })()}
               </p>
+            </div>
+          )}
+          {mySubmission.fileUrl && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-1 font-medium">Ảnh bài làm:</p>
+              <a
+                href={mySubmission.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block max-w-sm rounded-lg overflow-hidden border hover:opacity-90 transition"
+              >
+                <img
+                  src={mySubmission.fileUrl}
+                  alt="Bài làm"
+                  className="w-full h-auto max-h-64 object-contain bg-gray-50"
+                />
+              </a>
             </div>
           )}
           {mySubmission.score != null && (

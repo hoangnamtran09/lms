@@ -220,22 +220,28 @@ Hãy tách các câu hỏi từ văn bản trên và trả về mảng JSON.`, e
 
 // ---- Generate Assignment from Lesson ----
 
-const generateAssignmentPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ của bạn là tạo một đề bài tập từ nội dung bài học có sẵn.
+const generateAssignmentPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ của bạn là tạo một đề bài tập từ nội dung bài học có sẵn, theo chương trình Giáo dục và Đào tạo Việt Nam với 3 mức độ: Nhận biết, Thông hiểu, Vận dụng.
 
 **Yêu cầu:**
 1. Tạo đúng %d câu hỏi dựa trên nội dung bài học được cung cấp
 2. Loại câu hỏi: %s
 3. Câu hỏi phải bám sát nội dung bài học, kiểm tra mức độ hiểu bài
-4. Với câu trắc nghiệm (type="mcq"): question là câu hỏi KHÔNG chứa đáp án, options là mảng 4 đáp án A/B/C/D với isCorrect=true cho đáp án đúng, expectedAnswer là chữ cái đáp án đúng (VD: "B"), explanation giải thích ngắn gọn vì sao đáp án đó đúng
-5. Với câu trả lời ngắn (type="short_answer"): question là câu hỏi mở, expectedAnswer là các ý chính cần có (1-2 câu), explanation giải thích ngắn gọn
-6. Dùng $...$ cho công thức toán học (VD: $x^2 + y^2 = 1$, $\frac{a}{b}$)
-7. Độ khó phù hợp với khối lớp %d
-8. TỔNG điểm tất cả câu hỏi = 10. Phân phối điểm hợp lý theo độ khó và độ dài câu hỏi.
+4. PHÂN BỐ câu hỏi theo 3 mức độ (theo chương trình GDPT):
+   - **Nhận biết**: Nhớ lại kiến thức đã học, nhận ra khái niệm, định nghĩa, công thức. Câu hỏi đơn giản, trả lời trực tiếp từ bài học. (khoảng 1/3 tổng số câu)
+   - **Thông hiểu**: Hiểu và giải thích được kiến thức, diễn đạt lại bằng ngôn ngữ riêng, phân biệt được các khái niệm. (khoảng 1/3 tổng số câu)
+   - **Vận dụng**: Áp dụng kiến thức vào tình huống thực tế, giải quyết vấn đề mới, phân tích tổng hợp. (khoảng 1/3 tổng số câu)
+5. Mỗi câu hỏi PHẢI có trường "difficulty" tương ứng: "nhan_biet", "thong_hieu", "van_dung"
+6. Với câu trắc nghiệm (type="mcq"): question là câu hỏi KHÔNG chứa đáp án, options là mảng 4 đáp án A/B/C/D với isCorrect=true cho đáp án đúng, expectedAnswer là chữ cái đáp án đúng (VD: "B"), explanation giải thích ngắn gọn vì sao đáp án đó đúng
+7. Với câu trả lời ngắn (type="short_answer"): question là câu hỏi mở, expectedAnswer là các ý chính cần có (1-2 câu), explanation giải thích ngắn gọn
+8. Dùng $...$ cho công thức toán học (VD: $x^2 + y^2 = 1$, $\frac{a}{b}$)
+9. Độ khó phù hợp với khối lớp %d
+10. TỔNG điểm tất cả câu hỏi = 10. Phân phối điểm hợp lý theo mức độ (Nhận biết điểm thấp hơn, Vận dụng điểm cao hơn).
 
 **Định dạng Output (MẢNG JSON):**
 [
   {
     "type": "mcq",
+    "difficulty": "nhan_biet",
     "question": "Nội dung câu hỏi (KHÔNG chứa đáp án)",
     "options": [
       {"text": "Đáp án A", "isCorrect": false},
@@ -245,14 +251,29 @@ const generateAssignmentPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ 
     ],
     "expectedAnswer": "B",
     "explanation": "Giải thích ngắn gọn vì sao B đúng",
-    "score": 3
+    "score": 2
   },
   {
     "type": "short_answer",
+    "difficulty": "thong_hieu",
     "question": "Nội dung câu hỏi tự luận ngắn?",
     "expectedAnswer": "Các ý chính cần có trong câu trả lời",
     "explanation": "Giải thích ngắn gọn",
-    "score": 7
+    "score": 3
+  },
+  {
+    "type": "mcq",
+    "difficulty": "van_dung",
+    "question": "Nội dung câu hỏi vận dụng?",
+    "options": [
+      {"text": "Đáp án A", "isCorrect": false},
+      {"text": "Đáp án B", "isCorrect": true},
+      {"text": "Đáp án C", "isCorrect": false},
+      {"text": "Đáp án D", "isCorrect": false}
+    ],
+    "expectedAnswer": "B",
+    "explanation": "Giải thích ngắn gọn",
+    "score": 5
   }
 ]
 

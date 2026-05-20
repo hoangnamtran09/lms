@@ -173,6 +173,28 @@ func (h *Handler) BulkUpload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"results": results})
 }
 
+var mimeTypes = map[string]string{
+	".pdf":  "application/pdf",
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".bmp":  "image/bmp",
+	".svg":  "image/svg+xml",
+	".mp4":  "video/mp4",
+	".doc":  "application/msword",
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+func detectContentType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ct, ok := mimeTypes[ext]; ok {
+		return ct
+	}
+	return "application/octet-stream"
+}
+
 func (h *Handler) uploadToR2(r *http.Request, file io.Reader, filename string, folder, fileName string) (key string, url string, err error) {
 	buf := new(bytes.Buffer)
 	if _, err := io.Copy(buf, file); err != nil {
@@ -180,6 +202,7 @@ func (h *Handler) uploadToR2(r *http.Request, file io.Reader, filename string, f
 	}
 
 	ext := filepath.Ext(filename)
+	contentType := detectContentType(filename)
 
 	if folder != "" && fileName != "" {
 		sanitizedFolder := sanitizePath(folder)
@@ -193,7 +216,7 @@ func (h *Handler) uploadToR2(r *http.Request, file io.Reader, filename string, f
 		Bucket:      aws.String(h.bucketName),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(buf.Bytes()),
-		ContentType: aws.String("application/pdf"),
+		ContentType: aws.String(contentType),
 	})
 	if err != nil {
 		return "", "", err

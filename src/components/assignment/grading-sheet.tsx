@@ -28,9 +28,22 @@ interface Question {
   expectedAnswer: string;
   score: number;
   type?: "mcq" | "short_answer";
+  difficulty?: string;
   options?: McqOption[];
   explanation?: string;
 }
+
+const difficultyLabels: Record<string, string> = {
+  nhan_biet: "Nhận biết",
+  thong_hieu: "Thông hiểu",
+  van_dung: "Vận dụng",
+};
+
+const difficultyColors: Record<string, string> = {
+  nhan_biet: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  thong_hieu: "bg-blue-100 text-blue-700 border-blue-200",
+  van_dung: "bg-orange-100 text-orange-700 border-orange-200",
+};
 
 interface Submission {
   id: string;
@@ -410,6 +423,11 @@ export function GradingSheet({
                       <Badge variant="outline" className="text-xs font-medium">
                         {isMcq ? "Trắc nghiệm" : "Tự luận"}
                       </Badge>
+                      {q.difficulty && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                          {difficultyLabels[q.difficulty] || q.difficulty}
+                        </span>
+                      )}
                       <span className="text-xs text-gray-400 font-medium">{q.score || 10}đ</span>
                     </div>
                   </div>

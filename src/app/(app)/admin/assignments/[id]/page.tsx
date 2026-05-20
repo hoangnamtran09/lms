@@ -38,9 +38,22 @@ interface Question {
   expectedAnswer: string;
   score: number;
   type?: "mcq" | "short_answer";
+  difficulty?: string;
   options?: McqOption[];
   explanation?: string;
 }
+
+const difficultyLabels: Record<string, string> = {
+  nhan_biet: "Nhận biết",
+  thong_hieu: "Thông hiểu",
+  van_dung: "Vận dụng",
+};
+
+const difficultyColors: Record<string, string> = {
+  nhan_biet: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  thong_hieu: "bg-blue-100 text-blue-700 border-blue-200",
+  van_dung: "bg-orange-100 text-orange-700 border-orange-200",
+};
 
 interface Submission {
   id: string;
@@ -87,9 +100,14 @@ function SubmissionContent({ content, questions }: { content: string; questions:
       return (
         <div className="space-y-1.5 mb-2">
           {questions.map((q, i) => (
-            <div key={q.id} className="text-sm">
-              <span className="font-medium text-gray-700">Câu {i + 1}:</span>{" "}
-              <span className="text-gray-600">{String(answerMap.get(q.id) || "(không trả lời)")}</span>
+            <div key={q.id} className="text-sm flex items-center gap-2">
+              <span className="font-medium text-gray-700 shrink-0">Câu {i + 1}:</span>
+              {q.difficulty && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                  {difficultyLabels[q.difficulty] || q.difficulty}
+                </span>
+              )}
+              <span className="text-gray-600 truncate">{String(answerMap.get(q.id) || "(không trả lời)")}</span>
             </div>
           ))}
           {questions.length === 0 && (
@@ -259,6 +277,19 @@ export default function AdminAssignmentDetailPage({
             )}
             {assignment.creatorName && <p>Giáo viên: {assignment.creatorName}</p>}
             {questions.length > 0 && <p>{questions.length} câu hỏi</p>}
+            {questions.some((q) => q.difficulty) && (
+              <div className="flex items-center gap-1.5 mt-1">
+                {["nhan_biet", "thong_hieu", "van_dung"].map((d) => {
+                  const count = questions.filter((q) => q.difficulty === d).length;
+                  if (count === 0) return null;
+                  return (
+                    <span key={d} className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[d] || ""}`}>
+                      {difficultyLabels[d]}: {count}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
         {assignment.rubric && (
