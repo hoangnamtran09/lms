@@ -49,6 +49,7 @@ const allNavItems: NavItem[] = [
   { label: "Thành tựu", href: "/achievements", icon: Award, roles: ["STUDENT"] },
   { label: "Báo cáo tuần", href: "/reports", icon: BarChart3, roles: ["STUDENT", "PARENT", "TEACHER"] },
 	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["TEACHER"] },
+	{ label: "Điểm danh", href: "/teacher/attendance", icon: ClipboardCheck, roles: ["TEACHER"] },
 	  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
   { label: "Cài đặt", href: "/parent/settings", icon: Settings, roles: ["PARENT"] },
   // Admin management

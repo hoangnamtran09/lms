@@ -4,6 +4,7 @@ import (
 	"github.com/lms/backend/internal/achievements"
 	"github.com/lms/backend/internal/ai"
 	"github.com/lms/backend/internal/assignments"
+	"github.com/lms/backend/internal/attendance"
 	"github.com/lms/backend/internal/flashcards"
 	"github.com/lms/backend/internal/classes"
 	"github.com/lms/backend/internal/courses"
@@ -48,5 +49,6 @@ func migrate(db *gorm.DB) error {
 		&ai.AICache{},
 		&studyplanner.StudyPlan{},
 		&reports.WeeklyReport{},
+		&attendance.Attendance{},
 	)
 }

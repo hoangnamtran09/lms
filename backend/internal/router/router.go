@@ -12,6 +12,7 @@ import (
 	"github.com/lms/backend/internal/ai"
 	"github.com/lms/backend/internal/analytics"
 	"github.com/lms/backend/internal/assignments"
+	"github.com/lms/backend/internal/attendance"
 	"github.com/lms/backend/internal/auth"
 	"github.com/lms/backend/internal/classes"
 	"github.com/lms/backend/internal/config"
@@ -60,6 +61,7 @@ type Handlers struct {
 	Search         *search.Handler
 	StudyPlanner   *studyplanner.Handler
 	Reports        *reports.Handler
+	Attendance     *attendance.Handler
 }
 
 func New(
@@ -129,6 +131,8 @@ func New(
 		reportsSvc := reports.NewService(db, aiSvc)
 		reportsH := reports.NewHandler(reportsSvc, db)
 	searchH := search.NewHandler(db)
+	attendanceSvc := attendance.NewService(db)
+	attendanceH := attendance.NewHandler(attendanceSvc)
 	// Mount
 	h := &Handlers{
 		Auth:         authH,
@@ -154,6 +158,7 @@ func New(
 		Search:         searchH,
 		StudyPlanner:   studyPlannerH,
 		Reports:        reportsH,
+		Attendance:     attendanceH,
 	}
 
 	_ = quizzesSvc
@@ -427,6 +432,12 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)
 		r.Get("/api/teacher/students", h.Teacher.ListStudents)
 		r.Post("/api/teacher/link-parent", h.Teacher.LinkParent)
+
+		// Attendance
+		r.With(middleware.RequirePermission(permissions.ResAttendance, permissions.ActRead)).
+			Get("/api/attendance", h.Attendance.List)
+		r.With(middleware.RequirePermission(permissions.ResAttendance, permissions.ActWrite)).
+			Post("/api/attendance", h.Attendance.Mark)
 
 		// Parent — self-service (view own children)
 		r.With(middleware.RequirePermission(permissions.ResChildren, permissions.ActRead)).

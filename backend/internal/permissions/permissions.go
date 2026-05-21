@@ -16,6 +16,7 @@ const (
 	ResClasses      Resource = "classes"
 	ResAI           Resource = "ai"
 	ResChildren     Resource = "children"
+	ResAttendance  Resource = "attendance"
 )
 
 type Action string
@@ -54,6 +55,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
+		ResAttendance:  {ActManage},
 	},
 	RoleAdmin: {
 		ResUsers:        {ActRead, ActWrite},
@@ -69,6 +71,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
+		ResAttendance:  {ActManage},
 	},
 	RoleTeacher: {
 		ResUsers:        {ActRead, ActWrite},
@@ -82,6 +85,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResGradeLevels:  {ActRead},
 		ResAI:           {ActRead},
 		ResChildren:     {ActManage},
+		ResAttendance:  {ActRead, ActWrite},
 	},
 	RoleParent: {
 		ResCourses:      {ActRead},
