@@ -689,17 +689,25 @@ type roadmapRequest struct {
 func (h *Handler) Roadmap(w http.ResponseWriter, r *http.Request) {
 	var req roadmapRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		fmt.Printf("DEBUG: roadmap decode error: %v\n", err)
 		jsonErr(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
+		fmt.Printf("DEBUG: roadmap claims nil\n")
 		jsonErr(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	profiles, _ := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+	fmt.Printf("DEBUG: roadmap for user %s\n", claims.UserID)
+	profiles, err := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+	if err != nil {
+		fmt.Printf("DEBUG: ListByUser error: %v\n", err)
+	}
+	fmt.Printf("DEBUG: found %d weakness profiles\n", len(profiles))
+	
 	weaknessText := ""
 	for _, p := range profiles {
 		weaknessText += fmt.Sprintf("- %s (sai %d lần)\n", p.Topic, p.ErrorCount)
@@ -716,21 +724,29 @@ Tạo lộ trình gồm 3-5 bước. Với mỗi bước:
 
 Trả về JSON: [{"step": 1, "title": "...", "description": "...", "estimatedMinutes": 30}]`, weaknessText)
 
+	fmt.Printf("DEBUG: calling AI service\n")
 	response, err := h.aiService.Chat([]ChatMessage{
 		{Role: "system", Content: "Bạn là cố vấn học tập. Chỉ trả về JSON, không giải thích thêm."},
 		{Role: "user", Content: prompt},
 	})
 	if err != nil {
+		fmt.Printf("DEBUG: AI Chat error: %v\n", err)
 		jsonErr(w, "Roadmap generation failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Printf("DEBUG: AI response length: %d\n", len(response))
 	var roadmap []map[string]interface{}
-	if err := json.Unmarshal([]byte(extractJSON(response)), &roadmap); err != nil {
+	extracted := extractJSON(response)
+	fmt.Printf("DEBUG: extracted JSON length: %d\n", len(extracted))
+	if err := json.Unmarshal([]byte(extracted), &roadmap); err != nil {
+		// Log the problematic response for debugging
+		fmt.Printf("DEBUG roadmap parse error: %v\nExtracted: %q\nRaw response: %q\n", err, extracted, response)
 		jsonErr(w, "Failed to parse roadmap: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Printf("DEBUG: roadmap parsed successfully, %d steps\n", len(roadmap))
 	jsonOk(w, roadmap)
 }
 
@@ -1306,7 +1322,7 @@ func jsonErr(w http.ResponseWriter, msg string, code int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-// extractJSON strips markdown code fences from an AI response.
+// extractJSON strips markdown code fences from an AI response and extracts valid JSON.
 func extractJSON(raw string) string {
 	s := strings.TrimSpace(raw)
 
@@ -1326,14 +1342,22 @@ func extractJSON(raw string) string {
 		s = strings.TrimSpace(s)
 	}
 
-	// If not JSON array or object, try to find one
-	if !strings.HasPrefix(s, "[") && !strings.HasPrefix(s, "{") {
-		if idx := strings.Index(s, "["); idx >= 0 {
-			s = s[idx:]
-		} else if idx := strings.Index(s, "{"); idx >= 0 {
-			s = s[idx:]
-		}
+	// Find first [ or { that starts valid JSON
+	var startIdx int
+	openBracketIdx := strings.Index(s, "[")
+	openBraceIdx := strings.Index(s, "{")
+	
+	if openBracketIdx >= 0 && (openBraceIdx < 0 || openBracketIdx < openBraceIdx) {
+		startIdx = openBracketIdx
+	} else if openBraceIdx >= 0 {
+		startIdx = openBraceIdx
+	} else {
+		return ""
 	}
+
+	// Extract from first valid JSON char onward
+	s = s[startIdx:]
+	
 	// Find matching closing bracket
 	if strings.HasPrefix(s, "[") {
 		if idx := strings.LastIndex(s, "]"); idx > 0 {
@@ -1346,7 +1370,6 @@ func extractJSON(raw string) string {
 	}
 
 	// Sanitize control characters that are invalid in JSON strings.
-	// AI sometimes returns raw tabs or other control chars inside string values.
 	s = sanitizeJSONString(s)
 
 	return s

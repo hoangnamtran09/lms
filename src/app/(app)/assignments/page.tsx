@@ -49,12 +49,6 @@ export default function AssignmentsPage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Students don't have assignments page
-  if (user?.role === "STUDENT") {
-    router.replace("/");
-    return null;
-  }
-
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [myStatuses, setMyStatuses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
