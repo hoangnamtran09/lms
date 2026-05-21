@@ -375,11 +375,9 @@ export default function AdminAssignmentsPage() {
         maxScore: parseInt(editForm.maxScore || "100"),
         allowResubmit: editForm.allowResubmit === "true",
       };
-      if (editForm.dueDate) {
-        body.dueDate = new Date(editForm.dueDate).toISOString();
-      } else {
-        body.dueDate = null;
-      }
+      body.dueDate = editForm.dueDate
+        ? new Date(editForm.dueDate).toISOString()
+        : new Date().toISOString();
       await api(`/api/assignments/${editingAssignment.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
