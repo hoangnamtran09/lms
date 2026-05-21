@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Circle, FileText, FileVideo } from "lucide-react";
-import { api } from "@/lib/api-client";
+import { api, fetchList } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/ui/pagination";
 
@@ -44,7 +44,7 @@ export default function LessonListPage({ params }: { params: Promise<{ subjectId
     (async () => {
       const subject = await api<Subject>(`/api/subjects/${subjectId}`);
       setSubject(subject);
-      const courses = await api<Course[]>(`/api/courses?subjectId=${subjectId}`);
+      const courses = await fetchList<Course>(`/api/courses?subjectId=${subjectId}`);
       const lessons: Lesson[] = [];
       for (const c of courses) {
         const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
