@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Trash2, Plus, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain } from "lucide-react";
+import { ArrowLeft, Eye, Trash2, Plus, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain, Pencil } from "lucide-react";
 import { api, ApiError, uploadFile } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AssignmentRow {
   id: string;
@@ -101,6 +104,12 @@ export default function AdminAssignmentsPage() {
   const [creationMode, setCreationMode] = useState<CreationMode>("lesson");
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Edit form
+  const [editingAssignment, setEditingAssignment] = useState<AssignmentRow | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Manual mode
   const [title, setTitle] = useState("");
@@ -330,6 +339,59 @@ export default function AdminAssignmentsPage() {
     setSelectedClassId("");
     setSelectedTopic(null);
     setTopics([]);
+  };
+
+  const handleEditClick = async (a: AssignmentRow) => {
+    setEditingAssignment(a);
+    try {
+      const full = await api<Record<string, unknown>>(`/api/assignments/${a.id}`);
+      setEditForm({
+        title: (full.title as string) || "",
+        description: (full.description as string) || "",
+        rubric: (full.rubric as string) || "",
+        maxScore: String((full.maxScore as number) ?? 100),
+        dueDate: full.dueDate ? new Date(full.dueDate as string).toISOString().slice(0, 16) : "",
+        allowResubmit: full.allowResubmit ? "true" : "false",
+      });
+      setEditError(null);
+    } catch {
+      setEditError("Không thể tải thông tin bài tập");
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingAssignment) return;
+    if (!editForm.title?.trim()) {
+      setEditError("Tiêu đề không được để trống");
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const body: Record<string, unknown> = {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        rubric: editForm.rubric.trim(),
+        maxScore: parseInt(editForm.maxScore || "100"),
+        allowResubmit: editForm.allowResubmit === "true",
+      };
+      if (editForm.dueDate) {
+        body.dueDate = new Date(editForm.dueDate).toISOString();
+      } else {
+        body.dueDate = null;
+      }
+      await api(`/api/assignments/${editingAssignment.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      setEditingAssignment(null);
+      setEditForm({});
+      fetchAssignments();
+    } catch (e: unknown) {
+      setEditError(e instanceof ApiError ? e.message : "Cập nhật thất bại");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -970,6 +1032,9 @@ export default function AdminAssignmentsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(a)}>
+                          <Pencil className="size-3" />
+                        </Button>
                         <Link href={`/admin/assignments/${a.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="size-3" />
@@ -988,6 +1053,76 @@ export default function AdminAssignmentsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editingAssignment} onOpenChange={(open) => { if (!open) { setEditingAssignment(null); setEditForm({}); setEditError(null); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingAssignment ? `Sửa: ${editingAssignment.title}` : "Sửa bài tập"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-4">
+            {editError && <div className="p-3 bg-red-50 rounded-lg text-sm text-red-600">{editError}</div>}
+            <div>
+              <Label htmlFor="edit-title">Tiêu đề</Label>
+              <Input
+                id="edit-title"
+                value={editForm.title || ""}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-desc">Mô tả</Label>
+              <Textarea
+                id="edit-desc"
+                value={editForm.description || ""}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-rubric">Tiêu chí chấm điểm</Label>
+              <Textarea
+                id="edit-rubric"
+                value={editForm.rubric || ""}
+                onChange={(e) => setEditForm({ ...editForm, rubric: e.target.value })}
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-score">Điểm tối đa</Label>
+                <Input
+                  id="edit-score"
+                  type="number"
+                  value={editForm.maxScore || "100"}
+                  onChange={(e) => setEditForm({ ...editForm, maxScore: e.target.value })}
+                  min={1}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-due">Hạn nộp</Label>
+                <Input
+                  id="edit-due"
+                  type="datetime-local"
+                  value={editForm.dueDate || ""}
+                  onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="edit-resubmit"
+                checked={editForm.allowResubmit === "true"}
+                onChange={(e) => setEditForm({ ...editForm, allowResubmit: String(e.target.checked) })}
+                className="size-4 rounded border-gray-300"
+              />
+              <Label htmlFor="edit-resubmit" className="cursor-pointer">Cho phép nộp lại</Label>
+            </div>
+            <Button onClick={handleEditSave} disabled={savingEdit} className="w-full">
+              {savingEdit ? "Đang lưu..." : "Lưu thay đổi"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

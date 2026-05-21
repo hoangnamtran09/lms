@@ -83,15 +83,31 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id := extractID(r.URL.Path)
+	claims := middleware.GetClaims(r.Context())
+
 	var u map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		jsonErr(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
 		return
 	}
-	if err := h.service.Update(r.Context(), extractID(r.URL.Path), u); err != nil {
+	if err := h.service.Update(r.Context(), id, u); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	title := ""
+	if t, ok := u["title"]; ok {
+		title = fmt.Sprintf(": %v", t)
+	}
+	go h.service.LogAudit(r.Context(), &AuditLog{
+		ID:           uuid.New().String(),
+		AssignmentID: id,
+		UserID:       claims.UserID,
+		UserName:     claims.UserName,
+		Action:       "UPDATE",
+		Detail:       fmt.Sprintf("Cập nhật bài tập%s", title),
+	})
 	jsonOk(w, map[string]string{"status": "ok"})
 }
 
