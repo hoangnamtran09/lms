@@ -7,6 +7,15 @@ export const MIN_TOTAL_TIME = 60;
 export const MIN_PAGES = 3;
 export const MIN_PAGE_TIME = 10;
 
+const HEARTBEAT_INTERVAL = 5000;
+const POLL_INTERVAL = 2000;
+
+interface SessionStatus {
+  elapsedSeconds: number;
+  qualifiedPages: number[];
+  chatUnlocked: boolean;
+}
+
 interface StudyProgress {
   elapsedSeconds: number;
   qualifiedPages: Set<number>;
@@ -22,18 +31,34 @@ export function useStudyTimer(
 ): StudyProgress {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [qualifiedPages, setQualifiedPages] = useState<Set<number>>(new Set());
+  const [chatUnlocked, setChatUnlocked] = useState(false);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pageTimeMapRef = useRef<Map<number, number>>(new Map());
-  const visiblePagesRef = useRef(visiblePages);
-  const elapsedRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
+  const visiblePagesRef = useRef(visiblePages);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     visiblePagesRef.current = visiblePages;
   }, [visiblePages]);
 
-  const startSession = useCallback(async () => {
+  // Start or resume session
+  const initSession = useCallback(async () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    try {
+      // Check for existing active session first
+      const existing = await api<{ id: string } | null>(
+        `/api/study-sessions/active?lessonId=${lessonId}`,
+      );
+      if (existing?.id) {
+        sessionIdRef.current = existing.id;
+        return;
+      }
+    } catch {}
+
     try {
       const data = await api<{ id: string }>("/api/study-sessions/start", {
         method: "POST",
@@ -43,90 +68,101 @@ export function useStudyTimer(
     } catch {}
   }, [lessonId]);
 
-  const stopTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  // Poll session status from server
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(async () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      try {
+        const status = await api<SessionStatus>(`/api/study-sessions/${sid}/status`);
+        setElapsedSeconds(status.elapsedSeconds);
+        setQualifiedPages(new Set(status.qualifiedPages));
+        setChatUnlocked(status.chatUnlocked);
+      } catch {}
+    }, POLL_INTERVAL);
+  }, []);
+
+  // Send heartbeat with visible pages
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) return;
+    heartbeatRef.current = setInterval(async () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      try {
+        await api(`/api/study-sessions/${sid}/heartbeat?interval=5`, {
+          method: "POST",
+          body: JSON.stringify({
+            visiblePages: Array.from(visiblePagesRef.current),
+          }),
+        });
+      } catch {}
+    }, HEARTBEAT_INTERVAL);
+  }, []);
+
+  const stopTimers = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
     }
   }, []);
 
   const endSession = useCallback(async () => {
-    stopTimer();
+    stopTimers();
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
       sessionIdRef.current = null;
     } catch {}
-  }, [stopTimer]);
+  }, [stopTimers]);
 
   const cancelSession = useCallback(async () => {
-    stopTimer();
+    stopTimers();
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
       await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
       sessionIdRef.current = null;
     } catch {}
-  }, [stopTimer]);
+  }, [stopTimers]);
 
-  const startTimer = useCallback(() => {
-    if (intervalRef.current) return;
-    intervalRef.current = setInterval(() => {
-      setElapsedSeconds((s) => {
-        const next = s + 1;
-        elapsedRef.current = next;
-        return next;
-      });
-
-      const map = pageTimeMapRef.current;
-      const vis = visiblePagesRef.current;
-      const newlyQualified: number[] = [];
-
-      for (const p of vis) {
-        const t = (map.get(p) || 0) + 1;
-        map.set(p, t);
-        if (t >= MIN_PAGE_TIME) newlyQualified.push(p);
-      }
-
-      if (newlyQualified.length > 0) {
-        setQualifiedPages((prev) => {
-          const next = new Set(prev);
-          for (const p of newlyQualified) next.add(p);
-          return next;
-        });
-      }
-    }, 1000);
-  }, []);
-
-  // Start/stop based on active
+  // Main lifecycle
   useEffect(() => {
     if (!active) {
-      stopTimer();
+      stopTimers();
       endSession();
+      startedRef.current = false;
       return;
     }
-    startTimer();
-    startSession();
+    initSession().then(() => {
+      startPolling();
+      startHeartbeat();
+    });
     return () => {
-      stopTimer();
+      stopTimers();
       endSession();
     };
-  }, [active, startTimer, stopTimer, startSession, endSession]);
+  }, [active, initSession, startPolling, startHeartbeat, stopTimers, endSession]);
 
-  // Pause on tab hidden
+  // Pause heartbeats on tab hidden, resume on visible
   useEffect(() => {
     if (!active) return;
     const onVisibility = () => {
       if (document.hidden) {
-        stopTimer();
+        stopTimers();
       } else {
-        startTimer();
+        startPolling();
+        startHeartbeat();
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [active, startTimer, stopTimer]);
+  }, [active, startPolling, startHeartbeat, stopTimers]);
 
   // End session on beforeunload
   useEffect(() => {
@@ -142,9 +178,6 @@ export function useStudyTimer(
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
-
-  const chatUnlocked =
-    elapsedSeconds >= MIN_TOTAL_TIME && qualifiedPages.size >= MIN_PAGES;
 
   return {
     elapsedSeconds,

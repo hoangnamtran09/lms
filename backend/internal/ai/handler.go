@@ -14,6 +14,7 @@ import (
 	"github.com/lms/backend/internal/gamification"
 	"github.com/lms/backend/internal/lessons"
 	"github.com/lms/backend/internal/middleware"
+	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/weaknesses"
 	"gorm.io/gorm"
 )
@@ -25,11 +26,12 @@ type Handler struct {
 	diamondService  *gamification.DiamondService
 	courseService   *courses.Service
 	cacheService    *CacheService
+	progressService *progress.Service
 	db              *gorm.DB
 }
 
-func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, cacheSvc *CacheService, db *gorm.DB) *Handler {
-	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, cacheService: cacheSvc, db: db}
+func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, cacheSvc *CacheService, progressSvc *progress.Service, db *gorm.DB) *Handler {
+	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, cacheService: cacheSvc, progressService: progressSvc, db: db}
 }
 
 type chatInput struct {
@@ -48,6 +50,15 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	if req.Message == "" {
 		jsonErr(w, "message is required", http.StatusBadRequest)
 		return
+	}
+
+	// Validate chat unlock
+	if req.SessionID != "" && h.progressService != nil {
+		status, err := h.progressService.GetStatus(r.Context(), req.SessionID)
+		if err != nil || !status.ChatUnlocked {
+			jsonErr(w, "Bạn cần đọc bài đủ thời gian để mở khoá chat", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Build system prompt with lesson context and weaknesses

@@ -7,6 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	MinTotalTime = 60 // seconds
+	MinPages     = 3
+	MinPageTime  = 10 // seconds per page
+)
+
 type StudySession struct {
 	ID              string     `gorm:"primaryKey;size:36" json:"id"`
 	UserID          string     `gorm:"size:36;not null;index" json:"userId"`
@@ -15,6 +21,20 @@ type StudySession struct {
 	DurationSeconds int        `json:"durationSeconds"`
 	StartedAt       time.Time  `json:"startedAt"`
 	EndedAt         *time.Time `json:"endedAt"`
+	LastHeartbeatAt *time.Time `gorm:"column:last_heartbeat_at" json:"-"`
+}
+
+// SessionPageTrack tracks cumulative time per page within a session.
+type SessionPageTrack struct {
+	SessionID  string `gorm:"primaryKey;size:36" json:"sessionId"`
+	PageNumber int    `gorm:"primaryKey" json:"pageNumber"`
+	Seconds    int    `json:"seconds"`
+}
+
+type SessionStatus struct {
+	ElapsedSeconds int   `json:"elapsedSeconds"`
+	QualifiedPages []int `json:"qualifiedPages"`
+	ChatUnlocked   bool  `json:"chatUnlocked"`
 }
 
 type Service struct {
@@ -23,12 +43,19 @@ type Service struct {
 
 func NewService(db *gorm.DB) *Service { return &Service{db: db} }
 
+func (s *Service) AutoMigrate() error {
+	return s.db.AutoMigrate(&StudySession{}, &SessionPageTrack{})
+}
+
 func (s *Service) Start(ctx context.Context, session *StudySession) error {
 	session.StartedAt = time.Now()
+	now := time.Now()
+	session.LastHeartbeatAt = &now
 	return s.db.WithContext(ctx).Create(session).Error
 }
 
 func (s *Service) Cancel(ctx context.Context, sessionID string) error {
+	s.db.WithContext(ctx).Delete(&SessionPageTrack{}, "session_id = ?", sessionID)
 	return s.db.WithContext(ctx).Delete(&StudySession{}, "id = ?", sessionID).Error
 }
 
@@ -44,6 +71,82 @@ func (s *Service) End(ctx context.Context, sessionID string) (*StudySession, err
 		"ended_at":         &now,
 		"duration_seconds": session.DurationSeconds,
 	}).Error
+}
+
+// Heartbeat records visible pages for a session and tracks cumulative page time.
+// intervalSeconds is the approximate time since the last heartbeat.
+func (s *Service) Heartbeat(ctx context.Context, sessionID string, visiblePages []int, intervalSeconds int) error {
+	if intervalSeconds <= 0 {
+		intervalSeconds = 5
+	}
+	now := time.Now()
+
+	// Update last heartbeat time
+	if err := s.db.WithContext(ctx).Model(&StudySession{}).
+		Where("id = ?", sessionID).
+		Update("last_heartbeat_at", &now).Error; err != nil {
+		return err
+	}
+
+	// Upsert page time for each visible page
+	for _, page := range visiblePages {
+		var track SessionPageTrack
+		result := s.db.WithContext(ctx).
+			Where("session_id = ? AND page_number = ?", sessionID, page).
+			First(&track)
+		if result.Error != nil {
+			// Create new
+			track = SessionPageTrack{
+				SessionID:  sessionID,
+				PageNumber: page,
+				Seconds:    intervalSeconds,
+			}
+			if err := s.db.WithContext(ctx).Create(&track).Error; err != nil {
+				return err
+			}
+		} else {
+			// Update existing
+			if err := s.db.WithContext(ctx).Model(&SessionPageTrack{}).
+				Where("session_id = ? AND page_number = ?", sessionID, page).
+				Update("seconds", gorm.Expr("seconds + ?", intervalSeconds)).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// GetStatus returns the current session status including chat unlock state.
+func (s *Service) GetStatus(ctx context.Context, sessionID string) (*SessionStatus, error) {
+	var session StudySession
+	if err := s.db.WithContext(ctx).Where("id = ?", sessionID).First(&session).Error; err != nil {
+		return nil, err
+	}
+
+	// Calculate elapsed seconds
+	elapsed := session.DurationSeconds
+	if session.EndedAt == nil {
+		elapsed = int(time.Now().Sub(session.StartedAt).Seconds())
+	}
+
+	// Get qualified pages (cumulative time >= MinPageTime)
+	var tracks []SessionPageTrack
+	s.db.WithContext(ctx).
+		Where("session_id = ? AND seconds >= ?", sessionID, MinPageTime).
+		Find(&tracks)
+
+	qualifiedPages := make([]int, 0, len(tracks))
+	for _, t := range tracks {
+		qualifiedPages = append(qualifiedPages, t.PageNumber)
+	}
+
+	chatUnlocked := elapsed >= MinTotalTime && len(qualifiedPages) >= MinPages
+
+	return &SessionStatus{
+		ElapsedSeconds: elapsed,
+		QualifiedPages: qualifiedPages,
+		ChatUnlocked:   chatUnlocked,
+	}, nil
 }
 
 type LeaderboardEntry struct {

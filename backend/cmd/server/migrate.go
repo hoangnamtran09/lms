@@ -40,6 +40,7 @@ func migrate(db *gorm.DB) error {
 		&gamification.DiamondTransaction{},
 		&gamification.Streak{},
 		&progress.StudySession{},
+		&progress.SessionPageTrack{},
 		&ai.ChatMessageRecord{},
 		&gradelevels.GradeLevel{},
 		&classes.Class{},

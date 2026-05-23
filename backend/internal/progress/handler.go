@@ -3,19 +3,23 @@ package progress
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lms/backend/internal/middleware"
 	"github.com/lms/backend/internal/weaknesses"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
 	service         *Service
 	weaknessService *weaknesses.Service
+	db              *gorm.DB
 }
 
-func NewHandler(service *Service, weaknessSvc *weaknesses.Service) *Handler {
-	return &Handler{service: service, weaknessService: weaknessSvc}
+func NewHandler(service *Service, weaknessSvc *weaknesses.Service, db *gorm.DB) *Handler {
+	return &Handler{service: service, weaknessService: weaknessSvc, db: db}
 }
 
 func (h *Handler) StartSession(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +78,73 @@ func (h *Handler) EndSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOk(w, map[string]string{"status": "ended"})
+}
+
+func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
+	parts := splitPath(r.URL.Path)
+	sessionID := ""
+	if len(parts) >= 2 {
+		sessionID = parts[len(parts)-2]
+	}
+	var req struct {
+		VisiblePages []int `json:"visiblePages"`
+	}
+	intervalSeconds := 5
+	json.NewDecoder(r.Body).Decode(&req)
+	if iv := r.URL.Query().Get("interval"); iv != "" {
+		if n, err := strconv.Atoi(iv); err == nil && n > 0 {
+			intervalSeconds = n
+		}
+	}
+
+	if err := h.service.Heartbeat(r.Context(), sessionID, req.VisiblePages, intervalSeconds); err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOk(w, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) SessionStatus(w http.ResponseWriter, r *http.Request) {
+	parts := splitPath(r.URL.Path)
+	sessionID := ""
+	if len(parts) >= 2 {
+		sessionID = parts[len(parts)-2]
+	}
+	status, err := h.service.GetStatus(r.Context(), sessionID)
+	if err != nil {
+		jsonErr(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOk(w, status)
+}
+
+func (h *Handler) ActiveSession(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
+	lessonID := r.URL.Query().Get("lessonId")
+
+	var session StudySession
+	err := h.db.WithContext(r.Context()).
+		Where("user_id = ? AND lesson_id = ? AND ended_at IS NULL", claims.UserID, lessonID).
+		Order("started_at DESC").
+		First(&session).Error
+	if err != nil {
+		jsonOk(w, nil)
+		return
+	}
+	// Check if session is stale (no heartbeat for > 30s)
+	if session.LastHeartbeatAt != nil && time.Since(*session.LastHeartbeatAt) > 30*time.Second {
+		// End the stale session
+		now := time.Now()
+		session.EndedAt = &now
+		session.DurationSeconds = int(now.Sub(session.StartedAt).Seconds())
+		h.db.WithContext(r.Context()).Model(&StudySession{}).Where("id = ?", session.ID).Updates(map[string]interface{}{
+			"ended_at":         &now,
+			"duration_seconds": session.DurationSeconds,
+		})
+		jsonOk(w, nil)
+		return
+	}
+	jsonOk(w, &session)
 }
 
 func (h *Handler) Leaderboard(w http.ResponseWriter, r *http.Request) {

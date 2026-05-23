@@ -101,7 +101,7 @@ func New(
 	coursesH := courses.NewHandler(coursesSvc)
 	lessonsH := lessons.NewHandler(lessonsSvc)
 		cacheSvc := ai.NewCacheService(db)
-		aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, cacheSvc, db)
+		aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, cacheSvc, progressSvc, db)
 	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
@@ -110,7 +110,7 @@ func New(
 	subjectsH.SetR2Delete(mediaH.DeleteByURL)
 	parentSvc := parent.NewService(db)
 	parentH := parent.NewHandler(parentSvc, usersSvc)
-	progressH := progress.NewHandler(progressSvc, weaknessSvc)
+	progressH := progress.NewHandler(progressSvc, weaknessSvc, db)
 	gamificationH := gamification.NewHandler(diamondSvc, streakSvc)
 	achievementsH := achievements.NewHandler(achievementsSvc, db)
 	weaknessH := weaknesses.NewHandler(weaknessSvc)
@@ -362,8 +362,11 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 
 		// Progress — study sessions
 		r.Post("/api/study-sessions/start", h.Progress.StartSession)
+		r.Post("/api/study-sessions/{id}/heartbeat", h.Progress.Heartbeat)
+		r.Get("/api/study-sessions/{id}/status", h.Progress.SessionStatus)
 		r.Post("/api/study-sessions/{id}/end", h.Progress.EndSession)
 		r.Delete("/api/study-sessions/{id}", h.Progress.CancelSession)
+		r.Get("/api/study-sessions/active", h.Progress.ActiveSession)
 		r.Get("/api/study-sessions/leaderboard", h.Progress.Leaderboard)
 		r.Get("/api/study-sessions/stats", h.Progress.UserStats)
 		r.Get("/api/study-sessions/weekly-chart", h.Progress.WeeklyChart)
