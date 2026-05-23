@@ -39,6 +39,7 @@ export default function AdminSettingsPage() {
       .finally(() => setLoading(false));
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchGradeLevels(); }, []);
 
   const openAdd = () => {

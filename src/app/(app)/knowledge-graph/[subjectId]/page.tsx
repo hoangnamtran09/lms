@@ -108,7 +108,6 @@ function computeGraphLayout(result: GraphResult) {
   // Build React Flow nodes
   const rfNodes: Node[] = result.nodes.map((n) => {
     const pos = nodePositions[n.id] || { x: centerX, y: centerY };
-    const depth = depthMap[n.id] ?? 0;
     const colors = masteryColors[n.mastery] || masteryColors.mastered;
     const isConcept = n.type === "concept";
 
@@ -168,14 +167,14 @@ export default function KnowledgeGraphPage({ params }: { params: Promise<{ subje
         const { nodes: rfNodes, edges: rfEdges } = computeGraphLayout(data);
         setNodes(rfNodes);
         setEdges(rfEdges);
-      } catch (err: any) {
-        setError(err.message || "Không thể tạo sơ đồ tri thức");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Không thể tạo sơ đồ tri thức");
       } finally {
         setLoading(false);
       }
     }
     fetchGraph();
-  }, [subjectId]);
+  }, [subjectId, setEdges, setNodes]);
 
   if (loading) {
     return (

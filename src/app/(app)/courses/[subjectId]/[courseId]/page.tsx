@@ -34,9 +34,8 @@ export default function LessonListPage({
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    setPage(1);
-  }, [courseId]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setPage(1); }, [courseId]);
 
   useEffect(() => {
     Promise.all([

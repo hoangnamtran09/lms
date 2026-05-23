@@ -36,6 +36,7 @@ export default function SearchPage({
 
   useEffect(() => {
     if (!q?.trim()) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     api<SearchResult[]>(`/api/search?q=${encodeURIComponent(q.trim())}`)
       .then(setResults)

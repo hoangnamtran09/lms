@@ -61,10 +61,6 @@ export default function AdminCoursesPage() {
   const [bulkError, setBulkError] = useState("");
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
 
-  const fetchGradeLevels = () => {
-    api<GradeLevel[]>("/api/grade-levels").then(setGradeLevels).catch(() => {});
-  };
-
   const fetchSubjects = () => {
     setSubLoading(true);
     api<Subject[]>("/api/subjects").then(setSubjects).catch(() => {}).finally(() => setSubLoading(false));
@@ -91,9 +87,16 @@ export default function AdminCoursesPage() {
   };
 
   useEffect(() => {
-    api<Subject[]>("/api/subjects").then(setSubjects).catch(() => {});
-    api<GradeLevel[]>("/api/grade-levels").then(setGradeLevels).catch(() => {});
-    setSubLoading(false);
+    Promise.all([
+      api<Subject[]>("/api/subjects"),
+      api<GradeLevel[]>("/api/grade-levels"),
+    ])
+      .then(([subjects, gl]) => {
+        setSubjects(subjects);
+        setGradeLevels(gl);
+      })
+      .catch(() => {})
+      .finally(() => setSubLoading(false));
   }, []);
 
   const handleEditSubject = (s: Subject) => {

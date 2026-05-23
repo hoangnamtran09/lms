@@ -54,8 +54,8 @@ export default function FlashcardsPage() {
     try {
       const data = await api<Deck[]>("/api/flashcards/decks");
       setDecks(data);
-    } catch (err: any) {
-      setError(err.message || "Không thể tải dữ liệu");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể tải dữ liệu");
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,7 @@ export default function FlashcardsPage() {
         { method: "POST", body: JSON.stringify({ lessonId: selectedLessonId, count: cardCount }) }
       );
 
-      const deck = await api<Deck>("/api/flashcards/decks", {
+      await api<Deck>("/api/flashcards/decks", {
         method: "POST",
         body: JSON.stringify({
           lessonId: selectedLessonId,
@@ -108,8 +108,8 @@ export default function FlashcardsPage() {
 
       setShowCreate(false);
       fetchDecks();
-    } catch (err: any) {
-      alert("Lỗi tạo bộ thẻ: " + (err.message || "Unknown"));
+    } catch (err: unknown) {
+      alert("Lỗi tạo bộ thẻ: " + (err instanceof Error ? err.message : "Unknown"));
     } finally {
       setCreating(false);
     }

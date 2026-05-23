@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Map, Clock, ChevronRight, Sparkles } from "lucide-react";
+import { Map, Clock, Sparkles } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,18 +28,16 @@ export default function RoadmapPage() {
         body: JSON.stringify({ subjectId: "" }),
       });
       setSteps(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setGenerating(false);
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // Auto-generate on first load
-    generateRoadmap();
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { generateRoadmap(); }, []);
 
   if (loading || generating) {
     return (

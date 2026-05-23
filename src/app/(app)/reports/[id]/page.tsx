@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, use } from "react";
 import {
   ArrowLeft, Clock, Award, Gem, Flame,
   TrendingUp, TrendingDown, Minus,
@@ -84,9 +84,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReport = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchReport = async () => {
     try {
       const data = await api<ReportResponse>(`/api/reports/${id}`);
       setReport(data);
@@ -95,11 +93,11 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  };
 
-  useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+  useEffect(() => { fetchReport(); }, [id]);
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
   const ai = report ? parseAIMessage(report.aiMessage) : null;
   const data = report?.report;

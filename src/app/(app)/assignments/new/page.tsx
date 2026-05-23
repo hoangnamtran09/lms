@@ -189,7 +189,7 @@ export default function NewAssignmentPage() {
         ? extractedQuestions.reduce((s, q) => s + (q.score || 10), 0)
         : maxScore;
 
-      const body: any = {
+      const body: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
         rubric: rubric.trim(),
@@ -208,8 +208,8 @@ export default function NewAssignmentPage() {
       });
       router.push("/assignments");
       router.refresh();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setSubmitting(false);
     }

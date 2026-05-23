@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,36 +90,50 @@ const statusLabel: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function SubmissionContent({ content, questions }: { content: string; questions: Question[] }) {
+function parseSubmissionJson(content: string) {
   try {
     const parsed = JSON.parse(content);
     if (parsed.answers && Array.isArray(parsed.answers)) {
       const answerMap = new Map(
         parsed.answers.map((a: { questionId: string; answer: string }) => [a.questionId, a.answer])
       );
-      return (
-        <div className="space-y-1.5 mb-2">
-          {questions.map((q, i) => (
-            <div key={q.id} className="text-sm flex items-center gap-2">
-              <span className="font-medium text-gray-700 shrink-0">Câu {i + 1}:</span>
-              {q.difficulty && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                  {difficultyLabels[q.difficulty] || q.difficulty}
-                </span>
-              )}
-              <span className="text-gray-600 truncate">{String(answerMap.get(q.id) || "(không trả lời)")}</span>
-            </div>
-          ))}
-          {questions.length === 0 && (
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{parsed.summary || content}</p>
-          )}
-        </div>
-      );
+      return { type: "answers" as const, answerMap, parsed, content };
     }
     if (parsed.summary) {
-      return <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{parsed.summary}</p>;
+      return { type: "summary" as const, summary: parsed.summary };
     }
   } catch {}
+  return null;
+}
+
+function SubmissionContent({ content, questions }: { content: string; questions: Question[] }) {
+  const parsed = parseSubmissionJson(content);
+
+  if (parsed?.type === "answers") {
+    return (
+      <div className="space-y-1.5 mb-2">
+        {questions.map((q, i) => (
+          <div key={q.id} className="text-sm flex items-center gap-2">
+            <span className="font-medium text-gray-700 shrink-0">Câu {i + 1}:</span>
+            {q.difficulty && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                {difficultyLabels[q.difficulty] || q.difficulty}
+              </span>
+            )}
+            <span className="text-gray-600 truncate">{String(parsed.answerMap.get(q.id) || "(không trả lời)")}</span>
+          </div>
+        ))}
+        {questions.length === 0 && (
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{parsed.parsed.summary || content}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (parsed?.type === "summary") {
+    return <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{parsed.summary}</p>;
+  }
+
   return <p className="text-sm text-gray-700 whitespace-pre-wrap mb-2">{content}</p>;
 }
 
@@ -195,15 +209,17 @@ export default function AdminAssignmentDetailPage({
       .finally(() => setLoading(false));
   };
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => { loadData(); }, [id]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const handleAutoGrade = async (submissionId: string) => {
     setAutoGrading(true);
     try {
       await api(`/api/submissions/${submissionId}/auto-grade`, { method: "POST" });
       loadData();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setAutoGrading(false);
     }
@@ -435,7 +451,6 @@ export default function AdminAssignmentDetailPage({
         questions={questions}
         maxScore={assignment.maxScore}
         rubric={assignment.rubric || ""}
-        assignmentId={assignment.id}
         initialIndex={gradingSheetIndex}
         onGraded={loadData}
       />

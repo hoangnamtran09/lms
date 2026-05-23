@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Clock, FileText } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -46,7 +45,6 @@ const statusVariant: Record<string, "default" | "secondary" | "outline" | "destr
 };
 
 export default function AssignmentsPage() {
-  const router = useRouter();
   const { user } = useAuth();
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);

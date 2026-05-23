@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,18 +58,10 @@ const roleOptions = [
   { value: "SUPER_ADMIN", label: "Quản trị viên" },
 ];
 
-const roleBadge: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  SUPER_ADMIN: "destructive",
-  ADMIN: "default",
-  TEACHER: "secondary",
-  PARENT: "outline",
-  STUDENT: "outline",
-};
-
 export default function AdminUsersPage() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
+
   const [roleFilter, setRoleFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,11 +97,9 @@ export default function AdminUsersPage() {
       setClasses(cls);
       setGradeLevels(gl);
     }).catch(() => {});
-  }, [roleFilter]);
+  }, [roleFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (users.length > 0) setLoading(false);
-  }, [users]);
+  const loading = users.length === 0;
 
   const filteredClasses = classGradeFilter
     ? classes.filter((c) => c.gradeLevelId === classGradeFilter)
@@ -130,7 +120,6 @@ export default function AdminUsersPage() {
       });
       setOpen(false);
       setForm({ username: "", password: "", fullName: "", email: "", role: "STUDENT", classId: "" });
-      setLoading(true);
       fetchUsers();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Tạo thất bại");

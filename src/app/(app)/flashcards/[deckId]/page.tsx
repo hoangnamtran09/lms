@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
-import { Layers, ArrowLeft, CheckCircle2, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, AlertCircle, Sparkles } from "lucide-react";
 
 interface Deck {
   id: string;
@@ -44,8 +44,8 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
       try {
         const result = await api<DeckData>(`/api/flashcards/decks/${deckId}`);
         setData(result);
-      } catch (err: any) {
-        setError(err.message || "Không thể tải bộ thẻ");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Không thể tải bộ thẻ");
       } finally {
         setLoading(false);
       }

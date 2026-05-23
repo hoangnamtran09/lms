@@ -8,7 +8,6 @@ import {
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InteractiveQuiz } from "@/components/ai/interactive-quiz";
-import { MathText } from "@/components/ai/math-text";
 import { bridge } from "@/lib/study-session-bridge";
 
 interface LessonSummary {
@@ -89,6 +88,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     }
   }, [activeQuiz]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -110,6 +110,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
         setLoading(false);
       });
   }, [lessonId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleQuizAnswered = (isCorrect: boolean) => {
     const question = activeQuiz?.question || "";

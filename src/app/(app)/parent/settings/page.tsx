@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, User, Mail, Shield } from "lucide-react";
+import { ArrowLeft, User, Shield } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

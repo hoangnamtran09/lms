@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { BookOpen, Calculator, Atom, Microscope, Globe, Palette, Music, Code, type LucideIcon } from "lucide-react";
 
 const iconMap: Record<string, LucideIcon> = {

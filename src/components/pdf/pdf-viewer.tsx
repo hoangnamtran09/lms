@@ -15,15 +15,23 @@ export default function PDFViewer({
   onLoadSuccess,
   pdfWidth,
 }: PDFViewerProps) {
-  const [Document, setDocument] = useState<any>(null);
-  const [Page, setPage] = useState<any>(null);
+  const [Document, setDocument] = useState<React.ComponentType<{
+    file: string;
+    onLoadSuccess: ({ numPages }: { numPages: number }) => void;
+    loading: React.ReactNode;
+    error: React.ReactNode;
+    children?: React.ReactNode;
+  }> | null>(null);
+  const [Page, setPage] = useState<React.ComponentType<{
+    pageNumber: number;
+    width?: number;
+    renderTextLayer: boolean;
+    renderAnnotationLayer: boolean;
+  }> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!file) {
-      setIsLoading(false);
-      return;
-    }
+    if (!file) return;
 
     const initPDF = async () => {
       try {

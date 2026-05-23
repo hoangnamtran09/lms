@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Calendar, Clock, BookOpen, Edit3, HelpCircle, FileText, Sparkles, CheckCircle2, Circle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Calendar, Clock, BookOpen, Edit3, HelpCircle, FileText, Sparkles, CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,13 +22,6 @@ interface PlanData {
   id: string;
   date: string;
   tasks: PlanTask[];
-  totalTasks: number;
-  completedTasks: number;
-}
-
-interface HistoryItem {
-  id: string;
-  date: string;
   totalTasks: number;
   completedTasks: number;
 }
@@ -71,16 +64,15 @@ export default function StudyPlannerPage() {
     try {
       const data = await api<{ plan: PlanData | null; date: string }>(`/api/study-planner/today?date=${d}`);
       setPlan(data.plan);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchPlan(date);
-  }, [date, fetchPlan]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchPlan(date); }, [date, fetchPlan]);
 
   const generatePlan = async () => {
     setGenerating(true);
@@ -90,8 +82,8 @@ export default function StudyPlannerPage() {
         method: "POST",
       });
       setPlan(data.plan);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setGenerating(false);
     }
@@ -115,8 +107,8 @@ export default function StudyPlannerPage() {
         method: "PATCH",
         body: JSON.stringify({ completed: newCompleted }),
       });
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
       // Revert on error
       fetchPlan(date);
     }

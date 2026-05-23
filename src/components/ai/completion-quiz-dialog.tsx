@@ -41,6 +41,7 @@ export function CompletionQuizDialog({
     if (!open) return;
 
     if (preloadedQuestions?.length) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuestions(preloadedQuestions);
       setPhase("quiz");
       return;

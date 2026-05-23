@@ -225,8 +225,8 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
         setResult(data);
         // Start with only central expanded
         setExpandedIds(new Set(["central"]));
-      } catch (err: any) {
-        setError(err.message || "Không thể tạo sơ đồ tư duy");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Không thể tạo sơ đồ tư duy");
       } finally {
         setLoading(false);
       }
@@ -322,7 +322,7 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
   }, [result, visibleNodeIds, expandedIds, nodePositions, branchColorMap, childrenMap, setRfNodes, setRfEdges]);
 
   const handleNodeClick = useCallback(
-    (_: any, node: Node) => {
+    (_: unknown, node: Node) => {
       const graphNode = result?.nodes.find((n) => n.id === node.id);
       if (graphNode) {
         setSelectedNode(graphNode);

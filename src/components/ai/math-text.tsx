@@ -20,7 +20,6 @@ export function MathText({ text }: { text: string }) {
   const html = useMemo(() => {
     // Split by $$...$$ (display) and $...$ (inline)
     const parts: string[] = [];
-    let remaining = text;
 
     // Handle display math $$...$$
     const displayRegex = /\$\$([\s\S]*?)\$\$/g;

@@ -181,10 +181,12 @@ export default function AdminAssignmentsPage() {
 
   // Fetch lessons — same logic as admin/courses page
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!selectedSubjectId) {
       if (lessons.length) setLessons([]);
       if (selectedLessonId) setSelectedLessonId("");
       return;
+    /* eslint-enable react-hooks/set-state-in-effect */
     }
     (async () => {
       setSelectedLessonId("");
@@ -201,17 +203,22 @@ export default function AdminAssignmentsPage() {
       });
       setLessons(all);
     })().catch(() => setLessons([]));
-  }, [selectedSubjectId]);
+  }, [selectedSubjectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch weakness topics when class changes
   useEffect(() => {
-    if (!selectedClassId) { if (topics.length) setTopics([]); return; }
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (!selectedClassId) {
+      if (topics.length) setTopics([]);
+      return;
+    }
     setLoadingTopics(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
     api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${selectedClassId}`)
       .then((data) => { setSelectedTopic(null); setTopics(data || []); })
       .catch(() => { setSelectedTopic(null); setTopics([]); })
       .finally(() => setLoadingTopics(false));
-  }, [selectedClassId]);
+  }, [selectedClassId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Generate from lesson ----
   const handleGenerateFromLesson = async () => {

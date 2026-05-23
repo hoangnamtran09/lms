@@ -232,7 +232,6 @@ interface RemediationExerciseProps {
   onAnswer?: (answer: ExerciseAnswer) => void;
   disabled?: boolean;
   initialAnswer?: ExerciseAnswer | null;
-  lessonId: string;
 }
 
 export function RemediationExercise({
@@ -242,7 +241,6 @@ export function RemediationExercise({
   onAnswer,
   disabled,
   initialAnswer,
-  lessonId,
 }: RemediationExerciseProps) {
   if (exercise.type === "mcq") {
     const init = initialAnswer?.type === "mcq" ? { selectedIdx: initialAnswer.selectedIdx, isCorrect: initialAnswer.isCorrect } : null;

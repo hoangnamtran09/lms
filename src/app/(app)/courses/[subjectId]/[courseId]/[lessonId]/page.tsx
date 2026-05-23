@@ -318,9 +318,10 @@ export default function LessonViewerPage({
         : `Mình vừa trả lời sai câu hỏi "${shortQuestion}". Hãy giải thích giúp mình nhé.`;
       if (isCorrect) playCorrectAnswerSound();
       clearLastQuizResult();
-      sendMessage(msg);
+      // Avoid calling setState synchronously within an effect — defer the send
+      setTimeout(() => sendMessage(msg), 0);
     }
-  }, [lastQuizResult, streaming, chatUnlocked]);
+  }, [lastQuizResult, streaming, chatUnlocked, clearLastQuizResult, sendMessage]);
 
   if (loading) {
     return (

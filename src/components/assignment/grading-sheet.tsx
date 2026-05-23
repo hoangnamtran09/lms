@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Check, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Clock, Hash, MessageSquareText } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
-  Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,7 +124,6 @@ interface GradingSheetProps {
   rubric: string;
   initialIndex: number;
   onGraded: () => void;
-  assignmentId: string;
 }
 
 export function GradingSheet({
@@ -136,7 +135,6 @@ export function GradingSheet({
   rubric,
   initialIndex,
   onGraded,
-  assignmentId,
 }: GradingSheetProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [perQuestionScores, setPerQuestionScores] = useState<Record<string, number>>({});
@@ -155,6 +153,7 @@ export function GradingSheet({
     [sub]
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!sub) return;
     setGeneralFeedback("");
@@ -178,7 +177,8 @@ export function GradingSheet({
 
     setPerQuestionScores(scores);
     setPerQuestionFeedback(feedbacks);
-  }, [currentIndex, sub?.id]);
+  }, [currentIndex, sub?.id, questions, sub]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const totalScore = questions.length > 0
     ? Object.values(perQuestionScores).reduce((s, v) => s + (v || 0), 0)
@@ -216,8 +216,8 @@ export function GradingSheet({
       });
       onGraded();
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e.message || "Chấm điểm thất bại");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Chấm điểm thất bại");
     } finally {
       setGrading(false);
     }
@@ -231,8 +231,8 @@ export function GradingSheet({
       await api(`/api/submissions/${sub.id}/auto-grade`, { method: "POST" });
       onGraded();
       onOpenChange(false);
-    } catch (e: any) {
-      setError(e.message || "Chấm AI thất bại");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Chấm AI thất bại");
     } finally {
       setAutoGrading(false);
     }

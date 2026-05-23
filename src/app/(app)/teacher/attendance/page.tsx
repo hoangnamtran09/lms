@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, Clock, AlertCircle, Save } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Student {
@@ -55,34 +54,37 @@ export default function TeacherAttendancePage() {
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   const [date, setDate] = useState(todayString);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [studentList, existingAttendance] = await Promise.all([
-        api<Student[]>("/api/teacher/students"),
-        api<AttendanceEntry[]>(`/api/attendance?classId=${user?.classId || ""}&date=${date}`),
-      ]);
-      setStudents(studentList);
-      const map: Record<string, string> = {};
-      const notes: Record<string, string> = {};
-      for (const a of existingAttendance) {
-        map[a.studentId] = a.status;
-        if (a.note) notes[a.studentId] = a.note;
-      }
-      setAttendanceMap(map);
-      setNotesMap(notes);
-    } catch {
-      setError("Không thể tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  }, [date, user?.classId]);
-
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (user?.classId) fetchData();
-    else setLoading(false);
-  }, [fetchData, user?.classId]);
+    if (!user?.classId) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [studentList, existingAttendance] = await Promise.all([
+          api<Student[]>("/api/teacher/students"),
+          api<AttendanceEntry[]>(`/api/attendance?classId=${user?.classId}&date=${date}`),
+        ]);
+        setStudents(studentList);
+        const map: Record<string, string> = {};
+        const notes: Record<string, string> = {};
+        for (const a of existingAttendance) {
+          map[a.studentId] = a.status;
+          if (a.note) notes[a.studentId] = a.note;
+        }
+        setAttendanceMap(map);
+        setNotesMap(notes);
+      } catch {
+        setError("Không thể tải dữ liệu");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [date, user?.classId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (user && user.role !== "TEACHER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     router.replace("/");

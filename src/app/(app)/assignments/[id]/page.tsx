@@ -126,29 +126,26 @@ export default function AssignmentDetailPage({
   const [mcqSelections, setMcqSelections] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [mySubmitted, setMySubmitted] = useState(false);
+  const [mySubmitted, setMySubmitted] = useState(() => {
+    try { return sessionStorage.getItem(`submitted-${id}`) === "true"; } catch { return false; }
+  });
   const [submitResults, setSubmitResults] = useState<QuestionResult[] | null>(null);
 
   // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [fileUrl, setFileUrl] = useState("");
+  const [, setFileUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mySubmission = submissions.find((s) => s.studentId === user?.id);
 
   // Weakness auto-resolve tracking
-  const [weaknessId, setWeaknessId] = useState<string | null>(null);
+  const [weaknessId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("weaknessId"));
   const correctRef = useRef(new Set<number>());
   const attemptedRef = useRef(new Set<number>());
   const answersRef = useRef<(ExerciseAnswer | null)[]>([]);
   const [allExercisesCorrect, setAllExercisesCorrect] = useState(false);
   const submittingRef = useRef(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setWeaknessId(params.get("weaknessId"));
-  }, []);
 
   const handleExerciseCorrect = (index: number) => {
     if (correctRef.current.has(index)) return;
@@ -252,18 +249,11 @@ export default function AssignmentDetailPage({
       .finally(() => setLoading(false));
   };
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => { loadData(); }, [id]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
-  // Restore submission state from sessionStorage on mount
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(`submitted-${id}`) === "true") {
-        setMySubmitted(true);
-      }
-    } catch {}
-  }, [id]);
-
-  // Restore previous answers from submission content
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (questions.length === 0) return;
     const content = mySubmission?.content || (() => {
@@ -293,7 +283,8 @@ export default function AssignmentDetailPage({
         try { sessionStorage.setItem(`submitted-${id}`, "true"); } catch {}
       }
     } catch {}
-  }, [mySubmission, questions]);
+  }, [mySubmission, questions, id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -320,8 +311,8 @@ export default function AssignmentDetailPage({
         const result = await uploadFile("/api/submissions/upload", selectedFile);
         uploadedUrl = result.url;
         setFileUrl(uploadedUrl);
-      } catch (e: any) {
-        setError("Tải file thất bại: " + e.message);
+      } catch (e: unknown) {
+        setError("Tải file thất bại: " + (e instanceof Error ? e.message : "Lỗi không xác định"));
         setSubmitting(false);
         setUploading(false);
         return;
@@ -357,8 +348,8 @@ export default function AssignmentDetailPage({
         sessionStorage.setItem(`submitted-${id}-content`, content);
       } catch {}
       loadData();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
       setSubmitting(false);
     }
@@ -428,7 +419,6 @@ export default function AssignmentDetailPage({
                     onAnswer={(ans) => handleExerciseAnswer(i, ans)}
                     disabled={submitted || !!mySubmission}
                     initialAnswer={previousAnswers[i] ?? null}
-                    lessonId={assignment.id}
                   />
                 ))}
               </div>
@@ -521,8 +511,8 @@ export default function AssignmentDetailPage({
                               if (content) {
                                 try {
                                   const parsed = JSON.parse(content);
-                                  const ans = parsed.answers?.find((a: any) => a.questionId === q.id);
-                                  return ans?.answer || "";
+              const ans = parsed.answers?.find((a: { questionId: string; answer: string }) => a.questionId === q.id);
+              return ans?.answer || "";
                                 } catch { return ""; }
                               }
                               return shortAnswer;
@@ -641,6 +631,7 @@ export default function AssignmentDetailPage({
             )}
             {selectedFile && (
               <div className="mt-2 max-w-xs rounded-lg overflow-hidden border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={URL.createObjectURL(selectedFile)}
                   alt="Preview"
@@ -691,6 +682,7 @@ export default function AssignmentDetailPage({
             )}
             {selectedFile && (
               <div className="mt-2 max-w-xs rounded-lg overflow-hidden border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={URL.createObjectURL(selectedFile)}
                   alt="Preview"
@@ -741,7 +733,7 @@ export default function AssignmentDetailPage({
                 const ans = (() => {
                   try {
                     const parsed = JSON.parse(mySubmission.content);
-                    return parsed.answers?.find((a: any) => a.questionId === q.id)?.answer || "";
+                    return parsed.answers?.find((a: { questionId: string; answer: string }) => a.questionId === q.id)?.answer || "";
                   } catch { return ""; }
                 })();
                 const grade = gradingDetails.find((g) => g.questionId === q.id) || submitResults?.find((r) => r.questionId === q.id);
@@ -782,6 +774,7 @@ export default function AssignmentDetailPage({
                 rel="noopener noreferrer"
                 className="block max-w-sm rounded-lg overflow-hidden border hover:opacity-90 transition"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={mySubmission.fileUrl}
                   alt="Bài làm"

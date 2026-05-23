@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Trophy, Clock, Gem, Crown, Star, Sparkles, Zap, Flame, Users, TrendingUp, ChevronUp } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { Trophy, Clock, Gem, Crown, Star, Sparkles, Zap, Flame, Users, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     api<Entry[]>(`/api/study-sessions/leaderboard?period=${period}`)
       .then(setEntries)
@@ -91,7 +93,7 @@ export default function LeaderboardPage() {
   const totalTime = entries.reduce((s, e) => s + e.totalSeconds, 0);
   const totalHours = Math.round(totalTime / 360) / 10; // one decimal
   const maxTime = entries.length > 0 ? entries[0].totalSeconds : 1;
-  const motto = useMemo(() => messages[Math.floor(Math.random() * messages.length)], []);
+  const [motto] = useState(() => messages[Math.floor(Math.random() * messages.length)]);
 
   // Podium order: #2 - #1 - #3
   const podiumEntries = [

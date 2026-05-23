@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -11,11 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User, Mail, Shield, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { Mail, Shield, Save, Loader2, CheckCircle2 } from "lucide-react";
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -29,11 +27,8 @@ export default function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      setFullName(user.fullName);
-    }
-  }, [user]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (user) setFullName(user.fullName); }, [user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

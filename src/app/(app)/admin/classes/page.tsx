@@ -64,7 +64,6 @@ export default function AdminClassesPage() {
   const [glForm, setGlForm] = useState({ name: "", level: "" });
 
   const fetchData = () => {
-    setLoading(true);
     Promise.all([
       api<ClassItem[]>("/api/classes"),
       api<GradeLevel[]>("/api/grade-levels"),

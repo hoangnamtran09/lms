@@ -5,7 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Clock, Trophy, Gem, Flame, BookOpen, TrendingUp, Target,
-  Star, ArrowUpRight, Medal, Activity, Sparkles, Play,
+  Star, ArrowUpRight, Medal, Activity, Sparkles,
   BarChart3, Award, ChevronRight, Calendar,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -133,9 +133,6 @@ function StudentDashboard() {
 
   const maxWeekSeconds = Array.isArray(weeklyChart) ? Math.max(...weeklyChart.map((d) => d.seconds), 1) : 1;
   const weekTotalSeconds = Array.isArray(weeklyChart) ? weeklyChart.reduce((sum, d) => sum + d.seconds, 0) : 0;
-
-  const top3 = Array.isArray(leaderboard) ? leaderboard.slice(0, 3) : [];
-  const rest = Array.isArray(leaderboard) ? leaderboard.slice(3, 10) : [];
 
   // Latest achievements — up to 4
   const latestAchievements = Array.isArray(achievements) ? achievements.slice(0, 4) : [];
