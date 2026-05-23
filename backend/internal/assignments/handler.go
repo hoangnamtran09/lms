@@ -47,7 +47,38 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Không tìm thấy bài tập", http.StatusNotFound)
 		return
 	}
+
+	// Strip answer keys from questions for students
+	claims := middleware.GetClaims(r.Context())
+	if claims != nil && claims.Role == "STUDENT" {
+		stripAnswerKeys(a)
+	}
+
 	jsonOk(w, a)
+}
+
+// stripAnswerKeys removes expectedAnswer and options.isCorrect from questions
+// to prevent students from seeing answer keys on the client.
+func stripAnswerKeys(a *Assignment) {
+	if a.Questions == "" {
+		return
+	}
+	var questions []map[string]interface{}
+	if err := json.Unmarshal([]byte(a.Questions), &questions); err != nil {
+		return
+	}
+	for _, q := range questions {
+		delete(q, "expectedAnswer")
+		if opts, ok := q["options"].([]interface{}); ok {
+			for _, opt := range opts {
+				if m, ok := opt.(map[string]interface{}); ok {
+					delete(m, "isCorrect")
+				}
+			}
+		}
+	}
+	sanitized, _ := json.Marshal(questions)
+	a.Questions = string(sanitized)
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +152,16 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // --- Submissions ---
 
+// QuestionResult holds per-question grading details.
+type QuestionResult struct {
+	QuestionID    string `json:"questionId"`
+	Question      string `json:"question"`
+	Score         int    `json:"score"`
+	MaxScore      int    `json:"maxScore"`
+	Feedback      string `json:"feedback"`
+	CorrectAnswer string `json:"correctAnswer,omitempty"`
+}
+
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	var sub Submission
@@ -134,10 +175,129 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	if sub.AssignmentID == "" {
 		sub.AssignmentID = strings.Split(r.URL.Path, "/")[3]
 	}
+
+	// Get assignment for auto-grading
+	assignment, err := h.service.FindByID(r.Context(), sub.AssignmentID)
+	if err != nil {
+		jsonErr(w, "Không tìm thấy bài tập", http.StatusNotFound)
+		return
+	}
+
+	// Parse answers from submission content
+	type answerItem struct {
+		QuestionID string `json:"questionId"`
+		Answer     string `json:"answer"`
+	}
+	type answerWrapper struct {
+		Answers []answerItem `json:"answers"`
+	}
+	var aw answerWrapper
+	hasAnswers := false
+	if sub.Content != "" {
+		if err := json.Unmarshal([]byte(sub.Content), &aw); err == nil && len(aw.Answers) > 0 {
+			hasAnswers = true
+		}
+	}
+
+	answerMap := make(map[string]string)
+	if hasAnswers {
+		for _, a := range aw.Answers {
+			answerMap[a.QuestionID] = a.Answer
+		}
+	}
+
+	// Parse assignment questions
+	var questions []map[string]interface{}
+	if assignment.Questions != "" {
+		json.Unmarshal([]byte(assignment.Questions), &questions)
+	}
+
+	// Auto-grade MCQ questions
+	var results []QuestionResult
+	totalScore := 0
+	totalMaxScore := 0
+	for _, q := range questions {
+		qID, _ := q["id"].(string)
+		qText, _ := q["question"].(string)
+		qScore := 10
+		if s, ok := q["score"].(float64); ok {
+			qScore = int(s)
+		}
+		qType, _ := q["type"].(string)
+		hasOptions := false
+		if opts, ok := q["options"].([]interface{}); ok && len(opts) > 0 {
+			hasOptions = true
+		}
+
+		maxScore := qScore
+		if maxScore <= 0 {
+			maxScore = 10
+		}
+		totalMaxScore += maxScore
+
+		isMcq := qType == "mcq" || hasOptions
+		if !isMcq || !hasAnswers {
+			results = append(results, QuestionResult{
+				QuestionID: qID,
+				Question:   qText,
+				Score:      0,
+				MaxScore:   maxScore,
+				Feedback:   "",
+			})
+			continue
+		}
+
+		studentAns := strings.TrimSpace(answerMap[qID])
+		expectedAns := ""
+		if ea, ok := q["expectedAnswer"].(string); ok {
+			expectedAns = strings.TrimSpace(ea)
+		}
+
+		correct := strings.EqualFold(studentAns, expectedAns)
+		score := 0
+		feedback := "Sai"
+		if correct {
+			score = maxScore
+			feedback = "Đúng"
+		}
+		totalScore += score
+
+		results = append(results, QuestionResult{
+			QuestionID:    qID,
+			Question:      qText,
+			Score:         score,
+			MaxScore:      maxScore,
+			Feedback:      feedback,
+			CorrectAnswer: expectedAns,
+		})
+	}
+
+	// Cap total score
+	if totalScore > assignment.MaxScore && assignment.MaxScore > 0 {
+		totalScore = assignment.MaxScore
+	}
+	if totalScore > totalMaxScore {
+		totalScore = totalMaxScore
+	}
+
+	// Save submission
 	if err := h.service.Submit(r.Context(), &sub); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Store grading results in submission feedback
+	if len(results) > 0 {
+		summary := fmt.Sprintf("Tổng điểm: %d/%d", totalScore, totalMaxScore)
+		detailJSON, _ := json.Marshal(results)
+		feedback := summary + "\n" + string(detailJSON)
+		totalScoreVal := totalScore
+		h.service.GradeSubmission(r.Context(), sub.ID, totalScoreVal, feedback, "auto")
+		sub.Score = &totalScoreVal
+		sub.Feedback = feedback
+		sub.Status = StatusGraded
+	}
+
 	go h.service.LogAudit(r.Context(), &AuditLog{
 		ID:           uuid.New().String(),
 		AssignmentID: sub.AssignmentID,
@@ -145,11 +305,13 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		UserID:       claims.UserID,
 		UserName:     claims.UserName,
 		Action:       "SUBMIT",
-		Detail:       "Nộp bài tập",
+		Detail:       fmt.Sprintf("Nộp bài tập (tự động chấm MCQ: %d/%d)", totalScore, totalMaxScore),
 	})
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(sub)
+
+	jsonOk(w, map[string]interface{}{
+		"submission": sub,
+		"results":    results,
+	})
 }
 
 func (h *Handler) ListSubmissions(w http.ResponseWriter, r *http.Request) {

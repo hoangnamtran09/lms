@@ -171,13 +171,7 @@ export function GradingSheet({
       });
     } else if (questions.length > 0) {
       questions.forEach((q) => {
-        if (detectQuestionType(q) === "mcq") {
-          const studentLetter = (studentAnswers.get(q.id) || "").trim().toUpperCase();
-          const correctLetter = q.expectedAnswer?.trim().toUpperCase();
-          scores[q.id] = studentLetter === correctLetter ? (q.score || 10) : 0;
-        } else {
-          scores[q.id] = 0;
-        }
+        scores[q.id] = 0;
         feedbacks[q.id] = "";
       });
     }

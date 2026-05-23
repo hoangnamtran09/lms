@@ -56,15 +56,6 @@ const difficultyColors: Record<string, string> = {
   van_dung: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
-function detectQuestionType(q: Question): "mcq" | "short_answer" {
-  if (q.type === "mcq" || (q.options && q.options.length > 0)) return "mcq";
-  if (q.type === "short_answer") return "short_answer";
-  const letterAnswer = /^[A-D]$/i.test(q.expectedAnswer?.trim() || "");
-  const hasOptionPattern = /[A-D]\.\s/.test(q.question);
-  if (letterAnswer && hasOptionPattern) return "mcq";
-  return "short_answer";
-}
-
 function parseInlineMcqOptions(questionText: string): McqOption[] {
   const lines = questionText.split(/\n/);
   const options: McqOption[] = [];
@@ -79,12 +70,17 @@ function parseInlineMcqOptions(questionText: string): McqOption[] {
   return [];
 }
 
+function isMcqQuestion(q: Question): boolean {
+  return q.type === "mcq" || (q.options !== undefined && q.options.length > 0);
+}
+
 interface QuestionResult {
   questionId: string;
   question: string;
   score: number;
   maxScore: number;
   feedback: string;
+  correctAnswer?: string;
 }
 
 interface Submission {
@@ -131,8 +127,7 @@ export default function AssignmentDetailPage({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mySubmitted, setMySubmitted] = useState(false);
-  const [locallyGraded, setLocallyGraded] = useState(false);
-  const [mcqResults, setMcqResults] = useState<Record<string, { isCorrect: boolean }>>({});
+  const [submitResults, setSubmitResults] = useState<QuestionResult[] | null>(null);
 
   // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -268,7 +263,7 @@ export default function AssignmentDetailPage({
     } catch {}
   }, [id]);
 
-  // Restore previous answers and compute MCQ results from submission
+  // Restore previous answers from submission content
   useEffect(() => {
     if (questions.length === 0) return;
     const content = mySubmission?.content || (() => {
@@ -280,16 +275,13 @@ export default function AssignmentDetailPage({
       if (parsed.answers && Array.isArray(parsed.answers)) {
         const selections: Record<string, number> = {};
         const texts: Record<string, string> = {};
-        const results: Record<string, { isCorrect: boolean }> = {};
         parsed.answers.forEach((a: { questionId: string; answer: string }) => {
           const q = questions.find((q) => q.id === a.questionId);
           if (!q) return;
-          if (detectQuestionType(q) === "mcq") {
+          if (isMcqQuestion(q)) {
             const idx = a.answer ? a.answer.toUpperCase().charCodeAt(0) - 65 : -1;
             if (idx >= 0 && idx < 4) {
               selections[q.id] = idx;
-              const correctLetter = q.expectedAnswer?.trim().toUpperCase();
-              results[q.id] = { isCorrect: a.answer.toUpperCase() === correctLetter };
             }
           } else {
             texts[q.id] = a.answer || "";
@@ -297,10 +289,6 @@ export default function AssignmentDetailPage({
         });
         setMcqSelections(selections);
         setPerQuestionAnswers(texts);
-        if (Object.keys(results).length > 0) {
-          setMcqResults(results);
-          setLocallyGraded(true);
-        }
         setMySubmitted(true);
         try { sessionStorage.setItem(`submitted-${id}`, "true"); } catch {}
       }
@@ -318,8 +306,8 @@ export default function AssignmentDetailPage({
     const hasQuestions = questions.length > 0;
     if (!hasQuestions && !answer.trim() && !selectedFile) return;
     if (hasQuestions) {
-      const anyMcqAnswered = questions.some((q) => detectQuestionType(q) === "mcq" && mcqSelections[q.id] != null);
-      const anyShortAnswered = questions.some((q) => detectQuestionType(q) !== "mcq" && perQuestionAnswers[q.id]?.trim());
+      const anyMcqAnswered = questions.some((q) => isMcqQuestion(q) && mcqSelections[q.id] != null);
+      const anyShortAnswered = questions.some((q) => !isMcqQuestion(q) && perQuestionAnswers[q.id]?.trim());
       if (!anyMcqAnswered && !anyShortAnswered && !selectedFile) return;
     }
     setSubmitting(true);
@@ -341,50 +329,24 @@ export default function AssignmentDetailPage({
       setUploading(false);
     }
 
-    // Grade MCQs locally
-    const results: Record<string, { isCorrect: boolean }> = {};
-    questions.forEach((q) => {
-      if (detectQuestionType(q) === "mcq") {
-        const selectedIdx = mcqSelections[q.id];
-        const correctLetter = q.expectedAnswer?.trim().toUpperCase();
-        const selectedLetter = selectedIdx != null ? String.fromCharCode(65 + selectedIdx) : "";
-        results[q.id] = { isCorrect: selectedLetter === correctLetter };
-      }
-    });
-    setMcqResults(results);
-    setLocallyGraded(true);
-
     try {
       const content = hasQuestions
         ? JSON.stringify({
             answers: questions.map((q) => ({
               questionId: q.id,
-              answer: detectQuestionType(q) === "mcq"
+              answer: isMcqQuestion(q)
                 ? String.fromCharCode(65 + (mcqSelections[q.id] ?? 0))
                 : (perQuestionAnswers[q.id] || ""),
             })),
           })
         : answer;
-      await api(`/api/assignments/${id}/submit`, {
+      const res = await api<{ submission: Submission; results: QuestionResult[] }>(`/api/assignments/${id}/submit`, {
         method: "POST",
         body: JSON.stringify({ assignmentId: id, content, fileUrl: uploadedUrl }),
       });
-      // Optimistically add submission so mySubmission is found immediately
-      const optimistic: Submission = {
-        id: "optimistic-" + Date.now(),
-        assignmentId: id,
-        studentId: user?.id || "",
-        studentName: user?.fullName || "",
-        content,
-        fileUrl: uploadedUrl,
-        score: null,
-        feedback: "",
-        status: "SUBMITTED",
-        submittedAt: new Date().toISOString(),
-        gradedAt: null,
-        gradedBy: "",
-      };
-      setSubmissions((prev) => [...prev, optimistic]);
+      // Use server-returned submission (no optimistic needed)
+      setSubmissions((prev) => [...prev, res.submission]);
+      setSubmitResults(res.results);
       setSubmitted(true);
       setMySubmitted(true);
       setAnswer("");
@@ -472,12 +434,20 @@ export default function AssignmentDetailPage({
               </div>
             ) : questions.length > 0 ? (
               <div className="mt-3 space-y-3">
-                {questions.map((q, i) => {
-                  const isMcq = detectQuestionType(q) === "mcq";
-                  const selection = mcqSelections[q.id];
-                  const result = mcqResults[q.id];
-                  const shortAnswer = perQuestionAnswers[q.id] || "";
-                  return (
+                {(() => {
+                  // Merge grading details from submission feedback and submit response
+                  const allResults = submitResults && submitResults.length > 0 ? submitResults : gradingDetails;
+                  const resultMap = new Map<string, QuestionResult>();
+                  allResults.forEach((r) => resultMap.set(r.questionId, r));
+                  const hasResults = resultMap.size > 0;
+                  const isGraded = hasResults || !!mySubmission;
+
+                  return questions.map((q, i) => {
+                    const mcq = isMcqQuestion(q);
+                    const selection = mcqSelections[q.id];
+                    const shortAnswer = perQuestionAnswers[q.id] || "";
+                    const gradeResult = resultMap.get(q.id);
+                    return (
                     <div key={q.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="flex items-start gap-2 mb-2">
                         <span className="text-sm font-bold text-purple-600 shrink-0 mt-0.5">Câu {i + 1}</span>
@@ -487,14 +457,14 @@ export default function AssignmentDetailPage({
                             {difficultyLabels[q.difficulty] || q.difficulty}
                           </span>
                         )}
-                        {result && (
-                          <Badge variant={result.isCorrect ? "default" : "outline"} className="text-xs">
-                            {result.isCorrect ? "Đúng" : "Sai"}
+                        {gradeResult && (
+                          <Badge variant={gradeResult.feedback === "Đúng" ? "default" : "outline"} className="text-xs">
+                            {gradeResult.feedback === "Đúng" ? "Đúng" : "Sai"}
                           </Badge>
                         )}
                       </div>
                       <p className="text-gray-700 whitespace-pre-wrap mb-3"><MathText text={q.question} /></p>
-                      {isMcq ? (
+                      {mcq ? (
                         <div className="space-y-1.5">
                           {(q.options && q.options.length > 0
                             ? q.options
@@ -502,17 +472,16 @@ export default function AssignmentDetailPage({
                           ).map((opt, idx) => {
                             const letter = String.fromCharCode(65 + idx);
                             let btnStyle = "w-full text-left px-3 py-2 rounded-lg text-sm transition border flex items-center gap-2 ";
-                            if (!locallyGraded && !mySubmission && !mySubmitted) {
+                            if (!isGraded) {
                               btnStyle += selection === idx
                                 ? "bg-primary/10 border-primary text-primary"
                                 : "bg-white border-gray-200 hover:border-primary/50 cursor-pointer";
                             } else {
-                              const correctLetter = q.expectedAnswer?.trim().toUpperCase();
-                              const isCorrectOption = opt.isCorrect || letter === correctLetter;
                               const isSelected = selection === idx;
-                              if (isCorrectOption) {
+                              const isCorrect = gradeResult?.feedback === "Đúng";
+                              if (isSelected && isCorrect) {
                                 btnStyle += "bg-green-50 border-green-300 text-green-800";
-                              } else if (isSelected && !isCorrectOption) {
+                              } else if (isSelected && !isCorrect) {
                                 btnStyle += "bg-red-50 border-red-300 text-red-800";
                               } else {
                                 btnStyle += "bg-white border-gray-100 text-gray-400";
@@ -523,23 +492,21 @@ export default function AssignmentDetailPage({
                                 key={idx}
                                 className={btnStyle}
                                 onClick={() => {
-                                  if (!locallyGraded && !mySubmission && !mySubmitted) {
+                                  if (!isGraded) {
                                     setMcqSelections((prev) => ({ ...prev, [q.id]: idx }));
                                   }
                                 }}
-                                disabled={locallyGraded || !!mySubmission || mySubmitted}
+                                disabled={isGraded}
                               >
                                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
                                   {letter}
                                 </span>
                                 <span className="flex-1"><MathText text={opt.text} /></span>
-                                {locallyGraded && (() => {
-                                  const correctLetter = q.expectedAnswer?.trim().toUpperCase();
-                                  const isCorrectOption = opt.isCorrect || letter === correctLetter;
-                                  if (isCorrectOption) return <Check className="size-4 text-green-600 shrink-0" />;
-                                  if (selection === idx && !isCorrectOption) return <X className="size-4 text-red-600 shrink-0" />;
-                                  return null;
-                                })()}
+                                {isGraded && selection === idx && (
+                                  gradeResult?.feedback === "Đúng"
+                                    ? <Check className="size-4 text-green-600 shrink-0" />
+                                    : <X className="size-4 text-red-600 shrink-0" />
+                                )}
                               </button>
                             );
                           })}
@@ -565,16 +532,16 @@ export default function AssignmentDetailPage({
                             }
                             placeholder="Nhập câu trả lời của bạn..."
                             rows={3}
-                            disabled={submitting || !!mySubmission || mySubmitted}
+                            disabled={isGraded}
                           />
                         </div>
                       )}
                       {/* Show result and explanation after submission */}
-                      {(locallyGraded || mySubmission) && (
-                        <div className={`mt-3 p-3 rounded-lg text-sm ${result ? (result.isCorrect ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200") : "bg-blue-50 border border-blue-200"}`}>
+                      {isGraded && (
+                        <div className={`mt-3 p-3 rounded-lg text-sm ${gradeResult ? (gradeResult.feedback === "Đúng" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200") : "bg-blue-50 border border-blue-200"}`}>
                           <div className="flex items-center gap-2 mb-1">
-                            {result ? (
-                              result.isCorrect ? (
+                            {gradeResult ? (
+                              gradeResult.feedback === "Đúng" ? (
                                 <><Check className="size-4 text-green-600" /><span className="font-medium text-green-700">Đúng</span></>
                               ) : (
                                 <><X className="size-4 text-red-600" /><span className="font-medium text-red-700">Sai</span></>
@@ -583,14 +550,9 @@ export default function AssignmentDetailPage({
                               <><FileText className="size-4 text-blue-600" /><span className="font-medium text-blue-700">Đã nộp</span></>
                             )}
                           </div>
-                          {isMcq && result && !result.isCorrect && (
+                          {mcq && gradeResult && gradeResult.feedback !== "Đúng" && gradeResult.correctAnswer && (
                             <p className="text-xs text-gray-600 mb-1">
-                              Đáp án đúng: <span className="font-medium">{q.expectedAnswer}</span>
-                            </p>
-                          )}
-                          {!isMcq && q.expectedAnswer && (
-                            <p className="text-xs text-gray-600 mb-1">
-                              Đáp án mong đợi: <span className="font-medium"><MathText text={q.expectedAnswer} /></span>
+                              Đáp án đúng: <span className="font-medium">{gradeResult.correctAnswer}</span>
                             </p>
                           )}
                           {q.explanation && (
@@ -602,8 +564,8 @@ export default function AssignmentDetailPage({
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  )});
+                })()}
               </div>
             ) : (
               <p className="text-gray-600 whitespace-pre-wrap">{assignment.description || "Không có mô tả"}</p>
@@ -640,7 +602,7 @@ export default function AssignmentDetailPage({
                 submitting ||
                 uploading ||
                 (questions.every((q) =>
-                  detectQuestionType(q) === "mcq"
+                  isMcqQuestion(q)
                     ? mcqSelections[q.id] == null
                     : !perQuestionAnswers[q.id]?.trim()
                 ) && !selectedFile)
@@ -687,13 +649,6 @@ export default function AssignmentDetailPage({
               </div>
             )}
           </div>
-
-          {locallyGraded && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex items-center gap-2">
-              <Check className="size-4" />
-              Đã nộp bài. Kết quả hiển thị bên trên.
-            </div>
-          )}
         </div>
       )}
       {/* Student: submit for plain text assignments */}
@@ -769,27 +724,33 @@ export default function AssignmentDetailPage({
                       {detail.score}/{detail.maxScore}
                     </Badge>
                   </div>
-                  <p className="text-xs text-gray-500">{detail.feedback}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-gray-500">{detail.feedback}</p>
+                    {detail.feedback !== "Đúng" && detail.correctAnswer && (
+                      <span className="text-xs text-green-600 font-medium">
+                        Đáp án: {detail.correctAnswer}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           ) : questions.length > 0 ? (
             <div className="space-y-2 mb-4">
               {questions.map((q, i) => {
-                const isMcq = detectQuestionType(q) === "mcq";
                 const ans = (() => {
                   try {
                     const parsed = JSON.parse(mySubmission.content);
                     return parsed.answers?.find((a: any) => a.questionId === q.id)?.answer || "";
                   } catch { return ""; }
                 })();
-                const mcqResult = mcqResults[q.id];
+                const grade = gradingDetails.find((g) => g.questionId === q.id) || submitResults?.find((r) => r.questionId === q.id);
                 return (
                   <div key={q.id} className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-gray-700">Câu {i + 1}:</span>
                     <span className="text-gray-600">{ans || "(không trả lời)"}</span>
-                    {mcqResult && (
-                      mcqResult.isCorrect
+                    {grade && (
+                      grade.feedback === "Đúng"
                         ? <Check className="size-3.5 text-green-600" />
                         : <X className="size-3.5 text-red-500" />
                     )}
