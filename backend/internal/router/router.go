@@ -292,8 +292,6 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			Post("/api/ai/remediation", h.AI.GenerateRemediation)
 
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
-			Post("/api/ai/quiz-answer", h.AI.QuizAnswer)
-		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			Post("/api/ai/validate-quiz", h.AI.ValidateQuiz)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).

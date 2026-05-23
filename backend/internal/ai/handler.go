@@ -192,57 +192,6 @@ func (h *Handler) ExtractQuestions(w http.ResponseWriter, r *http.Request) {
 	jsonOk(w, map[string]interface{}{"questions": questions})
 }
 
-// ---- Quiz Answer ----
-
-type quizAnswerInput struct {
-	LessonID string `json:"lessonId"`
-	Correct  bool   `json:"correct"`
-	Topic    string `json:"topic"`
-}
-
-func (h *Handler) QuizAnswer(w http.ResponseWriter, r *http.Request) {
-	var req quizAnswerInput
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		jsonErr(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	result := map[string]interface{}{}
-
-	if req.Correct {
-		// Award +2 diamonds
-		if err := h.diamondService.Add(r.Context(), claims.UserID, 2, "Trả lời đúng quiz", req.LessonID); err == nil {
-			result["diamondsEarned"] = 2
-		}
-		// Mark improvement on matching weakness
-		if req.Topic != "" {
-			if w, err := h.weaknessService.FindByUserAndTopic(r.Context(), claims.UserID, req.Topic); err == nil {
-				h.weaknessService.MarkImproved(r.Context(), w.ID)
-			}
-		}
-	} else {
-		// Record weakness signal
-		topic := req.Topic
-		if topic == "" {
-			if ctx_, err := h.lessonService.GetContext(r.Context(), req.LessonID); err == nil {
-				topic = ctx_.LessonTitle
-			}
-		}
-		if topic != "" {
-			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "quiz", 1.0)
-		}
-		result["weaknessRecorded"] = topic
-	}
-
-	jsonOk(w, result)
-}
-
 // ---- Validate Quiz (server-side grading) ----
 
 type validateQuizInput struct {

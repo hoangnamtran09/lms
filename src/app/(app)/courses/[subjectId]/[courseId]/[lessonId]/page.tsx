@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock, StopCircle } from "lucide-react";
+import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock } from "lucide-react";
 import { api, apiStream } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
