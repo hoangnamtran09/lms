@@ -27,11 +27,12 @@ type Handler struct {
 	courseService   *courses.Service
 	cacheService    *CacheService
 	progressService *progress.Service
+	quizStore       *QuizStore
 	db              *gorm.DB
 }
 
 func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknesses.Service, diamondSvc *gamification.DiamondService, courseSvc *courses.Service, cacheSvc *CacheService, progressSvc *progress.Service, db *gorm.DB) *Handler {
-	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, cacheService: cacheSvc, progressService: progressSvc, db: db}
+	return &Handler{aiService: aiSvc, lessonService: lessonSvc, weaknessService: weaknessSvc, diamondService: diamondSvc, courseService: courseSvc, cacheService: cacheSvc, progressService: progressSvc, quizStore: NewQuizStore(), db: db}
 }
 
 type chatInput struct {
@@ -116,6 +117,24 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 			for _, match := range matches {
 				topic := match[1]
 				h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "chat", 0.8)
+			}
+		}
+
+		// Parse :::quiz blocks and store answers server-side
+		quizRe := regexp.MustCompile(`:::quiz\s*(\{[\s\S]*?\})\s*:::`)
+		quizMatches := quizRe.FindAllStringSubmatch(fullResponse.String(), -1)
+		for _, m := range quizMatches {
+			var quizData struct {
+				Question    string       `json:"question"`
+				Options     []QuizOption `json:"options"`
+				Explanation string       `json:"explanation"`
+			}
+			jsonStr := m[1]
+			if err := json.Unmarshal([]byte(jsonStr), &quizData); err != nil {
+				continue
+			}
+			if quizData.Question != "" && len(quizData.Options) > 0 {
+				h.quizStore.Store(quizData.Question, quizData.Options, quizData.Explanation)
 			}
 		}
 
@@ -218,6 +237,67 @@ func (h *Handler) QuizAnswer(w http.ResponseWriter, r *http.Request) {
 		if topic != "" {
 			h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "quiz", 1.0)
 		}
+		result["weaknessRecorded"] = topic
+	}
+
+	jsonOk(w, result)
+}
+
+// ---- Validate Quiz (server-side grading) ----
+
+type validateQuizInput struct {
+	LessonID      string `json:"lessonId"`
+	Question      string `json:"question"`
+	SelectedIndex int    `json:"selectedIndex"`
+}
+
+func (h *Handler) ValidateQuiz(w http.ResponseWriter, r *http.Request) {
+	var req validateQuizInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
+		jsonErr(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	stored, ok := h.quizStore.Get(req.Question)
+	if !ok {
+		jsonErr(w, "Quiz not found or expired", http.StatusNotFound)
+		return
+	}
+
+	if req.SelectedIndex < 0 || req.SelectedIndex >= len(stored.Options) {
+		jsonErr(w, "Invalid selectedIndex", http.StatusBadRequest)
+		return
+	}
+
+	isCorrect := stored.Options[req.SelectedIndex].IsCorrect
+	result := map[string]interface{}{
+		"isCorrect":    isCorrect,
+		"explanation":  stored.Explanation,
+	}
+
+	if isCorrect {
+		if err := h.diamondService.Add(r.Context(), claims.UserID, 2, "Trả lời đúng quiz", req.LessonID); err == nil {
+			result["diamondsEarned"] = 2
+		}
+		topic := stored.Question
+		if len(topic) > 100 {
+			topic = topic[:100]
+		}
+		if w, err := h.weaknessService.FindByUserAndTopic(r.Context(), claims.UserID, topic); err == nil {
+			h.weaknessService.MarkImproved(r.Context(), w.ID)
+		}
+	} else {
+		topic := stored.Question
+		if len(topic) > 100 {
+			topic = topic[:100]
+		}
+		h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "quiz", 1.0)
 		result["weaknessRecorded"] = topic
 	}
 
@@ -372,15 +452,48 @@ func (h *Handler) CompletionQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result struct {
+	var quizResult struct {
 		Questions []map[string]interface{} `json:"questions"`
 	}
-	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
+	if err := json.Unmarshal([]byte(extractJSON(response)), &quizResult); err != nil {
 		jsonErr(w, "Lỗi parse kết quả: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	jsonOk(w, result)
+	// Strip isCorrect from each question and store answers server-side
+	for _, q := range quizResult.Questions {
+		question, _ := q["question"].(string)
+		if question == "" {
+			continue
+		}
+		explanation, _ := q["explanation"].(string)
+
+		var options []QuizOption
+		if opts, ok := q["options"].([]interface{}); ok {
+			for _, opt := range opts {
+				if m, ok2 := opt.(map[string]interface{}); ok2 {
+					text, _ := m["text"].(string)
+					isCorrect, _ := m["isCorrect"].(bool)
+					options = append(options, QuizOption{Text: text, IsCorrect: isCorrect})
+				}
+			}
+		}
+
+		if len(options) > 0 {
+			h.quizStore.Store(question, options, explanation)
+
+			// Strip isCorrect from options in the response to client
+			if opts, ok := q["options"].([]interface{}); ok {
+				for _, opt := range opts {
+					if m, ok2 := opt.(map[string]interface{}); ok2 {
+						delete(m, "isCorrect")
+					}
+				}
+			}
+		}
+	}
+
+	jsonOk(w, quizResult)
 	}
 
 	// ---- Learning Coach ----

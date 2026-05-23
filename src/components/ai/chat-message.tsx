@@ -7,9 +7,14 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { InteractiveQuiz } from "./interactive-quiz";
 
+interface QuizOption {
+  text: string;
+  isCorrect: boolean;
+}
+
 interface QuizData {
   question: string;
-  options: { text: string; isCorrect: boolean }[];
+  options: { text: string }[];
   explanation: string;
 }
 
@@ -17,11 +22,7 @@ function stripWeaknessMarkers(content: string): string {
   return content.replace(/:::weakness topic="[^"]*"/g, "");
 }
 
-// sanitizeLaTeXInJSON fixes common LaTeX backslash issues that break JSON.parse.
-// AI sometimes writes $\cos$ instead of $\\cos$ inside JSON strings.
 function sanitizeLaTeXInJSON(jsonStr: string): string {
-  // Replace single backslashes followed by LaTeX commands with double backslashes.
-  // Uses negative lookbehind to skip already-escaped backslashes.
   return jsonStr.replace(/(?<!\\)\\([a-zA-Z]+)/g, "\\\\$1");
 }
 
@@ -36,30 +37,33 @@ function parseQuizBlocks(
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(cleaned)) !== null) {
-    // Text before quiz
     if (match.index > lastIdx) {
       parts.push({ type: "text", content: cleaned.slice(lastIdx, match.index) });
     }
-    // Parse quiz JSON — try direct parse first, then sanitize LaTeX backslashes and retry
-    let quiz: QuizData | undefined;
+    let rawQuiz: { question: string; options: QuizOption[]; explanation: string } | undefined;
     try {
-      quiz = JSON.parse(match[1]);
+      rawQuiz = JSON.parse(match[1]);
     } catch {
       try {
-        quiz = JSON.parse(sanitizeLaTeXInJSON(match[1]));
-      } catch {
-        // Still broken — render as plain text
-      }
+        rawQuiz = JSON.parse(sanitizeLaTeXInJSON(match[1]));
+      } catch {}
     }
-    if (quiz) {
-      parts.push({ type: "quiz", content: match[0], quiz });
+    if (rawQuiz) {
+      parts.push({
+        type: "quiz",
+        content: match[0],
+        quiz: {
+          question: rawQuiz.question,
+          options: rawQuiz.options.map((o) => ({ text: o.text })),
+          explanation: rawQuiz.explanation,
+        },
+      });
     } else {
       parts.push({ type: "text", content: match[0] });
     }
     lastIdx = match.index + match[0].length;
   }
 
-  // Remaining text
   if (lastIdx < cleaned.length) {
     parts.push({ type: "text", content: cleaned.slice(lastIdx) });
   }
@@ -88,7 +92,6 @@ export function ChatMessage({
 
   const parts = parseQuizBlocks(content);
 
-  // Notify parent of new quizzes (in effect to avoid setState during render)
   useEffect(() => {
     if (!onQuizDetected) return;
     for (const part of parts) {

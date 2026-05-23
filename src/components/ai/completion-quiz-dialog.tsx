@@ -8,14 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InteractiveQuiz } from "@/components/ai/interactive-quiz";
 
-interface QuizOption {
-  text: string;
-  isCorrect: boolean;
-}
-
 export interface QuizQuestion {
   question: string;
-  options: QuizOption[];
+  options: { text: string }[];
   explanation: string;
 }
 

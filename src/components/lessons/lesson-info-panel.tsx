@@ -22,7 +22,7 @@ interface LessonSummary {
 
 interface QuizData {
   question: string;
-  options: { text: string; isCorrect: boolean }[];
+  options: { text: string }[];
   explanation: string;
 }
 
@@ -160,7 +160,6 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
 
   const showQuiz = !!activeQuiz;
   const showResult = showQuiz && quizPhase === "result";
-  const correctAnswer = activeQuiz?.options.find((o) => o.isCorrect)?.text || "";
   const accuracy = quizTotal > 0 ? Math.round((quizCorrect / quizTotal) * 100) : null;
 
   return (
@@ -340,8 +339,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-red-600">Chưa đúng</p>
-                      <p className="text-xs text-gray-500 mt-1">Đáp án đúng:</p>
-                      <p className="text-sm font-medium text-gray-900 mt-0.5"><MathText text={correctAnswer} /></p>
+                      <p className="text-xs text-gray-500 mt-1">Xem giải thích bên dưới để hiểu thêm.</p>
                     </div>
                     <div className="rounded-full bg-gray-50 border border-gray-200 px-4 py-2">
                       <p className="text-xs text-gray-600">Đừng lo, cố gắng nhé!</p>

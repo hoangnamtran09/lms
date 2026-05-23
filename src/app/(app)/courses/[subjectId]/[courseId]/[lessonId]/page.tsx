@@ -558,6 +558,12 @@ export default function LessonViewerPage({
         onComplete={async () => {
           setShowQuiz(false);
           await endSession();
+          try {
+            await api("/api/diamonds/earn", {
+              method: "POST",
+              body: JSON.stringify({ lessonId, durationSeconds: elapsedSeconds }),
+            });
+          } catch {} // Non-critical
           router.push(`/courses/${subjectId}`);
         }}
       />

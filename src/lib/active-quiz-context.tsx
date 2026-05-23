@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 
 export interface QuizData {
   question: string;
-  options: { text: string; isCorrect: boolean }[];
+  options: { text: string }[];
   explanation: string;
 }
 
