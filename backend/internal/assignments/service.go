@@ -155,21 +155,13 @@ func (s *Service) FindSubmission(ctx context.Context, id string) (*Submission, e
 
 func (s *Service) GradeSubmission(ctx context.Context, submissionID string, score int, feedback, gradedBy string) error {
 	now := time.Now()
-	if err := s.db.WithContext(ctx).Model(&Submission{}).Where("id = ?", submissionID).Updates(map[string]interface{}{
+	return s.db.WithContext(ctx).Model(&Submission{}).Where("id = ?", submissionID).Updates(map[string]interface{}{
 		"score":    score,
 		"feedback": feedback,
 		"graded_by": gradedBy,
 		"graded_at": &now,
 		"status":   StatusGraded,
-	}).Error; err != nil {
-		return err
-	}
-	// Mark assignment status for this student
-	var sub Submission
-	if err := s.db.WithContext(ctx).Where("id = ?", submissionID).First(&sub).Error; err != nil {
-		return err
-	}
-	return s.db.WithContext(ctx).Model(&Assignment{}).Where("id = ?", sub.AssignmentID).Update("status", StatusGraded).Error
+	}).Error
 }
 
 func (s *Service) ReturnSubmission(ctx context.Context, submissionID string) error {

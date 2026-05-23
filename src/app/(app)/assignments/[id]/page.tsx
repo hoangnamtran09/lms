@@ -177,7 +177,6 @@ export default function AssignmentDetailPage({
       })
         .then(() => {
           setSubmitted(true);
-          loadData();
         })
         .catch(() => {})
         .finally(() => { submittingRef.current = false; });
@@ -335,19 +334,16 @@ export default function AssignmentDetailPage({
         method: "POST",
         body: JSON.stringify({ assignmentId: id, content, fileUrl: uploadedUrl }),
       });
-      // Use server-returned submission (no optimistic needed)
       setSubmissions((prev) => [...prev, res.submission]);
       setSubmitResults(res.results);
       setSubmitted(true);
       setMySubmitted(true);
       setAnswer("");
       setSelectedFile(null);
-      // Persist submission state to survive page reload
       try {
         sessionStorage.setItem(`submitted-${id}`, "true");
         sessionStorage.setItem(`submitted-${id}-content`, content);
       } catch {}
-      loadData();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {
