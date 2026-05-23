@@ -257,6 +257,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Post("/api/assignments/{id}/submit", h.Assignments.Submit)
 		r.Get("/api/assignments/{id}/submissions", h.Assignments.ListSubmissions)
 		r.Get("/api/submissions/my", h.Assignments.MySubmissions)
+		r.Get("/api/grades/my", h.Assignments.MyGrades)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActGrade)).
 			Patch("/api/submissions/{id}/grade", h.Assignments.GradeSubmission)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActGrade)).

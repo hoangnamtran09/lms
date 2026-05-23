@@ -119,6 +119,34 @@ func (s *Service) ListSubmissionsByStudent(ctx context.Context, studentID string
 	return subs, err
 }
 
+type GradeRow struct {
+	ID             string     `json:"id"`
+	AssignmentID   string     `json:"assignmentId"`
+	AssignmentTitle string    `json:"assignmentTitle"`
+	MaxScore       int        `json:"maxScore"`
+	Score          *int       `json:"score"`
+	Status         string     `json:"status"`
+	Feedback       string     `json:"feedback"`
+	SubmittedAt    time.Time  `json:"submittedAt"`
+	GradedAt       *time.Time `json:"gradedAt"`
+}
+
+func (s *Service) GetMyGrades(ctx context.Context, studentID string) ([]GradeRow, error) {
+	var rows []GradeRow
+	err := s.db.WithContext(ctx).
+		Table("submissions").
+		Select(`submissions.id, submissions.assignment_id,
+			COALESCE(assignments.title, 'Đã xoá') as assignment_title,
+			assignments.max_score, submissions.score,
+			submissions.status, submissions.feedback,
+			submissions.submitted_at, submissions.graded_at`).
+		Joins("LEFT JOIN assignments ON assignments.id = submissions.assignment_id").
+		Where("submissions.student_id = ?", studentID).
+		Order("submissions.submitted_at DESC").
+		Scan(&rows).Error
+	return rows, err
+}
+
 func (s *Service) FindSubmission(ctx context.Context, id string) (*Submission, error) {
 	var sub Submission
 	err := s.db.WithContext(ctx).Where("id = ?", id).First(&sub).Error

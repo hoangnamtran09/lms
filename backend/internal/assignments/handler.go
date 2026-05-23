@@ -197,6 +197,19 @@ func (h *Handler) MySubmissions(w http.ResponseWriter, r *http.Request) {
 	jsonOk(w, subs)
 }
 
+func (h *Handler) MyGrades(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
+	rows, err := h.service.GetMyGrades(r.Context(), claims.UserID)
+	if err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		rows = []GradeRow{}
+	}
+	jsonOk(w, rows)
+}
+
 func (h *Handler) GradeSubmission(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	subID := extractSubmissionID(r.URL.Path)
