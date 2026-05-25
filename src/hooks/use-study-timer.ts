@@ -115,9 +115,9 @@ export function useStudyTimer(
     stopTimers();
     const sid = sessionIdRef.current;
     if (!sid) return;
+    sessionIdRef.current = null;
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
-      sessionIdRef.current = null;
     } catch {}
   }, [stopTimers]);
 
@@ -125,9 +125,9 @@ export function useStudyTimer(
     stopTimers();
     const sid = sessionIdRef.current;
     if (!sid) return;
+    sessionIdRef.current = null;
     try {
       await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
-      sessionIdRef.current = null;
     } catch {}
   }, [stopTimers]);
 
@@ -146,6 +146,7 @@ export function useStudyTimer(
     return () => {
       stopTimers();
       endSession();
+      startedRef.current = false;
     };
   }, [active, initSession, startPolling, startHeartbeat, stopTimers, endSession]);
 
