@@ -49,7 +49,13 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		user, err = h.userService.FindByID(r.Context(), userID)
 		if err != nil {
-			jsonErr(w, "Không tìm thấy người dùng", http.StatusNotFound)
+			respond(w, userResponse{
+				ID:         claims.UserID,
+				SupabaseID: claims.UserID,
+				FullName:   fallbackFullName(claims),
+				Role:       fallbackRole(claims),
+				Email:      fallbackEmail(claims),
+			}, http.StatusOK)
 			return
 		}
 	}
@@ -212,6 +218,33 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	respond(w, map[string]string{"message": "OK"}, http.StatusOK)
 }
 
+func fallbackFullName(claims *middleware.Claims) string {
+	if claims == nil {
+		return "Người dùng"
+	}
+	if claims.UserName != "" {
+		return claims.UserName
+	}
+	return "Người dùng"
+}
+
+func fallbackRole(claims *middleware.Claims) string {
+	if claims == nil || claims.Role == "" {
+		return "STUDENT"
+	}
+	return claims.Role
+}
+
+func fallbackEmail(claims *middleware.Claims) string {
+	if claims == nil {
+		return ""
+	}
+	if strings.Contains(claims.UserName, "@") {
+		return claims.UserName
+	}
+	return ""
+}
+
 // --- helpers ---
 
 func (h *Handler) createSupabaseUser(fullName, email, password, role string) (string, error) {
@@ -246,10 +279,10 @@ func (h *Handler) createSupabaseUser(fullName, email, password, role string) (st
 	}
 	json.Unmarshal(resp, &result)
 	if result.Err != "" {
-		return "", fmt.Errorf(result.Err)
+		return "", fmt.Errorf("%s", result.Err)
 	}
 	if result.Error.Message != "" {
-		return "", fmt.Errorf(result.Error.Message)
+		return "", fmt.Errorf("%s", result.Error.Message)
 	}
 	return result.ID, nil
 }

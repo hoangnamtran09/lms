@@ -8,13 +8,6 @@ export const MIN_PAGES = 3;
 export const MIN_PAGE_TIME = 10;
 
 const HEARTBEAT_INTERVAL = 5000;
-const POLL_INTERVAL = 2000;
-
-interface SessionStatus {
-  elapsedSeconds: number;
-  qualifiedPages: number[];
-  chatUnlocked: boolean;
-}
 
 interface StudyProgress {
   sessionId: string | null;
@@ -39,32 +32,26 @@ export function useStudyTimer(
   const localElapsedRef = useRef(0);
   const pageTimeRef = useRef<Map<number, number>>(new Map());
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const retryRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initInFlightRef = useRef(false);
+  const backendSyncDisabledRef = useRef(false);
 
-  const clearLocalSession = useCallback(() => {
-    sessionIdRef.current = null;
-    setSessionId(null);
-    setElapsedSeconds(0);
-    localElapsedRef.current = 0;
-    setQualifiedPages(new Set());
-    pageTimeRef.current.clear();
+  const stopLocalTimer = useCallback(() => {
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
   }, []);
 
-  const stopActiveTimers = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+  const stopBackendTimers = useCallback(() => {
     if (heartbeatRef.current) {
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
     }
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
+    if (retryRef.current) {
+      clearInterval(retryRef.current);
+      retryRef.current = null;
     }
   }, []);
 
@@ -72,39 +59,15 @@ export function useStudyTimer(
     visiblePagesRef.current = visiblePages;
   }, [visiblePages]);
 
-  const handleMissingSession = useCallback(() => {
-    stopActiveTimers();
-    clearLocalSession();
-  }, [clearLocalSession, stopActiveTimers]);
+  const stopAllTimers = useCallback(() => {
+    stopBackendTimers();
+    stopLocalTimer();
+  }, [stopBackendTimers, stopLocalTimer]);
 
-  const stopRetryTimer = useCallback(() => {
-    if (retryRef.current) {
-      clearInterval(retryRef.current);
-      retryRef.current = null;
-    }
-  }, []);
-
-  const syncSessionStatus = useCallback(async (sessionId: string) => {
-    try {
-      const status = await api<SessionStatus>(`/api/study-sessions/${sessionId}/status`);
-      setElapsedSeconds((current) => {
-        const next = Math.max(current, status.elapsedSeconds);
-        localElapsedRef.current = next;
-        return next;
-      });
-      setQualifiedPages((current) => {
-        const next = new Set(current);
-        status.qualifiedPages.forEach((page) => next.add(page));
-        return next;
-      });
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        handleMissingSession();
-        return;
-      }
-      console.error("[study-timer] status sync failed:", e);
-    }
-  }, [handleMissingSession]);
+  const handleBackendUnavailable = useCallback(() => {
+    backendSyncDisabledRef.current = true;
+    stopBackendTimers();
+  }, [stopBackendTimers]);
 
   const startLocalTimer = useCallback(() => {
     if (tickRef.current) return;
@@ -131,22 +94,8 @@ export function useStudyTimer(
 
   // Start or resume session
   const initSession = useCallback(async () => {
-    if (initInFlightRef.current || sessionIdRef.current) return;
+    if (initInFlightRef.current || sessionIdRef.current || backendSyncDisabledRef.current) return;
     initInFlightRef.current = true;
-
-    try {
-      const existing = await api<{ id: string } | null>(
-        `/api/study-sessions/active?lessonId=${lessonId}`,
-      );
-      if (existing?.id) {
-        sessionIdRef.current = existing.id;
-        setSessionId(existing.id);
-        await syncSessionStatus(existing.id);
-        return;
-      }
-    } catch (e) {
-      console.error("[study-timer] active session check failed:", e);
-    }
 
     try {
       const data = await api<{ id: string }>("/api/study-sessions/start", {
@@ -155,28 +104,21 @@ export function useStudyTimer(
       });
       sessionIdRef.current = data.id;
       setSessionId(data.id);
-      await syncSessionStatus(data.id);
     } catch (e) {
       console.error("[study-timer] session start failed:", e);
     } finally {
       initInFlightRef.current = false;
     }
-  }, [lessonId, syncSessionStatus]);
-
-  // Poll session status from server
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return;
-    pollRef.current = setInterval(async () => {
-      const sid = sessionIdRef.current;
-      if (!sid) return;
-      await syncSessionStatus(sid);
-    }, POLL_INTERVAL);
-  }, [syncSessionStatus]);
+  }, [lessonId]);
 
   // Send heartbeat with visible pages
   const startHeartbeat = useCallback(() => {
-    if (heartbeatRef.current) return;
+    if (heartbeatRef.current || backendSyncDisabledRef.current) return;
     heartbeatRef.current = setInterval(async () => {
+      if (backendSyncDisabledRef.current) {
+        stopBackendTimers();
+        return;
+      }
       const sid = sessionIdRef.current;
       if (!sid) return;
       try {
@@ -188,18 +130,17 @@ export function useStudyTimer(
         });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) {
-          handleMissingSession();
+          handleBackendUnavailable();
           return;
         }
         console.error("[study-timer] heartbeat failed:", e);
       }
     }, HEARTBEAT_INTERVAL);
-  }, [handleMissingSession]);
+  }, [handleBackendUnavailable, stopBackendTimers]);
 
   const stopTimers = useCallback(() => {
-    stopActiveTimers();
-    stopRetryTimer();
-  }, [stopActiveTimers, stopRetryTimer]);
+    stopAllTimers();
+  }, [stopAllTimers]);
 
   const endSession = useCallback(async () => {
     stopTimers();
@@ -207,6 +148,7 @@ export function useStudyTimer(
     if (!sid) return;
     sessionIdRef.current = null;
     setSessionId(null);
+    if (backendSyncDisabledRef.current) return;
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
     } catch (e) {
@@ -220,6 +162,7 @@ export function useStudyTimer(
     if (!sid) return;
     sessionIdRef.current = null;
     setSessionId(null);
+    if (backendSyncDisabledRef.current) return;
     try {
       await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
     } catch (e) {
@@ -237,13 +180,12 @@ export function useStudyTimer(
     startLocalTimer();
     const bootstrap = window.setTimeout(() => {
       void initSession().then(() => {
-        startPolling();
         startHeartbeat();
       });
     }, 0);
     if (!retryRef.current) {
       retryRef.current = setInterval(() => {
-        if (!sessionIdRef.current) {
+        if (!sessionIdRef.current && !backendSyncDisabledRef.current) {
           void initSession();
         }
       }, 5000);
@@ -251,24 +193,31 @@ export function useStudyTimer(
     return () => {
       window.clearTimeout(bootstrap);
       stopTimers();
-      endSession();
+      void endSession();
     };
-  }, [active, initSession, startLocalTimer, startPolling, startHeartbeat, stopTimers, endSession]);
+  }, [active, initSession, startLocalTimer, startHeartbeat, stopTimers, endSession]);
 
   // Pause heartbeats on tab hidden, resume on visible
   useEffect(() => {
     if (!active) return;
     const onVisibility = () => {
       if (document.hidden) {
-        stopActiveTimers();
+        stopTimers();
       } else {
-        startPolling();
+        startLocalTimer();
         startHeartbeat();
+        if (!retryRef.current && !backendSyncDisabledRef.current) {
+          retryRef.current = setInterval(() => {
+            if (!sessionIdRef.current && !backendSyncDisabledRef.current) {
+              void initSession();
+            }
+          }, 5000);
+        }
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [active, startPolling, startHeartbeat, stopActiveTimers]);
+  }, [active, initSession, startHeartbeat, startLocalTimer, stopTimers]);
 
   // End session on beforeunload
   useEffect(() => {

@@ -54,12 +54,22 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate chat unlock
+	// Validate chat unlock: allow if user has existing chat history for this lesson
 	if req.SessionID != "" && h.progressService != nil {
-		status, err := h.progressService.GetStatus(r.Context(), req.SessionID)
-		if err != nil || !status.ChatUnlocked {
-			jsonErr(w, "Bạn cần đọc bài đủ thời gian để mở khoá chat", http.StatusForbidden)
-			return
+		hasHistory := false
+		if claims := middleware.GetClaims(r.Context()); claims != nil {
+			var count int64
+			h.db.WithContext(r.Context()).Model(&ChatMessageRecord{}).
+				Where("user_id = ? AND lesson_id = ?", claims.UserID, req.LessonID).
+				Count(&count)
+			hasHistory = count > 0
+		}
+		if !hasHistory {
+			status, err := h.progressService.GetStatus(r.Context(), req.SessionID)
+			if err != nil || !status.ChatUnlocked {
+				jsonErr(w, "Bạn cần đọc bài đủ thời gian để mở khoá chat", http.StatusForbidden)
+				return
+			}
 		}
 	}
 

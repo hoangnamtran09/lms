@@ -55,6 +55,7 @@ export default function LessonViewerPage({
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const savedCountRef = useRef(0);
+  const [hasHistory, setHasHistory] = useState(false);
 
   // Sync ref with state for saveHistory
   const messagesRef = useRef<Message[]>([]);
@@ -85,6 +86,7 @@ export default function LessonViewerPage({
         .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
       if (msgs.length > 0) {
         setMessages(msgs);
+        setHasHistory(true);
         savedCountRef.current = msgs.length;
       }
     }).catch(() => {});
@@ -103,10 +105,12 @@ export default function LessonViewerPage({
     sessionId,
     elapsedSeconds,
     qualifiedPages,
-    chatUnlocked,
+    chatUnlocked: timerChatUnlocked,
     endSession,
     cancelSession,
   } = useStudyTimer(true, visiblePages, lessonId);
+
+  const chatUnlocked = timerChatUnlocked || hasHistory;
 
   const elapsedRef = useRef(elapsedSeconds);
   useEffect(() => {
@@ -131,7 +135,7 @@ export default function LessonViewerPage({
   // Auto-trigger AI greeting when chat unlocks
   const greetingSentRef = useRef(false);
   useEffect(() => {
-    if (chatUnlocked && !greetingSentRef.current && !streaming) {
+    if (chatUnlocked && !greetingSentRef.current && !streaming && !hasHistory) {
       greetingSentRef.current = true;
       // Gửi tin nhắn trống để AI chủ động chào và dẫn dắt
       setMessages([{ role: "assistant", content: "" }]);
