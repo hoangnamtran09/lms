@@ -49,7 +49,6 @@ export function useStudyTimer(
     startedRef.current = true;
 
     try {
-      // Check for existing active session first
       const existing = await api<{ id: string } | null>(
         `/api/study-sessions/active?lessonId=${lessonId}`,
       );
@@ -57,7 +56,9 @@ export function useStudyTimer(
         sessionIdRef.current = existing.id;
         return;
       }
-    } catch {}
+    } catch (e) {
+      console.error("[study-timer] active session check failed:", e);
+    }
 
     try {
       const data = await api<{ id: string }>("/api/study-sessions/start", {
@@ -65,7 +66,9 @@ export function useStudyTimer(
         body: JSON.stringify({ lessonId }),
       });
       sessionIdRef.current = data.id;
-    } catch {}
+    } catch (e) {
+      console.error("[study-timer] session start failed:", e);
+    }
   }, [lessonId]);
 
   // Poll session status from server
@@ -79,7 +82,9 @@ export function useStudyTimer(
         setElapsedSeconds(status.elapsedSeconds);
         setQualifiedPages(new Set(status.qualifiedPages));
         setChatUnlocked(status.chatUnlocked);
-      } catch {}
+      } catch (e) {
+        console.error("[study-timer] poll failed:", e);
+      }
     }, POLL_INTERVAL);
   }, []);
 
@@ -96,7 +101,9 @@ export function useStudyTimer(
             visiblePages: Array.from(visiblePagesRef.current),
           }),
         });
-      } catch {}
+      } catch (e) {
+        console.error("[study-timer] heartbeat failed:", e);
+      }
     }, HEARTBEAT_INTERVAL);
   }, []);
 
@@ -118,7 +125,9 @@ export function useStudyTimer(
     sessionIdRef.current = null;
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
-    } catch {}
+    } catch (e) {
+      console.error("[study-timer] end session failed:", e);
+    }
   }, [stopTimers]);
 
   const cancelSession = useCallback(async () => {
@@ -128,7 +137,9 @@ export function useStudyTimer(
     sessionIdRef.current = null;
     try {
       await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
-    } catch {}
+    } catch (e) {
+      console.error("[study-timer] cancel session failed:", e);
+    }
   }, [stopTimers]);
 
   // Main lifecycle
