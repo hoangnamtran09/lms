@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,15 +42,6 @@ export function LoginForm() {
           <div className="grid md:grid-cols-[0.95fr_1.05fr]">
             <div className="flex flex-col justify-between gap-8 bg-gradient-to-br from-white/70 via-white/55 to-primary/10 px-6 py-8 md:px-8">
               <div className="space-y-5">
-                <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-secondary shadow-lg">
-                  <Image
-                    src="/logo-Photoroom.png"
-                    alt="LMS"
-                    fill
-                    sizes="64px"
-                    className="object-cover"
-                  />
-                </div>
                 <div className="space-y-3">
                   <p className="text-sm font-semibold uppercase tracking-[0.28em] text-primary/80">
                     Nền học tập thông minh

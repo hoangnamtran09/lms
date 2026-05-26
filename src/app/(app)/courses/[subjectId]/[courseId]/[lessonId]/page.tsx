@@ -468,6 +468,7 @@ export default function LessonViewerPage({
                         role="assistant"
                         content={msg.content}
                         lessonId={lessonId}
+                        sessionId={sessionId}
                         hideQuizzes={true}
                         onQuizDetected={handleQuizDetected}
                         isStreaming={isStreamingThis}

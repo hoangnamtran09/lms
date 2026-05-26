@@ -75,6 +75,7 @@ export function ChatMessage({
   role,
   content,
   lessonId,
+  sessionId,
   hideQuizzes = false,
   onQuizDetected,
   onQuizAnswered,
@@ -83,6 +84,7 @@ export function ChatMessage({
   role: "user" | "assistant";
   content: string;
   lessonId: string;
+  sessionId: string | null;
   hideQuizzes?: boolean;
   onQuizDetected?: (quiz: QuizData) => void;
   onQuizAnswered?: (result: { isCorrect: boolean; question: string }) => void;
@@ -138,7 +140,7 @@ export function ChatMessage({
               </div>
             );
           }
-          return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} onAnswered={(isCorrect) => onQuizAnswered?.({ isCorrect, question: part.quiz!.question })} />;
+          return <InteractiveQuiz key={i} quiz={part.quiz} lessonId={lessonId} sessionId={sessionId} onAnswered={(isCorrect) => onQuizAnswered?.({ isCorrect, question: part.quiz!.question })} />;
         }
         const isLastText = i === parts.length - 1 || (i === parts.length - 2 && parts[parts.length - 1].type === "quiz");
         return (
