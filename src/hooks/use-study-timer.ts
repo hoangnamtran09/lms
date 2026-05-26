@@ -17,6 +17,7 @@ interface SessionStatus {
 }
 
 interface StudyProgress {
+  sessionId: string | null;
   elapsedSeconds: number;
   qualifiedPages: Set<number>;
   chatUnlocked: boolean;
@@ -29,24 +30,69 @@ export function useStudyTimer(
   visiblePages: Set<number>,
   lessonId: string,
 ): StudyProgress {
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [qualifiedPages, setQualifiedPages] = useState<Set<number>>(new Set());
-  const [chatUnlocked, setChatUnlocked] = useState(false);
 
   const sessionIdRef = useRef<string | null>(null);
   const visiblePagesRef = useRef(visiblePages);
+  const localElapsedRef = useRef(0);
+  const pageTimeRef = useRef<Map<number, number>>(new Map());
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startedRef = useRef(false);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initInFlightRef = useRef(false);
 
   useEffect(() => {
     visiblePagesRef.current = visiblePages;
   }, [visiblePages]);
 
+  const syncSessionStatus = useCallback(async (sessionId: string) => {
+    try {
+      const status = await api<SessionStatus>(`/api/study-sessions/${sessionId}/status`);
+      setElapsedSeconds((current) => {
+        const next = Math.max(current, status.elapsedSeconds);
+        localElapsedRef.current = next;
+        return next;
+      });
+      setQualifiedPages((current) => {
+        const next = new Set(current);
+        status.qualifiedPages.forEach((page) => next.add(page));
+        return next;
+      });
+    } catch (e) {
+      console.error("[study-timer] status sync failed:", e);
+    }
+  }, []);
+
+  const startLocalTimer = useCallback(() => {
+    if (tickRef.current) return;
+    tickRef.current = setInterval(() => {
+      localElapsedRef.current += 1;
+      setElapsedSeconds(localElapsedRef.current);
+
+      const visiblePagesNow = Array.from(visiblePagesRef.current);
+      if (visiblePagesNow.length === 0) return;
+
+      setQualifiedPages((current) => {
+        const next = new Set(current);
+        for (const page of visiblePagesNow) {
+          const seconds = (pageTimeRef.current.get(page) ?? 0) + 1;
+          pageTimeRef.current.set(page, seconds);
+          if (seconds >= MIN_PAGE_TIME) {
+            next.add(page);
+          }
+        }
+        return next;
+      });
+    }, 1000);
+  }, []);
+
   // Start or resume session
   const initSession = useCallback(async () => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (initInFlightRef.current || sessionIdRef.current) return;
+    initInFlightRef.current = true;
 
     try {
       const existing = await api<{ id: string } | null>(
@@ -54,6 +100,8 @@ export function useStudyTimer(
       );
       if (existing?.id) {
         sessionIdRef.current = existing.id;
+        setSessionId(existing.id);
+        await syncSessionStatus(existing.id);
         return;
       }
     } catch (e) {
@@ -66,10 +114,14 @@ export function useStudyTimer(
         body: JSON.stringify({ lessonId }),
       });
       sessionIdRef.current = data.id;
+      setSessionId(data.id);
+      await syncSessionStatus(data.id);
     } catch (e) {
       console.error("[study-timer] session start failed:", e);
+    } finally {
+      initInFlightRef.current = false;
     }
-  }, [lessonId]);
+  }, [lessonId, syncSessionStatus]);
 
   // Poll session status from server
   const startPolling = useCallback(() => {
@@ -77,16 +129,9 @@ export function useStudyTimer(
     pollRef.current = setInterval(async () => {
       const sid = sessionIdRef.current;
       if (!sid) return;
-      try {
-        const status = await api<SessionStatus>(`/api/study-sessions/${sid}/status`);
-        setElapsedSeconds(status.elapsedSeconds);
-        setQualifiedPages(new Set(status.qualifiedPages));
-        setChatUnlocked(status.chatUnlocked);
-      } catch (e) {
-        console.error("[study-timer] poll failed:", e);
-      }
+      await syncSessionStatus(sid);
     }, POLL_INTERVAL);
-  }, []);
+  }, [syncSessionStatus]);
 
   // Send heartbeat with visible pages
   const startHeartbeat = useCallback(() => {
@@ -116,6 +161,14 @@ export function useStudyTimer(
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
     }
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+    if (retryRef.current) {
+      clearInterval(retryRef.current);
+      retryRef.current = null;
+    }
   }, []);
 
   const endSession = useCallback(async () => {
@@ -123,6 +176,7 @@ export function useStudyTimer(
     const sid = sessionIdRef.current;
     if (!sid) return;
     sessionIdRef.current = null;
+    setSessionId(null);
     try {
       await api(`/api/study-sessions/${sid}/end`, { method: "POST" });
     } catch (e) {
@@ -135,6 +189,7 @@ export function useStudyTimer(
     const sid = sessionIdRef.current;
     if (!sid) return;
     sessionIdRef.current = null;
+    setSessionId(null);
     try {
       await api(`/api/study-sessions/${sid}`, { method: "DELETE" });
     } catch (e) {
@@ -147,19 +202,28 @@ export function useStudyTimer(
     if (!active) {
       stopTimers();
       endSession();
-      startedRef.current = false;
       return;
     }
-    initSession().then(() => {
-      startPolling();
-      startHeartbeat();
-    });
+    startLocalTimer();
+    const bootstrap = window.setTimeout(() => {
+      void initSession().then(() => {
+        startPolling();
+        startHeartbeat();
+      });
+    }, 0);
+    if (!retryRef.current) {
+      retryRef.current = setInterval(() => {
+        if (!sessionIdRef.current) {
+          void initSession();
+        }
+      }, 5000);
+    }
     return () => {
+      window.clearTimeout(bootstrap);
       stopTimers();
       endSession();
-      startedRef.current = false;
     };
-  }, [active, initSession, startPolling, startHeartbeat, stopTimers, endSession]);
+  }, [active, initSession, startLocalTimer, startPolling, startHeartbeat, stopTimers, endSession]);
 
   // Pause heartbeats on tab hidden, resume on visible
   useEffect(() => {
@@ -192,9 +256,10 @@ export function useStudyTimer(
   }, []);
 
   return {
+    sessionId,
     elapsedSeconds,
     qualifiedPages,
-    chatUnlocked,
+    chatUnlocked: elapsedSeconds >= MIN_TOTAL_TIME && qualifiedPages.size >= MIN_PAGES,
     endSession,
     cancelSession,
   };

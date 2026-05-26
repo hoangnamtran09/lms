@@ -21,10 +21,12 @@ type QuizState = "unanswered" | "loading" | "correct" | "incorrect";
 export function InteractiveQuiz({
   quiz,
   lessonId,
+  sessionId,
   onAnswered,
 }: {
   quiz: QuizData;
   lessonId: string;
+  sessionId: string | null;
   onAnswered?: (isCorrect: boolean) => void;
 }) {
   const [state, setState] = useState<QuizState>("unanswered");
@@ -44,6 +46,7 @@ export function InteractiveQuiz({
           method: "POST",
           body: JSON.stringify({
             lessonId,
+              sessionId: sessionId ?? "",
             question: quiz.question,
             selectedIndex: idx,
           }),

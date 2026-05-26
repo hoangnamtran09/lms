@@ -43,6 +43,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
   const [ctx, setCtx] = useState<{ subjectName: string; lessonTitle: string; description: string; gradeLevel: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<string | null>(null);
   const [objectives, setObjectives] = useState<string[]>([]);
@@ -66,6 +67,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed(bridge.getElapsed?.() ?? 0);
+      setSessionId(bridge.getSessionId?.() ?? null);
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -97,7 +99,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     setSummaryLoading(true);
     api<LessonSummary>("/api/ai/lesson-summary", {
       method: "POST",
-      body: JSON.stringify({ lessonId }),
+      body: JSON.stringify({ lessonId, sessionId: sessionId ?? "" }),
     })
       .then((s) => {
         setCtx({ subjectName: s.subjectName, lessonTitle: s.lessonTitle, description: s.description, gradeLevel: s.gradeLevel });
@@ -109,7 +111,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
         setSummaryLoading(false);
         setLoading(false);
       });
-  }, [lessonId]);
+  }, [lessonId, sessionId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleQuizAnswered = (isCorrect: boolean) => {
@@ -300,6 +302,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
                 <InteractiveQuiz
                   quiz={activeQuiz}
                   lessonId={lessonId}
+                  sessionId={sessionId}
                   onAnswered={(isCorrect) => handleQuizAnswered(isCorrect)}
                 />
               </div>

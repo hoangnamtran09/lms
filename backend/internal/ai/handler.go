@@ -196,6 +196,7 @@ func (h *Handler) ExtractQuestions(w http.ResponseWriter, r *http.Request) {
 
 type validateQuizInput struct {
 	LessonID      string `json:"lessonId"`
+	SessionID     string `json:"sessionId"`
 	Question      string `json:"question"`
 	SelectedIndex int    `json:"selectedIndex"`
 }
@@ -363,6 +364,7 @@ func (h *Handler) GradeExercise(w http.ResponseWriter, r *http.Request) {
 
 type completionQuizInput struct {
 	LessonID      string `json:"lessonId"`
+	SessionID     string `json:"sessionId"`
 	QuestionCount int    `json:"questionCount"`
 }
 
@@ -495,7 +497,8 @@ func (h *Handler) Coach(w http.ResponseWriter, r *http.Request) {
 // ---- Lesson Summary ----
 
 type lessonSummaryInput struct {
-	LessonID string `json:"lessonId"`
+	LessonID  string `json:"lessonId"`
+	SessionID string `json:"sessionId"`
 }
 
 func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {

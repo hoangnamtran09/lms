@@ -100,6 +100,7 @@ export default function LessonViewerPage({
 
   // Study timer
   const {
+    sessionId,
     elapsedSeconds,
     qualifiedPages,
     chatUnlocked,
@@ -116,14 +117,16 @@ export default function LessonViewerPage({
   const router = useRouter();
   useEffect(() => {
     bridge.getElapsed = () => elapsedRef.current;
+    bridge.getSessionId = () => sessionId;
     bridge.endSession = () => {
       setShowQuiz(true);
     };
     return () => {
       bridge.getElapsed = null;
+      bridge.getSessionId = null;
       bridge.endSession = null;
     };
-  }, []);
+  }, [sessionId]);
 
   // Auto-trigger AI greeting when chat unlocks
   const greetingSentRef = useRef(false);
@@ -135,7 +138,7 @@ export default function LessonViewerPage({
       setStreaming(true);
       apiStream(
         "/api/ai/chat",
-        { message: "Xin chào", lessonId: lessonId, sessionId: "", history: [] },
+        { message: "Xin chào", lessonId: lessonId, sessionId: sessionId ?? "", history: [] },
         (delta) => {
           setMessages((prev) => {
             const next = [...prev];
@@ -157,7 +160,7 @@ export default function LessonViewerPage({
         }
       );
     }
-  }, [chatUnlocked, streaming, lessonId, saveHistory]);
+  }, [chatUnlocked, streaming, lessonId, saveHistory, sessionId]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -218,13 +221,13 @@ export default function LessonViewerPage({
   useEffect(() => {
     api<{ questions: QuizQuestion[] }>("/api/ai/completion-quiz", {
       method: "POST",
-      body: JSON.stringify({ lessonId, questionCount: 5 }),
+      body: JSON.stringify({ lessonId, sessionId: sessionId ?? "", questionCount: 5 }),
     })
       .then((data) => {
         if (data.questions?.length) setQuizQuestions(data.questions);
       })
       .catch(() => {});
-  }, [lessonId]);
+  }, [lessonId, sessionId]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -277,7 +280,7 @@ export default function LessonViewerPage({
 
     apiStream(
       "/api/ai/chat",
-      { message: text, lessonId: lessonId, sessionId: "", history: prevMessages },
+      { message: text, lessonId: lessonId, sessionId: sessionId ?? "", history: prevMessages },
       (delta) => {
         setMessages((prev) => {
           const next = [...prev];
@@ -298,7 +301,7 @@ export default function LessonViewerPage({
         setStreaming(false);
       }
     );
-  }, [lessonId, saveHistory]);
+  }, [lessonId, saveHistory, sessionId]);
 
   const send = () => {
     const text = input.trim();
@@ -555,6 +558,7 @@ export default function LessonViewerPage({
       <CompletionQuizDialog
         open={showQuiz}
         lessonId={lessonId}
+        sessionId={sessionId}
         preloadedQuestions={quizQuestions}
         onComplete={async () => {
           setShowQuiz(false);

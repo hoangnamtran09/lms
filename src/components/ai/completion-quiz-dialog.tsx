@@ -23,11 +23,13 @@ type Phase = "loading" | "quiz" | "summary";
 export function CompletionQuizDialog({
   open,
   lessonId,
+  sessionId,
   onComplete,
   preloadedQuestions,
 }: {
   open: boolean;
   lessonId: string;
+  sessionId: string | null;
   onComplete: () => void;
   preloadedQuestions?: QuizQuestion[] | null;
 }) {
@@ -50,7 +52,7 @@ export function CompletionQuizDialog({
     setPhase("loading");
     api<CompletionQuizResponse>("/api/ai/completion-quiz", {
       method: "POST",
-      body: JSON.stringify({ lessonId, questionCount: 5 }),
+      body: JSON.stringify({ lessonId, sessionId: sessionId ?? "", questionCount: 5 }),
     })
       .then((data) => {
         if (!data.questions?.length) {
@@ -61,7 +63,7 @@ export function CompletionQuizDialog({
         }
       })
       .catch((e) => setError(e.message || "Lỗi tạo câu hỏi"));
-  }, [open, lessonId, preloadedQuestions]);
+  }, [open, lessonId, sessionId, preloadedQuestions]);
 
   const handleAnswered = (isCorrect: boolean) => {
     if (isCorrect) setCorrectCount((c) => c + 1);
@@ -116,6 +118,7 @@ export function CompletionQuizDialog({
               key={currentIndex}
               quiz={question}
               lessonId={lessonId}
+              sessionId={sessionId}
               onAnswered={(isCorrect) => handleAnswered(isCorrect)}
             />
             <div className="flex justify-end">
