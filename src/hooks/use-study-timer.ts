@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { api } from "@/lib/api-client";
+import { ApiError, api } from "@/lib/api-client";
 
 export const MIN_TOTAL_TIME = 60;
 export const MIN_PAGES = 3;
@@ -44,9 +44,45 @@ export function useStudyTimer(
   const retryRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initInFlightRef = useRef(false);
 
+  const clearLocalSession = useCallback(() => {
+    sessionIdRef.current = null;
+    setSessionId(null);
+    setElapsedSeconds(0);
+    localElapsedRef.current = 0;
+    setQualifiedPages(new Set());
+    pageTimeRef.current.clear();
+  }, []);
+
+  const stopActiveTimers = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     visiblePagesRef.current = visiblePages;
   }, [visiblePages]);
+
+  const handleMissingSession = useCallback(() => {
+    stopActiveTimers();
+    clearLocalSession();
+  }, [clearLocalSession, stopActiveTimers]);
+
+  const stopRetryTimer = useCallback(() => {
+    if (retryRef.current) {
+      clearInterval(retryRef.current);
+      retryRef.current = null;
+    }
+  }, []);
 
   const syncSessionStatus = useCallback(async (sessionId: string) => {
     try {
@@ -62,9 +98,13 @@ export function useStudyTimer(
         return next;
       });
     } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        handleMissingSession();
+        return;
+      }
       console.error("[study-timer] status sync failed:", e);
     }
-  }, []);
+  }, [handleMissingSession]);
 
   const startLocalTimer = useCallback(() => {
     if (tickRef.current) return;
@@ -147,29 +187,19 @@ export function useStudyTimer(
           }),
         });
       } catch (e) {
+        if (e instanceof ApiError && e.status === 404) {
+          handleMissingSession();
+          return;
+        }
         console.error("[study-timer] heartbeat failed:", e);
       }
     }, HEARTBEAT_INTERVAL);
-  }, []);
+  }, [handleMissingSession]);
 
   const stopTimers = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    if (heartbeatRef.current) {
-      clearInterval(heartbeatRef.current);
-      heartbeatRef.current = null;
-    }
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    if (retryRef.current) {
-      clearInterval(retryRef.current);
-      retryRef.current = null;
-    }
-  }, []);
+    stopActiveTimers();
+    stopRetryTimer();
+  }, [stopActiveTimers, stopRetryTimer]);
 
   const endSession = useCallback(async () => {
     stopTimers();
@@ -230,7 +260,7 @@ export function useStudyTimer(
     if (!active) return;
     const onVisibility = () => {
       if (document.hidden) {
-        stopTimers();
+        stopActiveTimers();
       } else {
         startPolling();
         startHeartbeat();
@@ -238,7 +268,7 @@ export function useStudyTimer(
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [active, startPolling, startHeartbeat, stopTimers]);
+  }, [active, startPolling, startHeartbeat, stopActiveTimers]);
 
   // End session on beforeunload
   useEffect(() => {
