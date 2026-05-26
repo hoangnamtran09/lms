@@ -41,8 +41,8 @@ export function LoginForm() {
       <div className="relative z-10">
         <Card className="w-full max-w-[580px] rounded-2xl ring-1 ring-foreground/10 shadow-2xl backdrop-blur-sm bg-white/70 dark:bg-black/50 animate-slide-up">
         <CardHeader className="text-center pt-6">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg">
-            <GraduationCap className="w-6 h-6" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg overflow-hidden">
+            <img src="/logo-Photoroom.png" alt="LMS" className="h-full w-full object-cover" />
           </div>
           <CardTitle className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
             Đăng nhập LMS

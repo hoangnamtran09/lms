@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, GraduationCap, Clock, LogOut, User } from "lucide-react";
+import { Menu, Clock, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -89,7 +89,7 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
           <MobileSidebar />
         </div>
         <Link href="/" className="flex items-center gap-2 lg:hidden">
-          <GraduationCap className="size-5 text-gray-900" />
+          <img src="/logo-Photoroom.png" alt="LMS" className="h-8 w-8 rounded-md object-cover" />
           <span className="text-lg font-bold text-gray-900">LMS</span>
         </Link>
       </div>

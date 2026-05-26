@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   LayoutDashboard,
-  GraduationCap,
   Users,
   ClipboardList,
   BookOpen,
@@ -75,7 +74,7 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <nav className={cn("flex flex-col gap-1 p-4", className)}>
       <div className="flex items-center gap-2 px-3 py-4">
-        <GraduationCap className="size-5 text-gray-900" />
+        <img src="/logo-Photoroom.png" alt="LMS" className="h-8 w-8 rounded-md object-cover" />
         <span className="text-lg font-bold text-gray-900">LMS</span>
       </div>
       {navItems.map((item) => {
