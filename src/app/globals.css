@@ -161,7 +161,7 @@
 
 /* Background for login page */
 .login-bg {
-  background-image: linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.32)), url('/Gemini_Generated_Image_c72dv9c72dv9c72d.png');
+  background-image: url('/backdroud.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
