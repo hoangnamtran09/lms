@@ -95,7 +95,34 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
+	contentType := resp.Header.Get("Content-Type")
+
+	// Non-streaming response (e.g., proxy doesn't support SSE)
+	if !strings.Contains(contentType, "text/event-stream") {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("read response: %w", err)
+		}
+		var result struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return fmt.Errorf("parse response: %w", err)
+		}
+		if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
+			onChunk(result.Choices[0].Message.Content)
+		}
+		onDone()
+		return nil
+	}
+
+	// SSE streaming response — parse chunked events
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024) // 1MB buffer for large lines
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
