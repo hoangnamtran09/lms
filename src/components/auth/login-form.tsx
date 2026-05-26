@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -31,18 +31,24 @@ export function LoginForm() {
     }
   };
 
+  useEffect(() => {
+    document.body.classList.add("login-bg");
+    return () => document.body.classList.remove("login-bg");
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-sm rounded-xl ring-1 ring-foreground/10">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <GraduationCap className="size-6 text-primary-foreground" />
+    <div className="relative min-h-screen flex items-center justify-center px-4">
+      <div className="relative z-10">
+        <Card className="w-full max-w-[580px] rounded-2xl ring-1 ring-foreground/10 shadow-2xl backdrop-blur-sm bg-white/70 dark:bg-black/50 animate-slide-up">
+        <CardHeader className="text-center pt-6">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-white shadow-lg">
+            <GraduationCap className="w-6 h-6" />
           </div>
-          <CardTitle className="text-xl font-bold text-gray-900">
+          <CardTitle className="text-xl font-extrabold text-gray-900 dark:text-gray-100">
             Đăng nhập LMS
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -72,7 +78,7 @@ export function LoginForm() {
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm flex-nowrap gap-4">
               <Link href="/register" className="font-medium text-primary hover:underline">
                 Đăng ký tài khoản
               </Link>
@@ -83,6 +89,7 @@ export function LoginForm() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
