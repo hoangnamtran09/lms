@@ -27,6 +27,7 @@ interface QuizData {
 
 interface Props {
   lessonId: string;
+  subjectId?: string;
   activeQuiz?: QuizData | null;
   onQuizAnswered?: (result: { isCorrect: boolean; question: string }) => void;
 }
@@ -39,7 +40,7 @@ function formatElapsed(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props) {
+export function LessonInfoPanel({ lessonId, subjectId, activeQuiz, onQuizAnswered }: Props) {
   const [ctx, setCtx] = useState<{ subjectName: string; lessonTitle: string; description: string; gradeLevel: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +100,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
     setSummaryLoading(true);
     api<LessonSummary>("/api/ai/lesson-summary", {
       method: "POST",
-      body: JSON.stringify({ lessonId, sessionId: sessionId ?? "" }),
+      body: JSON.stringify({ lessonId, subjectId, sessionId: sessionId ?? "" }),
     })
       .then((s) => {
         setCtx({ subjectName: s.subjectName, lessonTitle: s.lessonTitle, description: s.description, gradeLevel: s.gradeLevel });
@@ -111,7 +112,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
         setSummaryLoading(false);
         setLoading(false);
       });
-  }, [lessonId, sessionId]);
+  }, [lessonId, sessionId, subjectId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleQuizAnswered = (isCorrect: boolean) => {
@@ -302,6 +303,7 @@ export function LessonInfoPanel({ lessonId, activeQuiz, onQuizAnswered }: Props)
                 <InteractiveQuiz
                   quiz={activeQuiz}
                   lessonId={lessonId}
+                  subjectId={subjectId}
                   sessionId={sessionId}
                   onAnswered={(isCorrect) => handleQuizAnswered(isCorrect)}
                 />

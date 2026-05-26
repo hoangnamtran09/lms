@@ -38,6 +38,7 @@ func NewHandler(aiSvc *Service, lessonSvc *lessons.Service, weaknessSvc *weaknes
 type chatInput struct {
 	Message   string        `json:"message"`
 	LessonID  string        `json:"lessonId"`
+	SubjectID string        `json:"subjectId"`
 	SessionID string        `json:"sessionId"`
 	History   []ChatMessage `json:"history"`
 }
@@ -196,6 +197,7 @@ func (h *Handler) ExtractQuestions(w http.ResponseWriter, r *http.Request) {
 
 type validateQuizInput struct {
 	LessonID      string `json:"lessonId"`
+	SubjectID     string `json:"subjectId"`
 	SessionID     string `json:"sessionId"`
 	Question      string `json:"question"`
 	SelectedIndex int    `json:"selectedIndex"`
@@ -364,6 +366,7 @@ func (h *Handler) GradeExercise(w http.ResponseWriter, r *http.Request) {
 
 type completionQuizInput struct {
 	LessonID      string `json:"lessonId"`
+	SubjectID     string `json:"subjectId"`
 	SessionID     string `json:"sessionId"`
 	QuestionCount int    `json:"questionCount"`
 }
@@ -498,6 +501,7 @@ func (h *Handler) Coach(w http.ResponseWriter, r *http.Request) {
 
 type lessonSummaryInput struct {
 	LessonID  string `json:"lessonId"`
+	SubjectID string `json:"subjectId"`
 	SessionID string `json:"sessionId"`
 }
 

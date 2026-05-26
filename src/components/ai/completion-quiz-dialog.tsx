@@ -23,12 +23,14 @@ type Phase = "loading" | "quiz" | "summary";
 export function CompletionQuizDialog({
   open,
   lessonId,
+  subjectId,
   sessionId,
   onComplete,
   preloadedQuestions,
 }: {
   open: boolean;
   lessonId: string;
+  subjectId?: string;
   sessionId: string | null;
   onComplete: () => void;
   preloadedQuestions?: QuizQuestion[] | null;
@@ -118,6 +120,7 @@ export function CompletionQuizDialog({
               key={currentIndex}
               quiz={question}
               lessonId={lessonId}
+              subjectId={subjectId}
               sessionId={sessionId}
               onAnswered={(isCorrect) => handleAnswered(isCorrect)}
             />

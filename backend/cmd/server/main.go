@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/lms/backend/internal/config"
@@ -28,14 +29,20 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate all models
-	if err := migrate(db); err != nil {
-		log.Fatalf("Failed to migrate: %v", err)
-	}
+	// Auto-migrate and seed only when not explicitly skipped.
+	// Set SKIP_DB_MIGRATE=1 to avoid running migrations/seed (useful when pointing to prod DB).
+	if os.Getenv("SKIP_DB_MIGRATE") == "" {
+		// Auto-migrate all models
+		if err := migrate(db); err != nil {
+			log.Fatalf("Failed to migrate: %v", err)
+		}
 
-	// Seed initial data
-	if err := seed(db, cfg); err != nil {
-		log.Printf("Seed warning: %v", err)
+		// Seed initial data
+		if err := seed(db, cfg); err != nil {
+			log.Printf("Seed warning: %v", err)
+		}
+	} else {
+		log.Printf("SKIP_DB_MIGRATE set — skipping migrate and seed")
 	}
 
 	r := router.New(db, cfg)

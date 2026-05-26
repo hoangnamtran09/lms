@@ -138,7 +138,7 @@ export default function LessonViewerPage({
       setStreaming(true);
       apiStream(
         "/api/ai/chat",
-        { message: "Xin chào", lessonId: lessonId, sessionId: sessionId ?? "", history: [] },
+        { message: "Xin chào", lessonId: lessonId, subjectId, sessionId: sessionId ?? "", history: [] },
         (delta) => {
           setMessages((prev) => {
             const next = [...prev];
@@ -160,7 +160,7 @@ export default function LessonViewerPage({
         }
       );
     }
-  }, [chatUnlocked, streaming, lessonId, saveHistory, sessionId]);
+  }, [chatUnlocked, streaming, lessonId, saveHistory, sessionId, subjectId]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -221,13 +221,13 @@ export default function LessonViewerPage({
   useEffect(() => {
     api<{ questions: QuizQuestion[] }>("/api/ai/completion-quiz", {
       method: "POST",
-      body: JSON.stringify({ lessonId, sessionId: sessionId ?? "", questionCount: 5 }),
+      body: JSON.stringify({ lessonId, subjectId, sessionId: sessionId ?? "", questionCount: 5 }),
     })
       .then((data) => {
         if (data.questions?.length) setQuizQuestions(data.questions);
       })
       .catch(() => {});
-  }, [lessonId, sessionId]);
+  }, [lessonId, sessionId, subjectId]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -558,6 +558,7 @@ export default function LessonViewerPage({
       <CompletionQuizDialog
         open={showQuiz}
         lessonId={lessonId}
+        subjectId={subjectId}
         sessionId={sessionId}
         preloadedQuestions={quizQuestions}
         onComplete={async () => {

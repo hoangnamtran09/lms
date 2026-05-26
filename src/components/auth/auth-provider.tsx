@@ -14,6 +14,13 @@ interface User {
   avatarUrl?: string;
 }
 
+interface SupabaseSessionUser {
+  id: string;
+  email?: string | null;
+  app_metadata?: { role?: string };
+  user_metadata?: { fullName?: string };
+}
+
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -33,6 +40,16 @@ function setTokenCookie(token: string | null) {
   }
 }
 
+function buildFallbackUser(sessionUser: SupabaseSessionUser): User {
+  return {
+    id: sessionUser.id,
+    supabaseId: sessionUser.id,
+    fullName: sessionUser.user_metadata?.fullName || sessionUser.email || "Người dùng",
+    role: sessionUser.app_metadata?.role || "STUDENT",
+    email: sessionUser.email || undefined,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,14 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
 
   // Fetch local user profile from backend after Supabase session is established
-  const fetchLocalUser = useCallback(async (token?: string) => {
+  const fetchLocalUser = useCallback(async (sessionUser?: SupabaseSessionUser, token?: string) => {
     try {
       const u = await api<User>("/api/auth/me");
       setUser(u);
       if (token) setTokenCookie(token);
+      return u;
     } catch {
+      if (sessionUser) {
+        const fallbackUser = buildFallbackUser(sessionUser);
+        setUser(fallbackUser);
+        if (token) setTokenCookie(token);
+        return fallbackUser;
+      }
       setUser(null);
       setTokenCookie(null);
+      return null;
     }
   }, []);
 
@@ -55,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Restore session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        fetchLocalUser(session.access_token).finally(() => setLoading(false));
+        fetchLocalUser(session.user as SupabaseSessionUser, session.access_token).finally(() => setLoading(false));
       } else {
         setTokenCookie(null);
         setLoading(false);
@@ -65,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        fetchLocalUser(session.access_token);
+        fetchLocalUser(session.user as SupabaseSessionUser, session.access_token);
       } else {
         setUser(null);
         setTokenCookie(null);
@@ -78,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<User> => {
     setError(null);
     try {
-      const { error: signInError } = await withTimeout(
+      const { data, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
         30000,
         "Kết nối đến máy chủ xác thực bị timeout. Vui lòng thử lại."
@@ -87,8 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(signInError.message);
         throw signInError;
       }
-      const me = await api<User>("/api/auth/me");
-      setUser(me);
+      const me = await fetchLocalUser(data.user as SupabaseSessionUser | undefined, data.session?.access_token);
+      if (!me) {
+        throw new Error("Không thể tải thông tin người dùng");
+      }
       return me;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
