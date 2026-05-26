@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = "";
 
 export async function fetchList<T>(path: string): Promise<T[]> {
   const res = await api<T[] | { data: T[] }>(path);
