@@ -54,27 +54,9 @@ export default function LessonViewerPage({
   const { activeQuiz, setActiveQuiz, lastQuizResult, clearLastQuizResult } = useActiveQuiz();
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const savedCountRef = useRef(0);
   const [hasHistory, setHasHistory] = useState(false);
 
-  // Sync ref with state for saveHistory
-  const messagesRef = useRef<Message[]>([]);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  const saveHistory = useCallback(async () => {
-    const msgs = messagesRef.current;
-    const newMessages = msgs.slice(savedCountRef.current);
-    if (newMessages.length === 0) return;
-    try {
-      await api("/api/ai/chat-history", {
-        method: "POST",
-        body: JSON.stringify({ lessonId, messages: newMessages }),
-      });
-      savedCountRef.current = msgs.length;
-    } catch {}
-  }, [lessonId]);
+  // Chat history is now saved server-side in the AI handler
 
   // Load chat history on mount
   useEffect(() => {
@@ -87,7 +69,6 @@ export default function LessonViewerPage({
       if (msgs.length > 0) {
         setMessages(msgs);
         setHasHistory(true);
-        savedCountRef.current = msgs.length;
       }
     }).catch(() => {});
   }, [lessonId]);
@@ -156,7 +137,6 @@ export default function LessonViewerPage({
         () => {
           setStreaming(false);
           playAIResponseSound();
-          saveHistory();
         },
         (err) => {
           setChatError(err.message);
@@ -164,7 +144,7 @@ export default function LessonViewerPage({
         }
       );
     }
-  }, [chatUnlocked, streaming, lessonId, saveHistory, sessionId, subjectId]);
+  }, [chatUnlocked, streaming, lessonId, sessionId, subjectId, hasHistory]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -298,14 +278,13 @@ export default function LessonViewerPage({
       () => {
         setStreaming(false);
         playAIResponseSound();
-        saveHistory();
       },
       (err) => {
         setChatError(err.message);
         setStreaming(false);
       }
     );
-  }, [lessonId, saveHistory, sessionId]);
+  }, [lessonId, sessionId]);
 
   const send = () => {
     const text = input.trim();

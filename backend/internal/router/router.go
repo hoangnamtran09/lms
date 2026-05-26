@@ -29,7 +29,6 @@ import (
 	"github.com/lms/backend/internal/quizzes"
 	"github.com/lms/backend/internal/reports"
 	"github.com/lms/backend/internal/search"
-	"github.com/lms/backend/internal/studyplanner"
 	"github.com/lms/backend/internal/subjects"
 	"github.com/lms/backend/internal/teacher"
 	"github.com/lms/backend/internal/users"
@@ -59,7 +58,6 @@ type Handlers struct {
 	Notifications  *notifications.Handler
 	Flashcards     *flashcards.Handler
 	Search         *search.Handler
-	StudyPlanner   *studyplanner.Handler
 	Reports        *reports.Handler
 	Attendance     *attendance.Handler
 }
@@ -126,8 +124,6 @@ func New(
 	notificationsH := notifications.NewHandler(notificationsSvc)
 	flashcardsSvc := flashcards.NewService(db)
 		flashcardsH := flashcards.NewHandler(flashcardsSvc)
-		studyPlannerSvc := studyplanner.NewService(db)
-		studyPlannerH := studyplanner.NewHandler(studyPlannerSvc, aiSvc, db)
 		reportsSvc := reports.NewService(db, aiSvc)
 		reportsH := reports.NewHandler(reportsSvc, db)
 	searchH := search.NewHandler(db)
@@ -156,7 +152,6 @@ func New(
 		Notifications:  notificationsH,
 		Flashcards:     flashcardsH,
 		Search:         searchH,
-		StudyPlanner:   studyPlannerH,
 		Reports:        reportsH,
 		Attendance:     attendanceH,
 	}
@@ -286,9 +281,6 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			Post("/api/ai/quiz/generate", h.AI.GenerateQuiz)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
-			Post("/api/ai/roadmap", h.AI.Roadmap)
-		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
-			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
 			Post("/api/ai/remediation", h.AI.GenerateRemediation)
 
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
@@ -340,14 +332,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			r.Get("/api/flashcards/decks/{id}", h.Flashcards.GetDeck)
 			r.Post("/api/flashcards/review", h.Flashcards.ReviewCard)
 			r.Delete("/api/flashcards/decks/{id}", h.Flashcards.DeleteDeck)
-				// Study Planner
-				r.With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
-					Post("/api/study-planner/generate", h.StudyPlanner.Generate)
-				r.Get("/api/study-planner/today", h.StudyPlanner.GetToday)
-				r.Get("/api/study-planner/history", h.StudyPlanner.History)
-				r.Patch("/api/study-planner/{id}/task/{taskId}", h.StudyPlanner.CompleteTask)
-				r.Put("/api/study-planner/{id}/reorder", h.StudyPlanner.Reorder)
-				// Reports
+					// Reports
 				r.With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
 					Post("/api/reports/generate", h.Reports.Generate)
 				r.Get("/api/reports/list", h.Reports.List)

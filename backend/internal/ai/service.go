@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -62,12 +61,74 @@ type GradingResult struct {
 	Correct  bool   `json:"correct"`
 }
 
+// tryExtractContent attempts to extract text content from a parsed SSE/json chunk
+// by trying multiple common field paths across different AI provider formats.
+func tryExtractContent(data json.RawMessage) string {
+	// Fast path: typed OpenAI-compatible struct
+	var chunk chatChunk
+	if err := json.Unmarshal(data, &chunk); err == nil {
+		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+			return chunk.Choices[0].Delta.Content
+		}
+	}
+
+	// Flexible path: try known field paths
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return ""
+	}
+
+	// choices[0].delta.content (OpenAI standard)
+	if choices, _ := m["choices"].([]interface{}); len(choices) > 0 {
+		if c, _ := choices[0].(map[string]interface{}); c != nil {
+			if delta, _ := c["delta"].(map[string]interface{}); delta != nil {
+				if text, _ := delta["content"].(string); text != "" {
+					return text
+				}
+			}
+			if msg, _ := c["message"].(map[string]interface{}); msg != nil {
+				if text, _ := msg["content"].(string); text != "" {
+					return text
+				}
+			}
+			if text, _ := c["text"].(string); text != "" {
+				return text
+			}
+		}
+	}
+
+	// candidates[0].content.parts[0].text (Gemini native via proxy)
+	if cands, _ := m["candidates"].([]interface{}); len(cands) > 0 {
+		if ca, _ := cands[0].(map[string]interface{}); ca != nil {
+			if content, _ := ca["content"].(map[string]interface{}); content != nil {
+				if parts, _ := content["parts"].([]interface{}); len(parts) > 0 {
+					if p, _ := parts[0].(map[string]interface{}); p != nil {
+						if text, _ := p["text"].(string); text != "" {
+							return text
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Top-level text/content fields
+	if text, _ := m["text"].(string); text != "" {
+		return text
+	}
+	if text, _ := m["content"].(string); text != "" {
+		return text
+	}
+
+	return ""
+}
+
 // ChatStream sends a streaming chat request and calls onChunk for each text delta.
 func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), onDone func()) error {
 	reqBody := chatRequest{
 		Model:    s.model,
 		Messages: messages,
-		Stream:   true,
+		Stream:   false,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -95,60 +156,107 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
-	contentType := resp.Header.Get("Content-Type")
-
-	// Non-streaming response (e.g., proxy doesn't support SSE)
-	if !strings.Contains(contentType, "text/event-stream") {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("read response: %w", err)
-		}
-		var result struct {
-			Choices []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			} `json:"choices"`
-		}
-		if err := json.Unmarshal(body, &result); err != nil {
-			return fmt.Errorf("parse response: %w", err)
-		}
-		if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
-			onChunk(result.Choices[0].Message.Content)
-		}
+	// Read full body so we can try multiple parsing strategies
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	if len(raw) == 0 {
 		onDone()
 		return nil
 	}
 
-	// SSE streaming response — parse chunked events
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024) // 1MB buffer for large lines
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			onDone()
-			return nil
-		}
+	contentType := resp.Header.Get("Content-Type")
+	isSSE := strings.Contains(contentType, "text/event-stream")
 
-		var chunk chatChunk
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue
+	// Strategy 1: Try SSE line-by-line parsing (with flexible "data:" prefix)
+	if isSSE {
+		hadContent := false
+		for _, line := range strings.Split(string(raw), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Accept "data:" with or without the trailing space
+			if !strings.HasPrefix(line, "data:") {
+				continue
+			}
+			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			if payload == "[DONE]" {
+				onDone()
+				return nil
+			}
+			content := tryExtractContent(json.RawMessage(payload))
+			if content != "" {
+				hadContent = true
+				onChunk(content)
+			}
+			// Also check finish_reason via map for early stop
+			var m map[string]interface{}
+			if json.Unmarshal([]byte(payload), &m) == nil {
+				if choices, _ := m["choices"].([]interface{}); len(choices) > 0 {
+					if c, _ := choices[0].(map[string]interface{}); c != nil {
+						if fr, _ := c["finish_reason"].(string); fr == "stop" {
+							onDone()
+							return nil
+						}
+					}
+				}
+			}
 		}
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			onChunk(chunk.Choices[0].Delta.Content)
-		}
-		if len(chunk.Choices) > 0 && chunk.Choices[0].FinishReason == "stop" {
+		// If we had SSE lines with content, we're done
+		if hadContent {
 			onDone()
 			return nil
+		}
+		// SSE lines existed but no content extracted — fall through to JSON parse
+	}
+
+	// Strategy 2: Try JSON non-streaming parse (works regardless of Content-Type)
+	content := tryExtractContent(json.RawMessage(raw))
+	if content != "" {
+		onChunk(content)
+		onDone()
+		return nil
+	}
+
+	// Strategy 3: Deep fallback — unwrap nested "candidates" or "choices" wrapper
+	var wrapper map[string]interface{}
+	if json.Unmarshal(raw, &wrapper) == nil {
+		for _, key := range []string{"candidates", "choices", "data", "messages", "results"} {
+			if arr, _ := wrapper[key].([]interface{}); len(arr) > 0 {
+				if first, _ := arr[0].(map[string]interface{}); first != nil {
+					// Try known text paths inside the first item
+					for _, field := range []string{"text", "content"} {
+						if direct, _ := first[field].(string); direct != "" {
+							onChunk(direct)
+							onDone()
+							return nil
+						}
+					}
+					if nested, _ := first["content"].(map[string]interface{}); nested != nil {
+						if parts, _ := nested["parts"].([]interface{}); len(parts) > 0 {
+							if p, _ := parts[0].(map[string]interface{}); p != nil {
+								if text, _ := p["text"].(string); text != "" {
+									onChunk(text)
+									onDone()
+									return nil
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
+	// Nothing worked — return the raw body as an error for debugging
+	snippet := string(raw)
+	if len(snippet) > 500 {
+		snippet = snippet[:500]
+	}
 	onDone()
-	return scanner.Err()
+	return fmt.Errorf("could not extract content from AI response: %s", snippet)
 }
 
 // Chat sends a non-streaming chat request and returns the full response.

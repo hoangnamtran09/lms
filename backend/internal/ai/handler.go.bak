@@ -3,7 +3,6 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -150,19 +149,7 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-			// Save chat history: user message + AI response (server-side)
-			if claims != nil && req.LessonID != "" {
-				now := time.Now()
-				records := []ChatMessageRecord{
-					{UserID: claims.UserID, LessonID: req.LessonID, Role: "user", Content: req.Message, CreatedAt: now},
-					{UserID: claims.UserID, LessonID: req.LessonID, Role: "assistant", Content: fullResponse.String(), CreatedAt: now},
-				}
-				if err := h.db.WithContext(r.Context()).Create(&records).Error; err != nil {
-					log.Printf("Failed to save chat history: %v", err)
-				}
-			}
-
-			fmt.Fprintf(w, "data: [DONE]\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	})
 
@@ -781,6 +768,76 @@ func (h *Handler) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOk(w, quiz)
+}
+
+// ---- Existing: Roadmap ----
+
+type roadmapRequest struct {
+	SubjectID string `json:"subjectId"`
+}
+
+func (h *Handler) Roadmap(w http.ResponseWriter, r *http.Request) {
+	var req roadmapRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		fmt.Printf("DEBUG: roadmap decode error: %v\n", err)
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
+		fmt.Printf("DEBUG: roadmap claims nil\n")
+		jsonErr(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	fmt.Printf("DEBUG: roadmap for user %s\n", claims.UserID)
+	profiles, err := h.weaknessService.ListByUser(r.Context(), claims.UserID)
+	if err != nil {
+		fmt.Printf("DEBUG: ListByUser error: %v\n", err)
+	}
+	fmt.Printf("DEBUG: found %d weakness profiles\n", len(profiles))
+	
+	weaknessText := ""
+	for _, p := range profiles {
+		weaknessText += fmt.Sprintf("- %s (sai %d lần)\n", p.Topic, p.ErrorCount)
+	}
+
+	prompt := fmt.Sprintf(`Dựa trên các điểm yếu sau đây của học sinh, hãy tạo một lộ trình học tập cá nhân hoá:
+
+%s
+
+Tạo lộ trình gồm 3-5 bước. Với mỗi bước:
+- Tiêu đề bước
+- Mô tả ngắn gọn cần làm gì
+- Thời gian ước tính
+
+Trả về JSON: [{"step": 1, "title": "...", "description": "...", "estimatedMinutes": 30}]`, weaknessText)
+
+	fmt.Printf("DEBUG: calling AI service\n")
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là cố vấn học tập. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		fmt.Printf("DEBUG: AI Chat error: %v\n", err)
+		jsonErr(w, "Roadmap generation failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("DEBUG: AI response length: %d\n", len(response))
+	var roadmap []map[string]interface{}
+	extracted := extractJSON(response)
+	fmt.Printf("DEBUG: extracted JSON length: %d\n", len(extracted))
+	if err := json.Unmarshal([]byte(extracted), &roadmap); err != nil {
+		// Log the problematic response for debugging
+		fmt.Printf("DEBUG roadmap parse error: %v\nExtracted: %q\nRaw response: %q\n", err, extracted, response)
+		jsonErr(w, "Failed to parse roadmap: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("DEBUG: roadmap parsed successfully, %d steps\n", len(roadmap))
+	jsonOk(w, roadmap)
 }
 
 // ---- Existing: Generate Remediation ----
@@ -1419,13 +1476,7 @@ func sanitizeJSONString(s string) string {
 	for _, r := range s {
 		if escaped {
 			escaped = false
-			switch r {
-			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u':
-				b.WriteRune(r)
-			default:
-				b.WriteString("\\\\")
-				b.WriteRune(r)
-			}
+			b.WriteRune(r)
 			continue
 		}
 		if r == '\\' && inString {

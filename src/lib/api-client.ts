@@ -134,33 +134,44 @@ export async function apiStream(
 
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
+    let buffer = "";
+
+    const processLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) return;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") {
+        onDone();
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.delta) {
+          onChunk(parsed.delta);
+        } else if (parsed.error) {
+          onError(new Error(parsed.error));
+        }
+      } catch {
+        // ignore unparseable lines
+      }
+    };
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        if (buffer.trim()) {
+          processLine(buffer.trim());
+        }
         onDone();
         break;
       }
       const text = decoder.decode(value, { stream: true });
-      const lines = text.split("\n");
+      buffer += text;
+      const lines = buffer.split("\n");
+      // The last element may be a partial line; keep it in buffer
+      buffer = lines.pop() ?? "";
       for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6);
-        if (data === "[DONE]") {
-          onDone();
-          return;
-        }
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.delta) {
-            onChunk(parsed.delta);
-          } else if (parsed.error) {
-            onError(new Error(parsed.error));
-            return;
-          }
-        } catch {
-          // ignore unparseable lines
-        }
+        processLine(line);
       }
     }
   } catch (err) {
