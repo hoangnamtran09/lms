@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send, Loader2, MessageCircle, GripVertical, Lock } from "lucide-react";
@@ -9,7 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ChatMessage } from "@/components/ai/chat-message";
-import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { useStudyTimer, MIN_TOTAL_TIME, MIN_PAGES, MIN_PAGE_TIME } from "@/hooks/use-study-timer";
@@ -19,7 +19,8 @@ import { playAIResponseSound, playCorrectAnswerSound } from "@/lib/notification-
 import { CompletionQuizDialog } from "@/components/ai/completion-quiz-dialog";
 import type { QuizQuestion } from "@/components/ai/completion-quiz-dialog";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+const PdfDocument = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
+const PdfPage = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
 
 interface Lesson {
   id: string;
@@ -83,10 +84,23 @@ export default function LessonViewerPage({
   // PDF state
   const [numPages, setNumPages] = useState(0);
   const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([1]));
+  const [pdfWorkerReady, setPdfWorkerReady] = useState(false);
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
   const proxyUrl = lesson?.mediaUrl
     ? `${API_BASE}/api/media/pdf?url=${encodeURIComponent(lesson.mediaUrl)}`
     : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    import("react-pdf").then(({ pdfjs }) => {
+      if (cancelled) return;
+      pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+      setPdfWorkerReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Study timer
   const {
@@ -389,7 +403,8 @@ export default function LessonViewerPage({
               ref={scrollRef}
               className="flex-1 overflow-y-auto flex justify-center pt-12 pb-4"
             >
-              <Document
+              {pdfWorkerReady ? (
+              <PdfDocument
                 file={proxyUrl}
                 onLoadSuccess={({ numPages: np }) => setNumPages(np)}
                 loading={
@@ -407,13 +422,21 @@ export default function LessonViewerPage({
                 }
               >
                 {Array.from({ length: numPages }, (_, i) => (
-                  <Page
+                  <PdfPage
                     key={i + 1}
                     pageNumber={i + 1}
                     width={pdfWidth > 0 ? pdfWidth - 32 : undefined}
                   />
                 ))}
-              </Document>
+              </PdfDocument>
+              ) : (
+                <div className="flex items-center justify-center pt-12">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 w-32 rounded bg-gray-200 mx-auto" />
+                    <div className="h-[60vh] w-[45vh] rounded bg-gray-100" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

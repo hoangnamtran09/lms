@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { api } from "@/lib/api-client";
+import { API_BASE } from "@/lib/api-client";
 
 interface User {
   id: string;
@@ -59,7 +59,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch local user profile from backend after Supabase session is established
   const fetchLocalUser = useCallback(async (sessionUser?: SupabaseSessionUser, token?: string) => {
     try {
-      const u = await api<User>("/api/auth/me");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        headers,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const u = (await res.json()) as User;
       setUser(u);
       if (token) setTokenCookie(token);
       return u;

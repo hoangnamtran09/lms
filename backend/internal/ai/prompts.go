@@ -535,7 +535,7 @@ const weeklyReportPrompt = `Bạn là chuyên gia phân tích học tập tại 
   "overallAssessment": "positive" | "neutral" | "needsImprovement",
   "highlights": ["Danh sách 2-3 điểm nổi bật trong tuần"],
   "weaknessAnalysis": "Phân tích 1-2 câu về điểm yếu và xu hướng cải thiện",
-  "trendComparison": "So sánh với tuần trước: tăng/giảm bao nhiêu % thời gian học, điểm số, kim cương",
+  "trendComparison": "So sánh với tuần trước: tăng/giảm bao nhiêu %% thời gian học, điểm số, kim cương",
   "recommendations": ["2-3 đề xuất cụ thể cho tuần tới"],
   "coachMessage": "Lời nhắn tích cực, động viên, xưng 'mình' gọi 'bạn', 2-3 đoạn ngắn. Dùng **bold** cho số liệu quan trọng."
 }`

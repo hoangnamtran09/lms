@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE = "";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export async function fetchList<T>(path: string): Promise<T[]> {
   const res = await api<T[] | { data: T[] }>(path);
