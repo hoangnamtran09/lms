@@ -30,8 +30,15 @@ interface Lesson {
 }
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
+}
+
+function createMessageId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`;
 }
 
 export default function LessonViewerPage({
@@ -65,7 +72,7 @@ export default function LessonViewerPage({
     ).then((data) => {
       const msgs: Message[] = data.messages
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+        .map((m) => ({ id: createMessageId(), role: m.role as "user" | "assistant", content: m.content }));
       if (msgs.length > 0) {
         setMessages(msgs);
         setHasHistory(true);
@@ -119,7 +126,8 @@ export default function LessonViewerPage({
     if (chatUnlocked && !greetingSentRef.current && !streaming && !hasHistory) {
       greetingSentRef.current = true;
       // Gửi tin nhắn trống để AI chủ động chào và dẫn dắt
-      setMessages([{ role: "assistant", content: "" }]);
+      const greetingMessageId = createMessageId();
+      setMessages([{ id: greetingMessageId, role: "assistant", content: "" }]);
       setStreaming(true);
       apiStream(
         "/api/ai/chat",
@@ -127,9 +135,14 @@ export default function LessonViewerPage({
         (delta) => {
           setMessages((prev) => {
             const next = [...prev];
-            const idx = next.length - 1;
-            if (idx >= 0 && next[idx].role === "assistant") {
+            const idx = next.findIndex((message) => message.id === greetingMessageId);
+            if (idx >= 0) {
               next[idx] = { ...next[idx], content: next[idx].content + delta };
+            } else {
+              const lastIndex = next.length - 1;
+              if (lastIndex >= 0 && next[lastIndex].role === "assistant") {
+                next[lastIndex] = { ...next[lastIndex], content: next[lastIndex].content + delta };
+              }
             }
             return next;
           });
@@ -255,11 +268,10 @@ export default function LessonViewerPage({
 
   const sendMessage = useCallback((text: string) => {
     setChatError(null);
-    let prevMessages: Message[] = [];
-    setMessages((prev) => {
-      prevMessages = prev.filter((m) => m.content !== "");
-      return [...prev, { role: "user", content: text }, { role: "assistant", content: "" }];
-    });
+    const userMessageId = createMessageId();
+    const assistantMessageId = createMessageId();
+    const prevMessages = messages.filter((m) => m.content !== "").map(({ role, content }) => ({ role, content }));
+    setMessages((prev) => [...prev, { id: userMessageId, role: "user", content: text }, { id: assistantMessageId, role: "assistant", content: "" }]);
     setStreaming(true);
 
     apiStream(
@@ -268,9 +280,14 @@ export default function LessonViewerPage({
       (delta) => {
         setMessages((prev) => {
           const next = [...prev];
-          const idx = next.length - 1;
-          if (idx >= 0 && next[idx].role === "assistant") {
+          const idx = next.findIndex((message) => message.id === assistantMessageId);
+          if (idx >= 0) {
             next[idx] = { ...next[idx], content: next[idx].content + delta };
+          } else {
+            const lastIndex = next.length - 1;
+            if (lastIndex >= 0 && next[lastIndex].role === "assistant") {
+              next[lastIndex] = { ...next[lastIndex], content: next[lastIndex].content + delta };
+            }
           }
           return next;
         });
@@ -284,7 +301,7 @@ export default function LessonViewerPage({
         setStreaming(false);
       }
     );
-  }, [lessonId, sessionId]);
+  }, [lessonId, messages, sessionId]);
 
   const send = () => {
     const text = input.trim();
@@ -435,7 +452,7 @@ export default function LessonViewerPage({
                 const isLast = i === messages.length - 1;
                 const isStreamingThis = isLast && streaming;
                 return (
-                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div key={msg.id} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && (
                     <div className={`shrink-0 mt-1 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${isStreamingThis ? "animate-pulse" : ""}`}>
                       AI
@@ -468,7 +485,7 @@ export default function LessonViewerPage({
                 </div>
                 );
               })}
-              {chatError && <div className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600">{chatError}</div>}
+              {chatError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{chatError}</div>}
               <div ref={messagesEndRef} />
             </div>
 

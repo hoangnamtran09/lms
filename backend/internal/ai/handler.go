@@ -167,7 +167,8 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"%s\"}\n\n", err.Error())
+		errData, _ := json.Marshal(map[string]string{"error": err.Error()})
+		fmt.Fprintf(w, "data: %s\n\n", errData)
 		flusher.Flush()
 	}
 }

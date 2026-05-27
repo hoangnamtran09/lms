@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -64,62 +65,30 @@ type GradingResult struct {
 // tryExtractContent attempts to extract text content from a parsed SSE/json chunk
 // by trying multiple common field paths across different AI provider formats.
 func tryExtractContent(data json.RawMessage) string {
-	// Fast path: typed OpenAI-compatible struct
-	var chunk chatChunk
-	if err := json.Unmarshal(data, &chunk); err == nil {
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			return chunk.Choices[0].Delta.Content
-		}
-	}
-
-	// Flexible path: try known field paths
-	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
+	var payload interface{}
+	if err := json.Unmarshal(data, &payload); err != nil {
 		return ""
 	}
+	return extractTextValue(payload)
+}
 
-	// choices[0].delta.content (OpenAI standard)
-	if choices, _ := m["choices"].([]interface{}); len(choices) > 0 {
-		if c, _ := choices[0].(map[string]interface{}); c != nil {
-			if delta, _ := c["delta"].(map[string]interface{}); delta != nil {
-				if text, _ := delta["content"].(string); text != "" {
-					return text
-				}
+func extractTextValue(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case []interface{}:
+		for _, item := range v {
+			if text := extractTextValue(item); text != "" {
+				return text
 			}
-			if msg, _ := c["message"].(map[string]interface{}); msg != nil {
-				if text, _ := msg["content"].(string); text != "" {
-					return text
-				}
-			}
-			if text, _ := c["text"].(string); text != "" {
+		}
+	case map[string]interface{}:
+		for _, key := range []string{"content", "text", "output_text", "generated_text", "response", "parts", "message", "delta", "candidates", "choices", "data", "messages", "results"} {
+			if text := extractTextValue(v[key]); text != "" {
 				return text
 			}
 		}
 	}
-
-	// candidates[0].content.parts[0].text (Gemini native via proxy)
-	if cands, _ := m["candidates"].([]interface{}); len(cands) > 0 {
-		if ca, _ := cands[0].(map[string]interface{}); ca != nil {
-			if content, _ := ca["content"].(map[string]interface{}); content != nil {
-				if parts, _ := content["parts"].([]interface{}); len(parts) > 0 {
-					if p, _ := parts[0].(map[string]interface{}); p != nil {
-						if text, _ := p["text"].(string); text != "" {
-							return text
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Top-level text/content fields
-	if text, _ := m["text"].(string); text != "" {
-		return text
-	}
-	if text, _ := m["content"].(string); text != "" {
-		return text
-	}
-
 	return ""
 }
 
@@ -145,6 +114,8 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 		req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	}
 
+	log.Printf("[ChatStream] Calling %s model=%s messages=%d", s.apiURL, s.model, len(messages))
+
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("api call: %w", err)
@@ -153,6 +124,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[ChatStream] API error %d: %s", resp.StatusCode, string(errBody))
 		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
@@ -161,12 +133,14 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
-	if len(raw) == 0 {
-		onDone()
-		return nil
-	}
 
 	contentType := resp.Header.Get("Content-Type")
+	log.Printf("[ChatStream] Response: status=%d content-type=%s bodyLen=%d", resp.StatusCode, contentType, len(raw))
+
+	if len(raw) == 0 {
+		return fmt.Errorf("AI provider returned empty response body (status=%d, content-type=%s)", resp.StatusCode, contentType)
+	}
+
 	isSSE := strings.Contains(contentType, "text/event-stream")
 
 	// Strategy 1: Try SSE line-by-line parsing (with flexible "data:" prefix)
@@ -215,6 +189,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 	// Strategy 2: Try JSON non-streaming parse (works regardless of Content-Type)
 	content := tryExtractContent(json.RawMessage(raw))
 	if content != "" {
+		log.Printf("[ChatStream] Extracted %d chars via JSON parse", len(content))
 		onChunk(content)
 		onDone()
 		return nil
@@ -250,12 +225,12 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 		}
 	}
 
-	// Nothing worked — return the raw body as an error for debugging
+	// Nothing worked — log and return the raw body as an error for debugging
 	snippet := string(raw)
 	if len(snippet) > 500 {
 		snippet = snippet[:500]
 	}
-	onDone()
+	log.Printf("[ChatStream] Failed to extract content from response. Snippet: %s", snippet)
 	return fmt.Errorf("could not extract content from AI response: %s", snippet)
 }
 
@@ -292,18 +267,13 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return "", err
 	}
-	if len(result.Choices) > 0 {
-		return result.Choices[0].Message.Content, nil
+	content := tryExtractContent(json.RawMessage(raw))
+	if content != "" {
+		return content, nil
 	}
 	return "", fmt.Errorf("empty response")
 }

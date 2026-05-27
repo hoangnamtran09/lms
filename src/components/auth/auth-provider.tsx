@@ -105,18 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
-        30000,
+        15000,
         "Kết nối đến máy chủ xác thực bị timeout. Vui lòng thử lại."
       );
       if (signInError) {
         setError(signInError.message);
         throw signInError;
       }
-      const me = await fetchLocalUser(data.user as SupabaseSessionUser | undefined, data.session?.access_token);
-      if (!me) {
-        throw new Error("Không thể tải thông tin người dùng");
-      }
-      return me;
+      const sessionUser = data.user as SupabaseSessionUser;
+      const token = data.session?.access_token;
+      // Dùng fallback user ngay lập tức để login nhanh, không chờ backend
+      const fallbackUser = buildFallbackUser(sessionUser);
+      setUser(fallbackUser);
+      if (token) setTokenCookie(token);
+      // Fetch full profile từ backend bất đồng bộ
+      fetchLocalUser(sessionUser, token);
+      return fallbackUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
       setError(message);
