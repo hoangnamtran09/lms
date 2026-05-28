@@ -22,7 +22,13 @@ export function LoginForm() {
     try {
       const user = await login(email, password);
       const adminRoles = ["SUPER_ADMIN", "ADMIN"];
-      router.push(adminRoles.includes(user.role) ? "/admin" : "/");
+      if (adminRoles.includes(user.role)) {
+        router.push("/admin");
+      } else if (user.role === "TEACHER") {
+        router.push("/teacher");
+      } else {
+        router.push("/");
+      }
     } catch {
       // error is set by AuthProvider
     } finally {

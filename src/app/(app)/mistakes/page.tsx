@@ -62,7 +62,7 @@ export default function MistakesPage() {
           uniqueLessonIds.map((lid) =>
             api<LessonContext>(`/api/lessons/${lid}/context`)
               .then((ctx) => { map[lid] = ctx; })
-              .catch(() => { map[lid] = { subjectName: "Không rõ", lessonTitle: lid, description: "", gradeLevel: 0 }; })
+              .catch(() => { map[lid] = { subjectName: "Không rõ", lessonTitle: `#${lid.slice(0, 8)}`, description: "", gradeLevel: 0 }; })
           )
         );
         setLessonContext(map);
@@ -189,7 +189,7 @@ export default function MistakesPage() {
                   <div className="border-t">
                     {[...lessons.entries()].map(([lessonId, items]) => {
                       const ctx = lessonContext[lessonId];
-                      const lessonTitle = ctx?.lessonTitle || lessonId;
+                      const lessonTitle = ctx?.lessonTitle || `#${lessonId.slice(0, 8)}`;
 
                       return (
                         <div key={lessonId}>

@@ -58,8 +58,8 @@ function parseAIMessage(msg: AIMessage | string | null): AIMessage | null {
 
 function formatDateRange(start: string, end: string) {
   const fmt = (d: string) => {
-    const [y, m, day] = d.split("-");
-    const date = new Date(+y, +m - 1, +day);
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
     return date.toLocaleDateString("vi-VN", { day: "numeric", month: "long", year: "numeric" });
   };
   return `${fmt(start)} — ${fmt(end)}`;
@@ -72,9 +72,13 @@ function formatMinutes(m: number) {
   return `${min}ph`;
 }
 
+function renderBold(text: string) {
+  return { __html: text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") };
+}
+
 function dayLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-");
-  const date = new Date(+y, +m - 1, +d);
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
   return date.toLocaleDateString("vi-VN", { weekday: "short" });
 }
 
@@ -249,7 +253,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                   {data.topWeaknesses.slice(0, 3).map((w, i) => (
                     <div key={i}>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm text-gray-700 truncate">{w.topic}</span>
+                        <span className="text-sm text-gray-700 truncate">{/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(w.topic) ? "Chủ đề chưa xác định" : w.topic}</span>
                         <span className={`text-xs flex items-center gap-0.5 ${
                           w.trend === "improving" ? "text-green-600"
                             : w.trend === "needsAttention" ? "text-red-600"
@@ -288,7 +292,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
             {ai.highlights.map((h, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-indigo-900">
                 <span className="text-indigo-400 mt-0.5">•</span>
-                {h}
+                <span dangerouslySetInnerHTML={renderBold(h)} />
               </li>
             ))}
           </ul>
@@ -298,14 +302,14 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
       {ai?.trendComparison && (
         <div className="bg-white rounded-xl border p-5 mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">📈 So sánh với tuần trước</h3>
-          <p className="text-sm text-gray-600">{ai.trendComparison}</p>
+          <p className="text-sm text-gray-600" dangerouslySetInnerHTML={renderBold(ai.trendComparison)} />
         </div>
       )}
 
       {ai?.weaknessAnalysis && (
         <div className="bg-white rounded-xl border p-5 mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">🔍 Phân tích điểm yếu</h3>
-          <p className="text-sm text-gray-600">{ai.weaknessAnalysis}</p>
+          <p className="text-sm text-gray-600" dangerouslySetInnerHTML={renderBold(ai.weaknessAnalysis)} />
         </div>
       )}
 
@@ -316,7 +320,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
             {ai.recommendations.map((r, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-emerald-900">
                 <span className="text-emerald-500 font-bold mt-0.5">{i + 1}.</span>
-                {r}
+                <span dangerouslySetInnerHTML={renderBold(r)} />
               </li>
             ))}
           </ul>
@@ -329,9 +333,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
             <span className="text-xl">🤖</span>
             <span className="font-semibold text-purple-800">AI Coach nhận xét</span>
           </div>
-          <div className="text-sm text-purple-900 leading-relaxed whitespace-pre-line">
-            {ai.coachMessage.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}
-          </div>
+          <div
+            className="text-sm text-purple-900 leading-relaxed whitespace-pre-line"
+            dangerouslySetInnerHTML={renderBold(ai.coachMessage)}
+          />
         </div>
       )}
     </div>

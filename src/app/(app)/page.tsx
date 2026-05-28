@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   Clock, Trophy, Gem, Flame, BookOpen, TrendingUp, Target,
   Star, ArrowUpRight, Medal, Activity, Sparkles,
@@ -13,7 +12,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import TeacherDashboardPage from "./teacher/page";
 import ParentDashboardPage from "./parent/page";
 
 interface UserStats {
@@ -484,13 +482,8 @@ function StudentDashboard() {
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  if (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN")) {
-    redirect("/admin");
-  }
-
-  if (user && user.role === "TEACHER") {
-    return <TeacherDashboardPage />;
-  }
+  // Proxy handles admin/teacher → /admin, /teacher. Parent → /parent.
+  // Only students and unauthenticated users land here.
   if (user?.role === "PARENT") {
     return <ParentDashboardPage />;
   }

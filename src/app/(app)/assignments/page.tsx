@@ -132,11 +132,7 @@ export default function AssignmentsPage() {
             return (
               <Link
                 key={a.id}
-                href={
-                  user?.role === "TEACHER" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN"
-                    ? `/admin/assignments/${a.id}`
-                    : `/assignments/${a.id}`
-                }
+                href={`/assignments/${a.id}`}
                 className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-start justify-between gap-4">

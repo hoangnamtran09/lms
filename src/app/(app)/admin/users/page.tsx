@@ -61,6 +61,8 @@ const roleOptions = [
 export default function AdminUsersPage() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [roleFilter, setRoleFilter] = useState("");
   const [open, setOpen] = useState(false);
@@ -81,11 +83,13 @@ export default function AdminUsersPage() {
   });
 
   const fetchUsers = () => {
+    setIsLoading(true);
+    setFetchError(null);
     const params = new URLSearchParams();
     if (roleFilter) params.set("role", roleFilter);
     api<UserRow[]>(`/api/users?${params}`)
-      .then(setUsers)
-      .catch(() => {});
+      .then((data) => { setUsers(data); setIsLoading(false); })
+      .catch((err) => { setFetchError(err instanceof ApiError ? err.message : "Không thể tải danh sách người dùng"); setIsLoading(false); });
   };
 
   useEffect(() => {
@@ -97,9 +101,8 @@ export default function AdminUsersPage() {
       setClasses(cls);
       setGradeLevels(gl);
     }).catch(() => {});
-  }, [roleFilter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loading = users.length === 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter]);
 
   const filteredClasses = classGradeFilter
     ? classes.filter((c) => c.gradeLevelId === classGradeFilter)
@@ -146,12 +149,28 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton delay={0} className="h-8 w-48" />
         <Skeleton delay={100} className="h-10 w-full rounded-lg" />
         <Skeleton delay={200} className="h-60 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý Người dùng</h1>
+        </div>
+        <Card className="rounded-xl ring-1 ring-foreground/10">
+          <CardContent className="py-12 text-center">
+            <p className="text-red-500 mb-4">{fetchError}</p>
+            <Button onClick={fetchUsers}>Thử lại</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

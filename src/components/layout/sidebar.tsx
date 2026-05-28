@@ -34,29 +34,37 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["TEACHER", "PARENT", "STUDENT"] },
-  { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["TEACHER", "STUDENT"] },
-  { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["TEACHER", "PARENT", "STUDENT"] },
-  { label: "Bảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["TEACHER", "STUDENT"] },
-  { label: "Lỗi sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
-    { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["PARENT", "STUDENT"] },
+  { label: "Môn học", href: "/courses", icon: BookOpen, roles: ["STUDENT"] },
+  { label: "Bài tập", href: "/assignments", icon: ClipboardList, roles: ["PARENT", "STUDENT"] },
+  { label: "ảng xếp hạng", href: "/leaderboard", icon: Trophy, roles: ["STUDENT"] },
+  { label: "Điểm sai", href: "/mistakes", icon: AlertCircle, roles: ["STUDENT"] },
+  { label: "Sơ đồ tư duy", href: "/mindmap", icon: Brain, roles: ["STUDENT"] },
   { label: "Flashcards", href: "/flashcards", icon: Layers, roles: ["STUDENT"] },
   { label: "Thành tựu", href: "/achievements", icon: Award, roles: ["STUDENT"] },
-  { label: "Báo cáo tuần", href: "/reports", icon: BarChart3, roles: ["STUDENT", "PARENT", "TEACHER"] },
-	{ label: "Giáo viên", href: "/teacher", icon: Presentation, roles: ["TEACHER"] },
-	{ label: "Điểm danh", href: "/teacher/attendance", icon: ClipboardCheck, roles: ["TEACHER"] },
-	  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
+  { label: "Báo cáo tuần", href: "/reports", icon: BarChart3, roles: ["STUDENT", "PARENT"] },
+  // Teacher
+  { label: "Tổng quan", href: "/teacher", icon: Presentation, roles: ["TEACHER"] },
+  { label: "Môn học", href: "/teacher/courses", icon: BookOpen, roles: ["TEACHER"] },
+  { label: "Bài tập", href: "/teacher/assignments", icon: ClipboardList, roles: ["TEACHER"] },
+  { label: "Bảng xếp hạng", href: "/teacher/leaderboard", icon: Trophy, roles: ["TEACHER"] },
+  { label: "Học sinh", href: "/teacher/students", icon: UserCog, roles: ["TEACHER"] },
+  { label: "Phụ huynh", href: "/teacher/parents", icon: Heart, roles: ["TEACHER"] },
+  { label: "Báo cáo", href: "/teacher/reports", icon: BarChart3, roles: ["TEACHER"] },
+  { label: "Điểm yếu", href: "/teacher/mistakes", icon: AlertCircle, roles: ["TEACHER"] },
+  { label: "Điểm danh", href: "/teacher/attendance", icon: ClipboardCheck, roles: ["TEACHER"] },
+  // Parent
+  { label: "Phụ huynh", href: "/parent", icon: Heart, roles: ["PARENT"] },
   { label: "Cài đặt", href: "/parent/settings", icon: Settings, roles: ["PARENT"] },
-  // Admin management
+  // Admin
   { label: "Tổng quan", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Quản lí học sinh", href: "/admin/students", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí giáo viên", href: "/admin/teachers", icon: ScreenShare, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí môn học", href: "/admin/courses", icon: Library, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí lớp học", href: "/admin/classes", icon: Users, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
-  { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"] },
+  { label: "Quản lí phụ huynh", href: "/admin/parents", icon: Heart, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { label: "Quản lí bài tập", href: "/admin/assignments", icon: ClipboardCheck, roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí thành tựu", href: "/admin/achievements", icon: Award, roles: ["SUPER_ADMIN", "ADMIN"] },
-
 ];
 
 export function Sidebar({ className }: { className?: string }) {

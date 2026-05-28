@@ -41,6 +41,13 @@ func main() {
 		if err := seed(db, cfg); err != nil {
 			log.Printf("Seed warning: %v", err)
 		}
+
+		// Seed demo data (opt-in via SEED_DEMO=true)
+		if os.Getenv("SEED_DEMO") == "true" {
+			if err := seedDemo(db, cfg); err != nil {
+				log.Printf("Demo seed warning: %v", err)
+			}
+		}
 	} else {
 		log.Printf("SKIP_DB_MIGRATE set — skipping migrate and seed")
 	}

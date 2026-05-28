@@ -74,7 +74,13 @@ func (h *Handler) EndSession(w http.ResponseWriter, r *http.Request) {
 
 	// Stuck detection: > 30 min on a lesson → record progress weakness
 	if session.DurationSeconds > 1800 && session.LessonID != "" && h.weaknessService != nil {
-		_ = h.weaknessService.RecordError(r.Context(), claims.UserID, session.LessonID, session.LessonID, "progress", 1)
+		topic := session.LessonID
+		var lessonTitle string
+		h.db.WithContext(r.Context()).Table("lessons").Where("id = ?", session.LessonID).Select("title").Scan(&lessonTitle)
+		if lessonTitle != "" {
+			topic = lessonTitle
+		}
+		_ = h.weaknessService.RecordError(r.Context(), claims.UserID, session.LessonID, topic, "progress", 1)
 	}
 
 	jsonOk(w, map[string]string{"status": "ended"})

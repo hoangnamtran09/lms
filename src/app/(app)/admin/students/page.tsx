@@ -37,7 +37,7 @@ interface GradeLevel {
   name: string;
 }
 
-export default function AdminStudentsPage() {
+export default function AdminStudentsPage({ basePath = "/admin" }: { basePath?: string }) {
   const { user: me } = useAuth();
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,7 +191,7 @@ export default function AdminStudentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
-            href="/admin"
+            href={basePath}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
           >
             <ArrowLeft className="size-4" /> Quay lại

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Users, ClipboardList, Clock } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -32,7 +31,6 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function TeacherDashboardPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,12 +41,6 @@ export default function TeacherDashboardPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  // Redirect if user is not teacher/admin
-  if (user && user.role !== "TEACHER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
-    router.replace("/");
-    return null;
-  }
 
   if (loading) {
     return (
@@ -163,7 +155,7 @@ export default function TeacherDashboardPage() {
                 ))}
               </div>
             )}
-            <Link href="/assignments" className="text-sm text-primary hover:underline mt-3 inline-block">
+            <Link href="/teacher/assignments" className="text-sm text-primary hover:underline mt-3 inline-block">
               Xem tất cả bài tập
             </Link>
           </CardContent>

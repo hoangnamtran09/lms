@@ -125,13 +125,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const sessionUser = data.user as SupabaseSessionUser;
       const token = data.session?.access_token;
-      // Dùng fallback user ngay lập tức để login nhanh, không chờ backend
+      // Dùng fallback user ngay lập tức để UI hiển thị nhanh
       const fallbackUser = buildFallbackUser(sessionUser);
       setUser(fallbackUser);
       if (token) setTokenCookie(token);
-      // Fetch full profile từ backend bất đồng bộ
-      fetchLocalUser(sessionUser, token);
-      return fallbackUser;
+      // Đợi backend trả về role chính xác trước khi redirect
+      const verifiedUser = await fetchLocalUser(sessionUser, token);
+      return verifiedUser || fallbackUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
       setError(message);

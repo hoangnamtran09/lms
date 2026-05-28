@@ -4,10 +4,24 @@ import { createServerClient } from "@supabase/ssr";
 
 const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
 const adminPaths = ["/admin"];
+const teacherPaths = ["/teacher"];
 const parentPaths = ["/parent"];
+
+/**
+ * Copy Supabase session cookies from the temp response (where they were set during
+ * getUser/getSession) onto the actual response we're sending to the browser.
+ */
+function copySupabaseCookies(from: NextResponse, to: NextResponse) {
+  for (const cookie of from.cookies.getAll()) {
+    to.cookies.set(cookie.name, cookie.value);
+  }
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Temp response collects cookies Supabase sets during session check/refresh
+  const cookieJar = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,8 +32,9 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
+          cookiesToSet.forEach(({ name, value, ...opts }) => {
             request.cookies.set(name, value);
+            cookieJar.cookies.set(name, value, opts);
           });
         },
       },
@@ -46,52 +61,75 @@ export async function proxy(request: NextRequest) {
   }
 
   const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
+  const isTeacher = role === "TEACHER";
+  const isParent = role === "PARENT";
 
-  if (publicPaths.some((p) => pathname.startsWith(p))) {
-    if (sessionExists && pathname.startsWith("/login")) {
-      return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", request.url));
+  /** Build a response that includes any Supabase cookies that were set during auth checks. */
+  const ok = (res?: NextResponse) => {
+    const r = res ?? NextResponse.next();
+    copySupabaseCookies(cookieJar, r);
+    if (accessToken) {
+      r.cookies.set("token", accessToken, {
+        path: "/",
+        maxAge: 86400,
+        sameSite: "lax",
+      });
     }
-    return NextResponse.next();
+    return r;
+  };
+
+  const redirect = (path: string) => {
+    const r = NextResponse.redirect(new URL(path, request.url));
+    copySupabaseCookies(cookieJar, r);
+    return r;
+  };
+
+  // Redirect authenticated users away from /login to their dashboard
+  if (sessionExists && pathname.startsWith("/login")) {
+    if (isAdmin) return redirect("/admin");
+    if (isTeacher) return redirect("/teacher");
+    if (isParent) return redirect("/parent");
+    return ok();
+  }
+
+  // Allow all public paths through (for unauthenticated users)
+  if (publicPaths.some((p) => pathname.startsWith(p))) {
+    return ok();
   }
 
   if (!sessionExists) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
-    const response = NextResponse.redirect(loginUrl);
+    const r = NextResponse.redirect(loginUrl);
     // Clear stale auth cookies
     const cookiesToClear = request.cookies.getAll().filter(c => c.name.startsWith("sb-"));
     for (const c of cookiesToClear) {
-      response.cookies.set(c.name, "", { path: "/", maxAge: 0 });
+      r.cookies.set(c.name, "", { path: "/", maxAge: 0 });
     }
-    return response;
+    return r;
   }
 
-  const isTeacher = role === "TEACHER";
-  const teacherAllowedPaths = ["/admin/assignments", "/admin/students", "/admin/parents"];
-  if (
-    adminPaths.some((p) => pathname.startsWith(p)) &&
-    !isAdmin &&
-    !(isTeacher && teacherAllowedPaths.some((p) => pathname.startsWith(p)))
-  ) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Redirect root path to role-specific dashboard
+  if (sessionExists && pathname === "/") {
+    if (isAdmin) return redirect("/admin");
+    if (isTeacher) return redirect("/teacher");
+    if (isParent) return redirect("/parent");
+    return ok();
   }
 
-  const isParent = role === "PARENT";
+  if (adminPaths.some((p) => pathname.startsWith(p)) && !isAdmin) {
+    return redirect(isTeacher ? "/teacher" : "/");
+  }
+
+  if (teacherPaths.some((p) => pathname.startsWith(p)) && !isTeacher && !isAdmin) {
+    return redirect("/");
+  }
+
   if (parentPaths.some((p) => pathname.startsWith(p)) && !isParent) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return redirect("/");
   }
 
-  const response = NextResponse.next();
-
-  if (accessToken) {
-    response.cookies.set("token", accessToken, {
-      path: "/",
-      maxAge: 86400,
-      sameSite: "lax",
-    });
-  }
-
-  return response;
+  return ok();
 }
 
 export const config = {

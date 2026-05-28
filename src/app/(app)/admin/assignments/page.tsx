@@ -95,7 +95,7 @@ interface WeaknessTopic {
 
 type CreationMode = "lesson" | "weakness" | "manual";
 
-export default function AdminAssignmentsPage() {
+export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath?: string }) {
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -142,6 +142,11 @@ export default function AdminAssignmentsPage() {
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState("");
+
+  const getClassName = (classId: string) => {
+    const c = classes.find((c) => c.id === classId);
+    return c ? c.name : classId;
+  };
 
   const fetchAssignments = () => {
     api<AssignmentRow[]>("/api/assignments")
@@ -440,7 +445,7 @@ export default function AdminAssignmentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
-            href="/admin"
+            href={basePath}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
           >
             <ArrowLeft className="size-4" /> Quay lại
@@ -1021,7 +1026,7 @@ export default function AdminAssignmentsPage() {
                     <TableCell className="font-medium text-gray-900">{a.title}</TableCell>
                     <TableCell>
                       {a.classId ? (
-                        <Badge variant="outline" className="text-xs">{a.classId}</Badge>
+                        <Badge variant="outline" className="text-xs">{getClassName(a.classId)}</Badge>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}
@@ -1040,7 +1045,7 @@ export default function AdminAssignmentsPage() {
                         <Button variant="outline" size="sm" onClick={() => handleEditClick(a)}>
                           <Pencil className="size-3" />
                         </Button>
-                        <Link href={`/admin/assignments/${a.id}`}>
+                        <Link href={`${basePath}/assignments/${a.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="size-3" />
                           </Button>

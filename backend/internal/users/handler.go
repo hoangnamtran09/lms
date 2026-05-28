@@ -118,6 +118,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
+
+	// If role is being changed, sync to Supabase app_metadata so proxy.ts sees the correct role
+	if role, ok := updates["role"].(string); ok && role != "" {
+		user, err := h.service.FindByID(r.Context(), id)
+		if err == nil && user.SupabaseID != "" {
+			h.updateSupabaseAppMeta(user.SupabaseID, role)
+		}
+	}
+
 	if err := h.service.Update(r.Context(), id, updates); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -177,6 +186,20 @@ func (h *Handler) createSupabaseUser(req createUserRequest) (string, error) {
 		return "", fmt.Errorf(result.Error)
 	}
 	return result.ID, nil
+}
+
+func (h *Handler) updateSupabaseAppMeta(supabaseID, role string) error {
+	if h.supabaseURL == "" || h.supabaseServiceRole == "" {
+		return fmt.Errorf("Supabase chưa được cấu hình")
+	}
+	body := map[string]interface{}{
+		"app_metadata": map[string]string{
+			"role": role,
+		},
+	}
+	bodyJSON, _ := json.Marshal(body)
+	_, err := h.supabaseRequest("PUT", "/auth/v1/admin/users/"+supabaseID, bodyJSON)
+	return err
 }
 
 func (h *Handler) deleteSupabaseUser(supabaseID string) error {

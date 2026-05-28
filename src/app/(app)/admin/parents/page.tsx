@@ -40,7 +40,7 @@ interface UserRow {
   fullName: string;
 }
 
-export default function AdminParentsPage() {
+export default function AdminParentsPage({ basePath = "/admin" }: { basePath?: string }) {
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [parents, setParents] = useState<UserRow[]>([]);
@@ -151,7 +151,7 @@ export default function AdminParentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
-            href="/admin"
+            href={basePath}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
           >
             <ArrowLeft className="size-4" />

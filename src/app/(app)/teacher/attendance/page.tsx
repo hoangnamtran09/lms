@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, X, Clock, AlertCircle, Save } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -43,7 +42,6 @@ function todayString(): string {
 }
 
 export default function TeacherAttendancePage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,11 +83,6 @@ export default function TeacherAttendancePage() {
     })();
   }, [date, user?.classId]);
   /* eslint-enable react-hooks/set-state-in-effect */
-
-  if (user && user.role !== "TEACHER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
-    router.replace("/");
-    return null;
-  }
 
   const presentCount = students.filter((s) => attendanceMap[s.id] === "PRESENT").length;
   const totalCount = students.length;

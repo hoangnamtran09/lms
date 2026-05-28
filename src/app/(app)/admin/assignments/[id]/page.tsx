@@ -185,8 +185,10 @@ function GradingDetails({ feedback }: { feedback: string }) {
 
 export default function AdminAssignmentDetailPage({
   params,
+  basePath = "/admin",
 }: {
   params: Promise<{ id: string }>;
+  basePath?: string;
 }) {
   const { id } = use(params);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
@@ -252,7 +254,7 @@ export default function AdminAssignmentDetailPage({
     return (
       <div className="text-center py-20 animate-fade-in">
         <p className="text-gray-500">{error || "Không tìm thấy bài tập"}</p>
-        <Link href="/admin/assignments" className="text-sm text-primary hover:underline mt-2 inline-block">
+        <Link href={`${basePath}/assignments`} className="text-sm text-primary hover:underline mt-2 inline-block">
           Quay lại danh sách bài tập
         </Link>
       </div>
@@ -263,7 +265,7 @@ export default function AdminAssignmentDetailPage({
     <div className="animate-fade-in max-w-6xl">
       {/* Back link */}
       <Link
-        href="/admin/assignments"
+        href={`${basePath}/assignments`}
         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-4"
       >
         <ArrowLeft className="size-4" /> Quay lại
