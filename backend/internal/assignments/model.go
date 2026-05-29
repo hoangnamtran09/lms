@@ -2,8 +2,9 @@ package assignments
 
 import "time"
 
-// Status workflow: ASSIGNED → SUBMITTED → GRADED → RETURNED → ACCEPTED
+// Status workflow: DRAFT → ASSIGNED → SUBMITTED → GRADED → RETURNED → ACCEPTED
 const (
+	StatusDraft     = "DRAFT"
 	StatusAssigned  = "ASSIGNED"
 	StatusSubmitted = "SUBMITTED"
 	StatusGraded    = "GRADED"
@@ -26,9 +27,11 @@ type Assignment struct {
 	DueDate          time.Time `json:"dueDate"`
 	AttachmentURL    string    `gorm:"size:1000" json:"attachmentUrl"`
 	Questions        string    `gorm:"type:text" json:"questions"`
-	Status           string    `gorm:"size:20;default:ASSIGNED" json:"status"`
+	MatrixMetadata   string    `gorm:"type:text" json:"matrixMetadata"`
+	Status           string    `gorm:"size:20" json:"status"`
 	Source           string    `gorm:"size:20;default:teacher" json:"source"`
 	AllowResubmit    bool      `gorm:"default:false" json:"allowResubmit"`
+	SubmissionCount  int64     `gorm:"-" json:"submissionCount"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }

@@ -666,10 +666,28 @@ func normalizeScores(questions []map[string]interface{}) {
 
 // ---- Generate Assignment from Lesson ----
 
+// TestMatrix represents the MOET standard test matrix (ma trận đề).
+type TestMatrix struct {
+	Topics         []string                         `json:"topics"`
+	Levels         []string                         `json:"levels"`
+	Cells          map[string]map[string]MatrixCell `json:"cells"`
+	TotalQuestions int                              `json:"totalQuestions"`
+	TotalScore     int                              `json:"totalScore"`
+	Purpose        string                           `json:"purpose"`
+	Format         string                           `json:"format"`
+}
+
+// MatrixCell represents a cell in the test matrix.
+type MatrixCell struct {
+	QuestionCount int     `json:"questionCount"`
+	Score         float64 `json:"score"`
+}
+
 type generateAssignmentInput struct {
-	LessonID      string `json:"lessonId"`
-	QuestionCount int    `json:"questionCount"`
-	QuestionType  string `json:"questionType"` // "mcq", "open_ended", or "mixed"
+	LessonID      string      `json:"lessonId"`
+	QuestionCount int         `json:"questionCount"`
+	QuestionType  string      `json:"questionType"` // "mcq", "open_ended", or "mixed"
+	Matrix        *TestMatrix `json:"matrix,omitempty"`
 }
 
 func (h *Handler) GenerateAssignment(w http.ResponseWriter, r *http.Request) {
@@ -708,7 +726,12 @@ func (h *Handler) GenerateAssignment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := h.aiService.GenerateAssignment(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, req.QuestionCount, typeLabel, ctx_.GradeLevel)
+	var response string
+	if req.Matrix != nil {
+		response, err = h.aiService.GenerateMatrixAssignment(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, req.QuestionCount, typeLabel, ctx_.GradeLevel, req.Matrix)
+	} else {
+		response, err = h.aiService.GenerateAssignment(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, req.QuestionCount, typeLabel, ctx_.GradeLevel)
+	}
 	if err != nil {
 		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
 		return

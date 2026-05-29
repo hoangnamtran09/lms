@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lms/backend/internal/ai"
@@ -95,7 +96,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	a.ID = uuid.New().String()
 	a.CreatorID = claims.UserID
 	a.CreatorName = claims.UserName
-	a.Status = StatusAssigned
+	if a.Status == "" {
+		a.Status = StatusDraft
+	}
+	if a.DueDate.IsZero() {
+		a.DueDate = time.Now().AddDate(0, 0, 7) // default: 7 days from now
+	}
 	if err := h.service.Create(r.Context(), &a); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -213,15 +219,27 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auto-grade MCQ questions
+	// Calculate total question weight to scale scores to assignment.MaxScore
+	totalWeight := 0.0
+	for _, q := range questions {
+		if s, ok := q["score"].(float64); ok {
+			totalWeight += s
+		}
+	}
+	scale := 1.0
+	if totalWeight > 0 && assignment.MaxScore > 0 {
+		scale = float64(assignment.MaxScore) / totalWeight
+	}
+
 	var results []QuestionResult
 	totalScore := 0
 	totalMaxScore := 0
 	for _, q := range questions {
 		qID, _ := q["id"].(string)
 		qText, _ := q["question"].(string)
-		qScore := 10
+		qWeight := 0.0
 		if s, ok := q["score"].(float64); ok {
-			qScore = int(s)
+			qWeight = s
 		}
 		qType, _ := q["type"].(string)
 		hasOptions := false
@@ -229,9 +247,10 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 			hasOptions = true
 		}
 
-		maxScore := qScore
-		if maxScore <= 0 {
-			maxScore = 10
+		// Scale the question weight to the assignment's maxScore
+		maxScore := int(qWeight * scale)
+		if maxScore <= 0 && qWeight > 0 {
+			maxScore = 1 // at least 1 point if question has weight
 		}
 		totalMaxScore += maxScore
 
@@ -253,12 +272,14 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 			expectedAns = strings.TrimSpace(ea)
 		}
 
-		correct := strings.EqualFold(studentAns, expectedAns)
+		// Only grade if both student and expected answer are non-empty
 		score := 0
 		feedback := "Sai"
-		if correct {
+		if studentAns != "" && expectedAns != "" && strings.EqualFold(studentAns, expectedAns) {
 			score = maxScore
 			feedback = "Đúng"
+		} else if studentAns == "" {
+			feedback = "Chưa trả lời"
 		}
 		totalScore += score
 
@@ -272,12 +293,9 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Cap total score
+	// Cap total score at assignment maxScore
 	if totalScore > assignment.MaxScore && assignment.MaxScore > 0 {
 		totalScore = assignment.MaxScore
-	}
-	if totalScore > totalMaxScore {
-		totalScore = totalMaxScore
 	}
 
 	// Save submission
@@ -434,7 +452,7 @@ func (h *Handler) AutoGrade(w http.ResponseWriter, r *http.Request) {
 		ID             string `json:"id"`
 		Question       string `json:"question"`
 		ExpectedAnswer string `json:"expectedAnswer"`
-		Score          int    `json:"score"`
+		Score          float64 `json:"score"`
 	}
 	var questions []Question
 	hasQuestions := false
@@ -473,15 +491,25 @@ func (h *Handler) AutoGrade(w http.ResponseWriter, r *http.Request) {
 			Feedback   string `json:"feedback"`
 		}
 
+		// Calculate total weight to scale scores
+		totalWeight := 0.0
+		for _, q := range questions {
+			totalWeight += q.Score
+		}
+		scale := 1.0
+		if totalWeight > 0 && assignment.MaxScore > 0 {
+			scale = float64(assignment.MaxScore) / totalWeight
+		}
+
 		var detailResults []QuestionResult
 		totalScore := 0
 		totalMaxScore := 0
 
 		for _, q := range questions {
 			studentAns := answerMap[q.ID]
-			qMaxScore := q.Score
-			if qMaxScore <= 0 {
-				qMaxScore = 10
+			qMaxScore := int(q.Score * scale)
+			if qMaxScore <= 0 && q.Score > 0 {
+				qMaxScore = 1
 			}
 			totalMaxScore += qMaxScore
 

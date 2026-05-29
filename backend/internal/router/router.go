@@ -26,6 +26,7 @@ import (
 	"github.com/lms/backend/internal/parent"
 	"github.com/lms/backend/internal/permissions"
 	"github.com/lms/backend/internal/progress"
+	"github.com/lms/backend/internal/questionbank"
 	"github.com/lms/backend/internal/quizzes"
 	"github.com/lms/backend/internal/reports"
 	"github.com/lms/backend/internal/search"
@@ -60,6 +61,7 @@ type Handlers struct {
 	Search         *search.Handler
 	Reports        *reports.Handler
 	Attendance     *attendance.Handler
+	QuestionBank   *questionbank.Handler
 }
 
 func New(
@@ -129,6 +131,8 @@ func New(
 	searchH := search.NewHandler(db)
 	attendanceSvc := attendance.NewService(db)
 	attendanceH := attendance.NewHandler(attendanceSvc)
+	questionbankSvc := questionbank.NewService(db)
+	questionbankH := questionbank.NewHandler(questionbankSvc)
 	// Mount
 	h := &Handlers{
 		Auth:         authH,
@@ -154,6 +158,7 @@ func New(
 		Search:         searchH,
 		Reports:        reportsH,
 		Attendance:     attendanceH,
+		QuestionBank:   questionbankH,
 	}
 
 	_ = quizzesSvc
@@ -416,6 +421,19 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 				Patch("/api/classes/{id}", h.Classes.Update)
 			r.With(middleware.RequirePermission(permissions.ResClasses, permissions.ActManage)).
 				Delete("/api/classes/{id}", h.Classes.Delete)
+
+			// Question Bank
+			r.Get("/api/question-bank", h.QuestionBank.List)
+			r.Get("/api/question-bank/topics", h.QuestionBank.GetTopics)
+			r.Get("/api/question-bank/{id}", h.QuestionBank.Get)
+			r.With(middleware.RequirePermission(permissions.ResQuestionBank, permissions.ActWrite)).
+				Post("/api/question-bank", h.QuestionBank.Create)
+			r.With(middleware.RequirePermission(permissions.ResQuestionBank, permissions.ActWrite)).
+				Post("/api/question-bank/batch", h.QuestionBank.BatchCreate)
+			r.With(middleware.RequirePermission(permissions.ResQuestionBank, permissions.ActWrite)).
+				Patch("/api/question-bank/{id}", h.QuestionBank.Update)
+			r.With(middleware.RequirePermission(permissions.ResQuestionBank, permissions.ActManage)).
+				Delete("/api/question-bank/{id}", h.QuestionBank.Delete)
 
 			// Teacher
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)

@@ -16,7 +16,8 @@ const (
 	ResClasses      Resource = "classes"
 	ResAI           Resource = "ai"
 	ResChildren     Resource = "children"
-	ResAttendance  Resource = "attendance"
+	ResAttendance    Resource = "attendance"
+	ResQuestionBank  Resource = "question_bank"
 )
 
 type Action string
@@ -55,7 +56,8 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
-		ResAttendance:  {ActManage},
+		ResAttendance:   {ActManage},
+		ResQuestionBank: {ActManage},
 	},
 	RoleAdmin: {
 		ResUsers:        {ActRead, ActWrite},
@@ -71,7 +73,8 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResClasses:      {ActManage},
 		ResAI:           {ActManage},
 		ResChildren:     {ActManage},
-		ResAttendance:  {ActManage},
+		ResAttendance:   {ActManage},
+		ResQuestionBank: {ActManage},
 	},
 	RoleTeacher: {
 		ResUsers:        {ActRead, ActWrite},
@@ -85,7 +88,8 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResGradeLevels:  {ActRead},
 		ResAI:           {ActRead},
 		ResChildren:     {ActManage},
-		ResAttendance:  {ActRead, ActWrite},
+		ResAttendance:   {ActRead, ActWrite},
+		ResQuestionBank: {ActManage},
 	},
 	RoleParent: {
 		ResCourses:      {ActRead},
@@ -96,6 +100,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResAnalytics:    {ActRead},
 		ResAchievements: {ActRead},
 		ResChildren:     {ActManage},
+		ResQuestionBank: {ActRead},
 	},
 	RoleStudent: {
 		ResCourses:      {ActRead},
@@ -106,6 +111,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResAnalytics:    {ActRead},
 		ResAchievements: {ActRead},
 		ResAI:           {ActRead},
+		ResQuestionBank: {ActRead},
 	},
 }
 

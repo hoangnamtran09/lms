@@ -44,13 +44,17 @@ func Auth(jwtSecret, supabaseURL string, db *gorm.DB) func(http.Handler) http.Ha
 				return
 			}
 
-			// Enrich claims with local DB user data (ClassID)
+			// Enrich claims with local DB user data (Role + ClassID)
 			if db != nil {
 				var localUser struct {
 					ClassID string
+					Role    string
 				}
-				db.Table("users").Where("supabase_id = ?", claims.UserID).Select("class_id").Scan(&localUser)
+				db.Table("users").Where("supabase_id = ?", claims.UserID).Select("class_id, role").Scan(&localUser)
 				claims.ClassID = localUser.ClassID
+				if localUser.Role != "" {
+					claims.Role = localUser.Role
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)

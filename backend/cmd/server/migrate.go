@@ -14,6 +14,7 @@ import (
 	"github.com/lms/backend/internal/notifications"
 	"github.com/lms/backend/internal/parent"
 	"github.com/lms/backend/internal/progress"
+	"github.com/lms/backend/internal/questionbank"
 	"github.com/lms/backend/internal/quizzes"
 	"github.com/lms/backend/internal/reports"
 	"github.com/lms/backend/internal/studyplanner"
@@ -51,5 +52,6 @@ func migrate(db *gorm.DB) error {
 		&studyplanner.StudyPlan{},
 		&reports.WeeklyReport{},
 		&attendance.Attendance{},
+		&questionbank.QuestionBank{},
 	)
 }

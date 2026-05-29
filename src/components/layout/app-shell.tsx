@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, Clock, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -89,7 +90,7 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
           <MobileSidebar />
         </div>
         <Link href="/" className="flex items-center gap-2 lg:hidden">
-          <img src="/logo-Photoroom.png" alt="LMS" className="h-8 w-8 rounded-md object-cover" />
+          <Image src="/logo-Photoroom.png" alt="LMS" width={32} height={32} className="h-8 w-8 rounded-md object-cover" />
           <span className="text-lg font-bold text-gray-900">LMS</span>
         </Link>
       </div>
@@ -155,7 +156,7 @@ function LessonInfoSidebar({ lessonId }: { lessonId: string }) {
   const { activeQuiz, handleQuizAnswered } = useActiveQuiz();
 
   return (
-    <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
+    <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
       <LessonInfoPanel
         lessonId={lessonId}
         activeQuiz={activeQuiz}
@@ -177,7 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {isLessonViewer && lessonId ? (
           <LessonInfoSidebar lessonId={lessonId} />
         ) : (
-          <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
+          <aside className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen">
             <Sidebar />
           </aside>
         )}

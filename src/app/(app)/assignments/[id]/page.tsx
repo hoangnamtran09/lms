@@ -371,6 +371,18 @@ export default function AssignmentDetailPage({
     );
   }
 
+  // Compute answered state for question nav
+  const isQuestionAnswered = (q: Question): boolean => {
+    if (isMcqQuestion(q)) return mcqSelections[q.id] != null;
+    return !!perQuestionAnswers[q.id]?.trim();
+  };
+  const answeredCount = questions.filter(isQuestionAnswered).length;
+
+  const scrollToQuestion = (index: number) => {
+    const el = document.getElementById(`question-${index}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="animate-fade-in">
       <Link href="/assignments" className={backLink}>
@@ -378,9 +390,10 @@ export default function AssignmentDetailPage({
         Quay lại
       </Link>
 
-      {/* Assignment header */}
-      <div className="bg-white rounded-lg border p-6 mb-6">
-        <div className="flex items-start justify-between">
+      {/* Assignment header + question nav */}
+      <div className="flex gap-4 mb-6">
+      <div className="flex-1 min-w-0 bg-white rounded-lg border p-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
@@ -419,7 +432,8 @@ export default function AssignmentDetailPage({
                 ))}
               </div>
             ) : questions.length > 0 ? (
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 flex gap-2">
+                <div className="flex-1 min-w-0 space-y-3 w-full">
                 {(() => {
                   // Merge grading details from submission feedback and submit response
                   const allResults = submitResults && submitResults.length > 0 ? submitResults : gradingDetails;
@@ -434,7 +448,7 @@ export default function AssignmentDetailPage({
                     const shortAnswer = perQuestionAnswers[q.id] || "";
                     const gradeResult = resultMap.get(q.id);
                     return (
-                    <div key={q.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div key={q.id} id={`question-${i}`} className="p-4 bg-gray-50 rounded-lg border border-gray-200 scroll-mt-6">
                       <div className="flex items-start gap-2 mb-2">
                         <span className="text-sm font-bold text-purple-600 shrink-0 mt-0.5">Câu {i + 1}</span>
                         <span className="text-xs text-gray-400">({q.score || 10}đ)</span>
@@ -552,17 +566,44 @@ export default function AssignmentDetailPage({
                     </div>
                   )});
                 })()}
+                </div>
               </div>
             ) : (
               <p className="text-gray-600 whitespace-pre-wrap">{assignment.description || "Không có mô tả"}</p>
             )}
           </div>
-          <div className="text-right text-sm text-gray-500 shrink-0 ml-4">
+          <div className="w-[128px] shrink-0 text-right text-xs leading-tight text-gray-500 flex flex-col items-end gap-3">
             <p>Điểm tối đa: <span className="font-semibold">{assignment.maxScore}</span></p>
-            {assignment.dueDate && (
-              <p>Hạn: {new Date(assignment.dueDate).toLocaleDateString("vi-VN")}</p>
+            {assignment.dueDate && new Date(assignment.dueDate).getFullYear() > 1 && (
+              <p className="mt-1">Hạn: {new Date(assignment.dueDate).toLocaleDateString("vi-VN")}</p>
             )}
-            {assignment.creatorName && <p>Giáo viên: {assignment.creatorName}</p>}
+            {assignment.creatorName && <p className="mt-1">Giáo viên: {assignment.creatorName}</p>}
+            {questions.length > 0 && (
+              <div className="w-full rounded-lg border bg-gray-50 p-2 text-left">
+                <p className="text-[11px] font-semibold text-gray-400 text-center">
+                  {answeredCount}/{questions.length} đã làm
+                </p>
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {questions.map((q, i) => {
+                    const answered = isQuestionAnswered(q);
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => scrollToQuestion(i)}
+                        title={`Câu ${i + 1}${answered ? " (đã làm)" : " (chưa làm)"}`}
+                        className={`flex items-center justify-center size-6 rounded-md text-[9px] font-bold transition-all border hover:scale-105 ${
+                          answered
+                            ? "bg-emerald-500 border-emerald-600 text-white shadow-sm"
+                            : "bg-white border-gray-300 text-gray-400 hover:border-gray-500 hover:text-gray-600"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         {assignment.rubric && (
@@ -570,6 +611,7 @@ export default function AssignmentDetailPage({
             <span className="font-medium">Tiêu chí chấm:</span> {assignment.rubric}
           </div>
         )}
+      </div>
       </div>
 
       {/* Student: submit button (skip for weakness — exercises auto-submit) */}

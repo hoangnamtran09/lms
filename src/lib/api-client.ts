@@ -81,10 +81,11 @@ export async function uploadFile(path: string, file: File, extraFields?: Record<
 
 const REQUEST_TIMEOUT = 30000;
 
-export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+export async function api<T>(path: string, options?: RequestInit & { timeout?: number }): Promise<T> {
   const authHeaders = await getAuthHeaders();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const timeout = options?.timeout ?? REQUEST_TIMEOUT;
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     signal: controller.signal,

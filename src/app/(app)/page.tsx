@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+const ROLE_REDIRECT: Record<string, string> = {
+  TEACHER: "/teacher",
+  SUPER_ADMIN: "/admin",
+  ADMIN: "/admin",
+};
 import {
   Clock, Trophy, Gem, Flame, BookOpen, TrendingUp, Target,
   Star, ArrowUpRight, Medal, Activity, Sparkles,
@@ -481,9 +488,18 @@ function StudentDashboard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
-  // Proxy handles admin/teacher → /admin, /teacher. Parent → /parent.
-  // Only students and unauthenticated users land here.
+  useEffect(() => {
+    if (user?.role && ROLE_REDIRECT[user.role]) {
+      router.replace(ROLE_REDIRECT[user.role]);
+    }
+  }, [user?.role, router]);
+
+  if (user?.role && ROLE_REDIRECT[user.role]) {
+    return null;
+  }
+
   if (user?.role === "PARENT") {
     return <ParentDashboardPage />;
   }

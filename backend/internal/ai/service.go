@@ -331,6 +331,15 @@ func (s *Service) GenerateAssignment(lessonTitle, subjectName, lessonContent str
 	})
 }
 
+// GenerateMatrixAssignment generates assignment questions following a MOET test matrix.
+func (s *Service) GenerateMatrixAssignment(lessonTitle, subjectName, lessonContent string, questionCount int, questionType string, gradeLevel int, matrix interface{}) (string, error) {
+	prompt := BuildMatrixAssignmentPrompt(lessonTitle, subjectName, lessonContent, questionCount, questionType, gradeLevel, matrix)
+	return s.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tạo đề theo ma trận chuẩn BGDĐT. Chỉ trả về JSON, không giải thích thêm."},
+		{Role: "user", Content: prompt},
+	})
+}
+
 // ExtractQuestions extracts individual questions from document text.
 func (s *Service) ExtractQuestions(text string) (string, error) {
 	prompt := BuildExtractQuestionsPrompt(text)

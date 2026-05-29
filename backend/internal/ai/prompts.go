@@ -1,6 +1,10 @@
 package ai
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 // ---- Exercise Generator ----
 
@@ -299,6 +303,134 @@ func BuildGenerateAssignmentPrompt(lessonTitle, subjectName, lessonContent strin
 ---
 
 Hãy tạo %d câu hỏi và trả về mảng JSON.`, subjectName, lessonTitle, gradeLevel, content, questionCount)
+}
+
+// ---- Generate Assignment from Lesson with Matrix ----
+
+const matrixAssignmentPrompt = `Bạn là giáo viên tại LMS. Nhiệm vụ của bạn là tạo đề kiểm tra THEO MA TRẬN sau, phù hợp với chương trình Giáo dục và Đào tạo Việt Nam với 4 mức độ: Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao.
+
+**YÊU CẦU BẮT BUỘC:**
+1. TẠO ĐÚNG số lượng câu hỏi và điểm số theo từng ô trong ma trận bên dưới.
+2. Mỗi câu hỏi PHẢI có trường "topic" chính xác theo tên chủ đề.
+3. Mỗi câu hỏi PHẢI có trường "difficulty" chính xác theo cấp độ: "nhan_biet", "thong_hieu", "van_dung", "van_dung_cao".
+4. KHÔNG tự ý thay đổi số lượng câu hỏi hoặc phân phối điểm.
+
+**MA TRẬN ĐỀ:**
+%s
+
+**Thông tin:**
+- Môn: %s
+- Bài học: %s
+- Khối lớp: %d
+- Nội dung bài học:
+---
+%s
+---
+
+**Định dạng câu hỏi:**
+- Với câu trắc nghiệm (type="mcq"): question là câu hỏi KHÔNG chứa đáp án, options là mảng 4 đáp án A/B/C/D với isCorrect=true cho đáp án đúng, expectedAnswer là chữ cái đáp án đúng, explanation giải thích ngắn gọn.
+- Với câu trả lời ngắn (type="short_answer"): question là câu hỏi mở, expectedAnswer là các ý chính cần có (1-2 câu), explanation giải thích ngắn gọn.
+- Dùng $...$ cho công thức toán học.
+
+**Định dạng Output (MẢNG JSON):**
+[
+  {
+    "topic": "Tên chủ đề",
+    "type": "mcq",
+    "difficulty": "nhan_biet",
+    "question": "Nội dung câu hỏi (KHÔNG chứa đáp án)",
+    "options": [
+      {"text": "Đáp án A", "isCorrect": false},
+      {"text": "Đáp án B", "isCorrect": true},
+      {"text": "Đáp án C", "isCorrect": false},
+      {"text": "Đáp án D", "isCorrect": false}
+    ],
+    "expectedAnswer": "B",
+    "explanation": "Giải thích ngắn gọn",
+    "score": 2
+  }
+]
+
+CHỈ trả về mảng JSON, không thêm text hay markdown.`
+
+func matrixToInstruction(m interface{}) string {
+	matrixJSON, _ := json.MarshalIndent(m, "", "  ")
+	var matrixData map[string]interface{}
+	json.Unmarshal(matrixJSON, &matrixData)
+
+	var sb strings.Builder
+
+	if purpose, ok := matrixData["purpose"].(string); ok && purpose != "" {
+		labels := map[string]string{
+			"kiem_tra_15p":      "Kiểm tra 15 phút",
+			"kiem_tra_45p":      "Kiểm tra 45 phút",
+			"kiem_tra_giua_ky":  "Kiểm tra giữa kỳ",
+			"kiem_tra_cuoi_ky":  "Kiểm tra cuối kỳ",
+			"bai_tap_ve_nha":    "Bài tập về nhà",
+		}
+		if label, ok := labels[purpose]; ok {
+			sb.WriteString(fmt.Sprintf("- Mục đích: %s\n", label))
+		}
+	}
+	if format, ok := matrixData["format"].(string); ok && format != "" {
+		labels := map[string]string{
+			"tnkq":    "Trắc nghiệm khách quan",
+			"tu_luan": "Tự luận",
+			"ket_hop": "Kết hợp",
+		}
+		if label, ok := labels[format]; ok {
+			sb.WriteString(fmt.Sprintf("- Hình thức: %s\n", label))
+		}
+	}
+
+	levels := []string{"nhan_biet", "thong_hieu", "van_dung", "van_dung_cao"}
+	levelLabels := map[string]string{
+		"nhan_biet":     "Nhận biết",
+		"thong_hieu":    "Thông hiểu",
+		"van_dung":      "Vận dụng",
+		"van_dung_cao":  "Vận dụng cao",
+	}
+
+	if topics, ok := matrixData["topics"].([]interface{}); ok {
+		if cells, ok := matrixData["cells"].(map[string]interface{}); ok {
+			for _, t := range topics {
+				topic := t.(string)
+				sb.WriteString(fmt.Sprintf("\nCHỦ ĐỀ: \"%s\"\n", topic))
+				if topicCells, ok := cells[topic].(map[string]interface{}); ok {
+					for _, level := range levels {
+						if levelCell, ok := topicCells[level].(map[string]interface{}); ok {
+							qc := int(levelCell["questionCount"].(float64))
+							sc := levelCell["score"].(float64)
+							if qc > 0 {
+								sb.WriteString(fmt.Sprintf("  - %s: %d câu (tổng %.1f điểm)\n", levelLabels[level], qc, sc))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if totalQuestions, ok := matrixData["totalQuestions"].(float64); ok {
+		totalScore, _ := matrixData["totalScore"].(float64)
+		sb.WriteString(fmt.Sprintf("\nTỔNG: %.0f câu, %.0f điểm\n", totalQuestions, totalScore))
+	}
+
+	return sb.String()
+}
+
+func BuildMatrixAssignmentPrompt(lessonTitle, subjectName, lessonContent string, questionCount int, questionType string, gradeLevel int, matrix interface{}) string {
+	content := lessonContent
+	if len(content) > 3000 {
+		content = content[:3000] + "..."
+	}
+	if content == "" {
+		content = "Chưa có nội dung bài học"
+	}
+
+	instruction := matrixToInstruction(matrix)
+
+	return fmt.Sprintf(matrixAssignmentPrompt, instruction, subjectName, lessonTitle, gradeLevel, content)
 }
 
 // ---- Assignment Pre-Grade ----

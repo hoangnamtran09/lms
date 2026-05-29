@@ -47,7 +47,35 @@ func (s *Service) List(ctx context.Context, scope ScopeFilter) ([]Assignment, er
 	case "PARENT":
 		q = q.Where("class_id = ?", scope.ClassID)
 	}
-	return list, q.Order("created_at DESC").Find(&list).Error
+	if err := q.Order("created_at DESC").Find(&list).Error; err != nil {
+	return list, err
+}
+// Populate submission counts
+if len(list) > 0 {
+	ids := make([]string, len(list))
+	for i, a := range list {
+		ids[i] = a.ID
+	}
+	type countRow struct {
+		AssignmentID string
+		Count        int64
+	}
+	var counts []countRow
+	s.db.WithContext(ctx).
+		Table("submissions").
+		Select("assignment_id, count(*) as count").
+		Where("assignment_id IN ?", ids).
+		Group("assignment_id").
+		Scan(&counts)
+	countMap := make(map[string]int64, len(counts))
+	for _, c := range counts {
+		countMap[c.AssignmentID] = c.Count
+	}
+	for i := range list {
+		list[i].SubmissionCount = countMap[list[i].ID]
+	}
+}
+return list, nil
 }
 
 func (s *Service) FindByID(ctx context.Context, id string) (*Assignment, error) {

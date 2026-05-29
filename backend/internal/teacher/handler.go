@@ -29,7 +29,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	var students []StudentRow
 	h.db.Table("users").
-		Where("role = ? AND class_id IN (SELECT class_id FROM users WHERE id = ?)", "STUDENT", claims.UserID).
+		Where("role = ? AND class_id IN (SELECT class_id FROM users WHERE supabase_id = ?)", "STUDENT", claims.UserID).
 		Select("id, full_name, class_id, 0 as total_study, 0 as streak").
 		Limit(20).Find(&students)
 

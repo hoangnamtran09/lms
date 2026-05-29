@@ -3,9 +3,6 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
-const adminPaths = ["/admin"];
-const teacherPaths = ["/teacher"];
-const parentPaths = ["/parent"];
 
 /**
  * Copy Supabase session cookies from the temp response (where they were set during
@@ -117,18 +114,9 @@ export async function proxy(request: NextRequest) {
     return ok();
   }
 
-  if (adminPaths.some((p) => pathname.startsWith(p)) && !isAdmin) {
-    return redirect(isTeacher ? "/teacher" : "/");
-  }
-
-  if (teacherPaths.some((p) => pathname.startsWith(p)) && !isTeacher && !isAdmin) {
-    return redirect("/");
-  }
-
-  if (parentPaths.some((p) => pathname.startsWith(p)) && !isParent) {
-    return redirect("/");
-  }
-
+  // Let all authenticated users access any page.
+  // Authorization is handled by the backend API (RequirePermission).
+  // Frontend sidebar filters nav items by role.
   return ok();
 }
 
