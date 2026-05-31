@@ -1300,7 +1300,6 @@ export default function AssignmentDetailPage({
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-900">{assignment.creatorName || "Giáo viên"}</p>
-                    <p className="text-xs text-gray-500">Giáo viên hướng dẫn</p>
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-xl italic text-sm text-gray-700 relative">

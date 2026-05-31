@@ -157,8 +157,23 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID := claims.UserID
 	user, err := h.userService.FindBySupabaseID(r.Context(), userID)
 	if err != nil {
-		jsonErr(w, "Không tìm thấy người dùng", http.StatusNotFound)
-		return
+		// Try by local ID, then create if not found
+		user, err = h.userService.FindByID(r.Context(), userID)
+		if err != nil {
+			// Auto-create local user record from JWT claims
+			newUser := users.User{
+				ID:         uuid.New().String(),
+				SupabaseID: userID,
+				FullName:   fallbackFullName(claims),
+				Role:       fallbackRole(claims),
+				Email:      fallbackEmail(claims),
+			}
+			if createErr := h.userService.Create(r.Context(), &newUser); createErr != nil {
+				jsonErr(w, "Không thể tạo người dùng: "+createErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			user = &newUser
+		}
 	}
 
 	var req struct {
@@ -183,6 +198,9 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated user
 	updated, _ := h.userService.FindByID(r.Context(), user.ID)
+	if updated == nil {
+		updated = user
+	}
 	respond(w, userResponse{
 		ID:         updated.ID,
 		SupabaseID: updated.SupabaseID,
