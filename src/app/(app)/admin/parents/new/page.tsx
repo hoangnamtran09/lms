@@ -100,7 +100,7 @@ export default function NewParentPage() {
         method: "POST",
         body: JSON.stringify({
           fullName: form.fullName,
-          username: form.username || form.phone || form.fullName.toLowerCase().replace(/\s/g, ""),
+          username: form.username || form.phone || form.fullName.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s/g, "").replace(/[^a-z0-9]/g, ""),
           password: form.password || "Parent@123",
           phone: form.phone,
           role: "PARENT",

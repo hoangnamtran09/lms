@@ -83,7 +83,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Email == "" {
-		req.Email = req.Username + "@lms.internal"
+		safe := strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+				return r
+			}
+			return -1
+		}, req.Username)
+		req.Email = safe + "@lms.edu.vn"
 	}
 
 	// Create in Supabase Auth
