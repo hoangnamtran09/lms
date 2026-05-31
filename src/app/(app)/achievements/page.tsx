@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Award, Sparkles, ArrowLeft } from "lucide-react";
+import { Award, Sparkles, ArrowLeft, Gem, Star, Flame, Trophy, Target, Zap, BookOpen, Crown, Medal } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -29,21 +28,24 @@ interface UserAchievement {
   earnedAt: string;
 }
 
-const ICON_MAP: Record<string, string> = {
-  Trophy: "🏆",
-  Star: "⭐",
-  Medal: "🏅",
-  Flame: "🔥",
-  Gem: "💎",
-  Crown: "👑",
-  Rocket: "🚀",
-  Fire: "✨",
-  Ribbon: "🎀",
-  Lightning: "⚡",
-  Target: "🎯",
-  BookOpen: "📖",
-  Zap: "💥",
-  Award: "🎖️",
+import type { FC } from "react";
+import type { LucideProps } from "lucide-react";
+
+const ICON_MAP: Record<string, FC<LucideProps>> = {
+  Trophy: Trophy as FC<LucideProps>,
+  Star: Star as FC<LucideProps>,
+  Medal: Medal as FC<LucideProps>,
+  Flame: Flame as FC<LucideProps>,
+  Gem: Gem as FC<LucideProps>,
+  Crown: Crown as FC<LucideProps>,
+  Rocket: Zap as FC<LucideProps>,
+  Fire: Flame as FC<LucideProps>,
+  Ribbon: Medal as FC<LucideProps>,
+  Lightning: Zap as FC<LucideProps>,
+  Target: Target as FC<LucideProps>,
+  BookOpen: BookOpen as FC<LucideProps>,
+  Zap: Zap as FC<LucideProps>,
+  Award: Award as FC<LucideProps>,
 };
 
 const RULE_TYPE_LABELS: Record<string, string> = {
@@ -53,6 +55,16 @@ const RULE_TYPE_LABELS: Record<string, string> = {
   assignments_done: "Hoàn thành bài tập",
   diamonds_earned: "Tích luỹ kim cương",
 };
+
+// Icon background color by rule type
+function getIconStyle(ruleType: string, earned: boolean): string {
+  if (earned) {
+    if (ruleType === "diamonds_earned") return "bg-blue-100 text-blue-500";
+    return "bg-orange-100 text-orange-500";
+  }
+  if (ruleType === "diamonds_earned") return "bg-blue-50 text-blue-300";
+  return "bg-orange-50 text-orange-300";
+}
 
 export default function AchievementsPage() {
   const [allAchievements, setAllAchievements] = useState<AchievementInfo[]>([]);
@@ -80,12 +92,13 @@ export default function AchievementsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton delay={0} className="h-10 w-64" />
-        <Skeleton delay={80} className="h-6 w-96" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8">
+        <Skeleton delay={0} className="h-5 w-24 mb-6" />
+        <Skeleton delay={60} className="h-10 w-72 mb-2" />
+        <Skeleton delay={80} className="h-6 w-56 mb-10" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} delay={100 + i * 80} className="h-40 rounded-2xl" />
+            <Skeleton key={i} delay={100 + i * 80} className="h-52 rounded-2xl" />
           ))}
         </div>
       </div>
@@ -95,97 +108,103 @@ export default function AchievementsPage() {
   const earnedCount = earnedIds.size;
 
   return (
-    <div className="animate-fade-in max-w-5xl">
+    <div className="animate-fade-in max-w-[1280px] mx-auto px-4 md:px-8 py-8">
+      {/* Back button */}
       <Link
         href="/"
-        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
+        className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-medium mb-6 transition-colors"
       >
-        <ArrowLeft className="size-4" /> Quay lại
+        <ArrowLeft className="size-4" />
+        Quay lại
       </Link>
 
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex items-center justify-center size-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-200">
-            <Award className="size-5 text-white" />
+      {/* Header */}
+      <div className="mb-10">
+        <div className="flex items-center gap-4 mb-2">
+          <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-200">
+            <Award className="size-6" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900">
             Thành tựu
           </h1>
         </div>
-        <p className="text-base text-gray-500">
-          Bạn đã đạt được <span className="font-bold text-amber-600">{earnedCount}</span> / {allAchievements.length} thành tựu
+        <p className="text-lg text-gray-500">
+          Bạn đã đạt được{" "}
+          <span className="font-bold text-primary">{earnedCount}</span> / {allAchievements.length} thành tựu
         </p>
       </div>
 
+      {/* Achievement Grid */}
       {allAchievements.length === 0 ? (
-        <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-12 text-center">
-          <Award className="size-16 text-gray-300 mx-auto mb-4" />
+        <div className="bg-white rounded-3xl border border-gray-100 p-16 text-center">
+          <Award className="size-16 text-gray-200 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-gray-900 mb-1">Chưa có thành tựu nào</h3>
           <p className="text-sm text-gray-500">Hãy bắt đầu học để nhận thành tựu đầu tiên!</p>
-        </Card>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {allAchievements.map((a) => {
             const earned = earnedIds.has(a.id);
             const ua = earnedMap.get(a.id);
-            const emoji = ICON_MAP[a.icon] || "🏆";
+            const IconComponent = ICON_MAP[a.icon];
+            const iconBg = getIconStyle(a.ruleType, earned);
 
             return (
-              <Card
+              <div
                 key={a.id}
-                className={`rounded-2xl border-0 ring-1 shadow-sm p-5 transition-all ${
-                  earned
-                    ? "ring-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50"
-                    : "ring-gray-200/60 bg-white"
+                className={`achievement-card bg-white p-6 sm:p-8 rounded-2xl border shadow-sm flex flex-col h-full transition-all hover:-translate-y-1 hover:shadow-md ${
+                  earned ? "border-amber-200" : "border-gray-100"
                 }`}
               >
-                <div className="flex items-start gap-4">
+                {/* Icon + Info */}
+                <div className="flex items-start gap-5 mb-5">
                   <div
-                    className={`flex items-center justify-center size-14 rounded-xl text-2xl flex-shrink-0 ${
-                      earned
-                        ? "bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-amber-200"
-                        : "bg-gray-100"
-                    }`}
+                    className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${iconBg}`}
                   >
-                    {earned ? emoji : <span className="text-gray-300">{emoji}</span>}
+                    {IconComponent ? <IconComponent className="size-8" /> : <Award className="size-8" />}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className={`font-bold text-base ${earned ? "text-gray-900" : "text-gray-500"}`}>
+                  <div className="min-w-0">
+                    <h3 className={`text-lg font-bold mb-1 ${earned ? "text-gray-900" : "text-gray-600"}`}>
                       {a.title}
                     </h3>
-                    <p className={`text-sm mt-0.5 ${earned ? "text-gray-500" : "text-gray-400"}`}>
+                    <p className={`text-sm leading-relaxed ${earned ? "text-gray-500" : "text-gray-400"}`}>
                       {a.description}
                     </p>
                     {!earned && (
-                      <p className="text-xs text-gray-400 mt-1.5">
+                      <p className="text-[12px] text-gray-400 mt-1">
                         {RULE_TYPE_LABELS[a.ruleType] || a.ruleType}: {a.threshold}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="mt-4 flex items-center justify-between">
+
+                {/* Footer: Status + Reward */}
+                <div className="mt-auto flex justify-between items-center pt-2">
                   {earned ? (
-                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs px-3 py-1">
-                      <Sparkles className="size-3.5 mr-1" />
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs px-3 py-1 rounded-full">
+                      <Sparkles className="size-3 mr-1" />
                       Đã đạt được
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-gray-400 text-xs px-3 py-1">
+                    <span className="px-4 py-1 rounded-full bg-gray-100 text-gray-400 text-xs font-semibold">
                       Chưa đạt
-                    </Badge>
-                  )}
-                  {a.diamondReward > 0 && (
-                    <span className={`text-xs font-medium ${earned ? "text-amber-600" : "text-gray-400"}`}>
-                      💎 +{a.diamondReward}
                     </span>
                   )}
+                  {a.diamondReward > 0 && (
+                    <div className={`flex items-center gap-1.5 text-sm font-bold ${earned ? "text-amber-600" : "text-gray-400"}`}>
+                      <Gem className="size-4" />
+                      +{a.diamondReward}
+                    </div>
+                  )}
                 </div>
+
+                {/* Earned date */}
                 {earned && ua && (
-                  <p className="text-xs text-amber-500 mt-2">
+                  <p className="text-xs text-amber-500 mt-3">
                     Đạt được: {new Date(ua.earnedAt).toLocaleDateString("vi-VN")}
                   </p>
                 )}
-              </Card>
+              </div>
             );
           })}
         </div>

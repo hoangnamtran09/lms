@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, BookOpen, AlertCircle, Users, ChevronRight, Search, BarChart3 } from "lucide-react";
+import { ArrowLeft, TrendingUp, BookOpen, AlertCircle, Users, ChevronRight, Search, BarChart3, Sparkles } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { api } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
 import { MathText } from "@/components/ai/math-text";
@@ -91,150 +90,178 @@ export default function TeacherMistakesPage() {
   }
 
   return (
-    <div className="animate-fade-in max-w-5xl">
+    <div className="animate-fade-in max-w-5xl mx-auto px-4 md:px-8 py-8">
       <Link
         href="/teacher"
-        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
+        className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-3"
       >
         <ArrowLeft className="size-4" /> Quay lại
       </Link>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Quản lí điểm yếu</h1>
+      {/* Header with step indicator */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-2 px-4 py-1 bg-primary text-white rounded-full text-xs font-bold">
+            Bước 2
+          </div>
+          <span className="text-sm text-gray-500 font-medium">Phân tích & Chọn chủ đề</span>
+        </div>
+        <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900">Khắc phục điểm yếu</h1>
         <p className="text-sm text-gray-500 mt-1">
           Theo dõi và khắc phục điểm yếu của học sinh trong lớp
         </p>
       </div>
 
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center size-10 rounded-xl bg-red-100">
-                <AlertCircle className="size-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.totalWeaknesses}</p>
-                <p className="text-xs text-gray-500">Tổng điểm yếu</p>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+            <div className="size-14 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+              <AlertCircle className="size-7" />
             </div>
-          </Card>
-          <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center size-10 rounded-xl bg-amber-100">
-                <TrendingUp className="size-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.totalStudents}</p>
-                <p className="text-xs text-gray-500">Học sinh cần cải thiện</p>
-              </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Tổng điểm yếu</p>
+              <p className="text-[28px] font-bold text-gray-900">{summary.totalWeaknesses}</p>
             </div>
-          </Card>
-          <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex items-center justify-center size-10 rounded-xl bg-blue-100">
-                <BookOpen className="size-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.topics.length}</p>
-                <p className="text-xs text-gray-500">Chủ đề yếu</p>
-              </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+            <div className="size-14 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+              <Users className="size-7" />
             </div>
-          </Card>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">HS cần cải thiện</p>
+              <p className="text-[28px] font-bold text-gray-900">{summary.totalStudents}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-center gap-4 hover:shadow-md transition-shadow">
+            <div className="size-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <BookOpen className="size-7" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Chủ đề yếu</p>
+              <p className="text-[28px] font-bold text-gray-900">{summary.topics.length}</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Topics section */}
+      {/* Topics section — Stitch style */}
       {summary && summary.topics.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <BarChart3 className="size-5 text-indigo-600" />
-            Chủ đề nổi bật
-          </h2>
-          <div className="space-y-2">
-            {summary.topics.slice(0, 10).map((t, i) => (
-              <Card
-                key={i}
-                className="rounded-xl border-0 ring-1 ring-gray-200/60 shadow-sm p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">
-                      <MathText text={t.topic} />
-                    </p>
-                    {t.lessonTitle && (
-                      <p className="text-xs text-gray-500 mt-0.5">{t.lessonTitle}</p>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Chủ đề cần lưu ý</h2>
+              <p className="text-sm text-gray-500">Các chủ đề có nhiều học sinh gặp khó khăn</p>
+            </div>
+            <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+              {summary.topics.length} chủ đề ưu tiên
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {summary.topics.slice(0, 10).map((t, i) => {
+              const maxErrors = Math.max(...summary.topics.map((x) => x.totalErrors), 1);
+              const pct = Math.round((t.totalErrors / maxErrors) * 100);
+              return (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">
+                        <MathText text={t.topic} />
+                      </p>
+                      {t.lessonTitle && (
+                        <p className="text-xs text-gray-400 mt-0.5">{t.lessonTitle}</p>
+                      )}
+                    </div>
+                    {t.subjectName && (
+                      <Badge variant="outline" className="text-xs shrink-0 ml-2">{t.subjectName}</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-4">
-                    <Badge variant="destructive" className="text-xs">
-                      {t.totalErrors} lỗi
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {t.studentCount} HS
-                    </Badge>
+                  {/* Error bar */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-2 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-red-400 to-red-500 transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 5)}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-bold text-red-600 shrink-0">{t.totalErrors} lỗi</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Users className="size-3" />
+                      <span>{t.studentCount} học sinh</span>
+                    </div>
+                    <Link
+                      href={`/teacher/mistakes?topic=${encodeURIComponent(t.topic)}`}
+                      className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <Sparkles className="size-3" />
+                      Phân tích AI
+                    </Link>
                   </div>
                 </div>
-              </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Students list */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Users className="size-5 text-emerald-600" />
-            Học sinh có điểm yếu
-          </h2>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Học sinh có điểm yếu</h2>
+            <p className="text-sm text-gray-500">Danh sách học sinh cần được hỗ trợ thêm</p>
+          </div>
         </div>
 
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
-          <Input
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+          <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm học sinh..."
-            className="pl-9"
+            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
 
         {filteredStudents.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border">
-            <Users className="size-12 text-gray-300 mx-auto mb-4" />
+          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+            <Users className="size-12 text-gray-200 mx-auto mb-4" />
             <p className="text-gray-500">
               {search ? "Không tìm thấy học sinh" : "Không có học sinh nào có điểm yếu"}
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredStudents.map((s) => (
               <Link
                 key={s.id}
                 href={`/teacher/mistakes/${s.id}`}
-                className="flex items-center justify-between bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-sm transition-all"
+                className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-all group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center size-10 rounded-full bg-amber-100 text-amber-600 font-bold text-sm">
+                  <div className="size-11 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
                     {s.fullName.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{s.fullName}</p>
+                    <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">{s.fullName}</p>
                     <p className="text-xs text-gray-500">
                       {(s.weaknessCount || 0) > 0
-                        ? `${s.weaknessCount} điểm yếu cần khắc phục`
+                        ? `${s.weaknessCount} điểm yếu`
                         : "Không có điểm yếu"}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2">
                   {s.weaknessCount && s.weaknessCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
+                    <span className="bg-red-50 text-red-700 text-xs font-bold px-2 py-1 rounded-full">
                       {s.weaknessCount}
-                    </Badge>
+                    </span>
                   )}
-                  <ChevronRight className="size-4 text-gray-400" />
+                  <ChevronRight className="size-4 text-gray-300 group-hover:text-primary transition-colors" />
                 </div>
               </Link>
             ))}

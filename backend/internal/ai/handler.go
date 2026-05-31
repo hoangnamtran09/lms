@@ -1067,6 +1067,125 @@ type GraphResult struct {
 
 // ---- Mind Map ----
 
+// generateSimpleMindMap builds a basic mindmap from lesson content without AI.
+func generateSimpleMindMap(lessonTitle, subjectName, description string) GraphResult {
+	// Parse description into sentences/paragraphs
+	lines := strings.Split(strings.TrimSpace(description), "\n")
+	var sentences []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Split long paragraphs at periods
+		parts := strings.Split(line, ".")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if len(p) > 5 {
+				sentences = append(sentences, p)
+			}
+		}
+	}
+
+	result := GraphResult{
+		CentralTopic: lessonTitle,
+		Nodes: []GraphNode{
+			{
+				ID:          "central",
+				Label:       lessonTitle,
+				Type:        "concept",
+				Mastery:     "mastered",
+				Description: "Chủ đề chính của bài học",
+			},
+		},
+		Edges: []GraphEdge{},
+	}
+
+	// Create branch nodes from key concepts
+	branchCount := min(len(sentences), 6)
+	if branchCount == 0 {
+		// Fallback: create generic branches from subject + lesson
+		branches := []struct{ label, desc string }{
+			{"Khái niệm cơ bản", "Các định nghĩa và khái niệm nền tảng của " + lessonTitle},
+			{"Kiến thức trọng tâm", "Những nội dung quan trọng nhất cần nắm vững trong " + lessonTitle},
+			{"Ứng dụng thực tế", "Cách áp dụng kiến thức " + lessonTitle + " vào thực tiễn và bài tập"},
+			{"Bài tập vận dụng", "Các dạng bài tập thường gặp và phương pháp giải cho " + lessonTitle},
+			{"Tổng kết", "Tóm tắt và liên hệ các kiến thức đã học trong " + lessonTitle},
+		}
+		for i, b := range branches {
+			id := fmt.Sprintf("branch%d", i)
+			result.Nodes = append(result.Nodes, GraphNode{
+				ID: id, Label: b.label, Type: "concept",
+				Mastery: "learning", Description: b.desc,
+			})
+			result.Edges = append(result.Edges, GraphEdge{Source: "central", Target: id, Label: "bao gồm"})
+		}
+		return result
+	}
+
+	// Create branch nodes from key sentences
+	for i := 0; i < branchCount; i++ {
+		branchID := fmt.Sprintf("b%d", i)
+		label := sentences[i]
+		if len([]rune(label)) > 50 {
+			label = string([]rune(label)[:50]) + "..."
+		}
+		desc := sentences[i]
+		if len(desc) < 30 {
+			desc = "Nội dung về " + strings.ToLower(label) + " — đây là một trong những kiến thức quan trọng của bài học " + lessonTitle
+		}
+		result.Nodes = append(result.Nodes, GraphNode{
+			ID:          branchID,
+			Label:       label,
+			Type:        "concept",
+			Mastery:     "learning",
+			Description: desc,
+		})
+		result.Edges = append(result.Edges, GraphEdge{
+			Source: "central",
+			Target: branchID,
+			Label:  "bao gồm",
+		})
+	}
+
+	// Create detail nodes (subtopics) from remaining sentences
+	detailIdx := 0
+	for i := branchCount; i < len(sentences) && detailIdx < 12; i++ {
+		parentBranch := i % branchCount
+		parentLabel := ""
+		for _, n := range result.Nodes {
+			if n.ID == fmt.Sprintf("b%d", parentBranch) {
+				parentLabel = n.Label
+				break
+			}
+		}
+		detailID := fmt.Sprintf("d%d", detailIdx)
+		label := sentences[i]
+		if len([]rune(label)) > 45 {
+			label = string([]rune(label)[:45]) + "..."
+		}
+		desc := sentences[i]
+		if len(desc) < 25 && parentLabel != "" {
+			desc = fmt.Sprintf("Chi tiết về %s — thuộc nhóm %s trong bài học %s", strings.ToLower(label), strings.ToLower(parentLabel), lessonTitle)
+		}
+		result.Nodes = append(result.Nodes, GraphNode{
+			ID:          detailID,
+			Label:       label,
+			Type:        "subtopic",
+			Mastery:     "learning",
+			Description: desc,
+		})
+		result.Edges = append(result.Edges, GraphEdge{
+			Source: fmt.Sprintf("b%d", parentBranch),
+			Target: detailID,
+			Label:  "chi tiết",
+		})
+		detailIdx++
+	}
+
+	return result
+}
+
 type mindmapInput struct {
 	LessonID string `json:"lessonId"`
 }
@@ -1103,21 +1222,22 @@ func (h *Handler) MindMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prompt := BuildMindMapPrompt(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, ctx_.GradeLevel)
+	var result GraphResult
 
-	response, err := h.aiService.Chat([]ChatMessage{
+	// Try AI first; fall back to simple generated mindmap
+	prompt := BuildMindMapPrompt(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description, ctx_.GradeLevel)
+	response, aiErr := h.aiService.Chat([]ChatMessage{
 		{Role: "system", Content: "Bạn là trợ lý tạo sơ đồ tư duy. Chỉ trả về JSON, không giải thích thêm."},
 		{Role: "user", Content: prompt},
 	})
-	if err != nil {
-		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var result GraphResult
-	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
-		jsonErr(w, "Lỗi parse kết quả AI: "+err.Error(), http.StatusInternalServerError)
-		return
+	if aiErr == nil {
+		if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
+			// AI response couldn't be parsed — fall back
+			result = generateSimpleMindMap(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description)
+		}
+	} else {
+		// AI unavailable — use simple generation
+		result = generateSimpleMindMap(ctx_.LessonTitle, ctx_.SubjectName, ctx_.Description)
 	}
 
 	// Inject central node if not already present

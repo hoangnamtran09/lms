@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Trash2, Plus, ChevronUp, ClipboardList, FileText, Users, Loader2, Sparkles, BookOpen, Brain, Pencil } from "lucide-react";
+import { Eye, Trash2, Plus, FileText, Pencil, ClipboardList, BookOpen, Brain, Sparkles, Users, Loader2 } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { api, ApiError, uploadFile } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent,
 } from "@/components/ui/dialog";
 
 interface AssignmentRow {
@@ -364,6 +365,8 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
         maxScore: String((full.maxScore as number) ?? 100),
         dueDate: full.dueDate ? new Date(full.dueDate as string).toISOString().slice(0, 16) : "",
         allowResubmit: full.allowResubmit ? "true" : "false",
+        subjectId: (full.subjectId as string) || "",
+        classId: (full.classId as string) || "",
       });
       setEditError(null);
     } catch {
@@ -386,6 +389,8 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
         rubric: editForm.rubric.trim(),
         maxScore: parseInt(editForm.maxScore || "100"),
         allowResubmit: editForm.allowResubmit === "true",
+        subjectId: editForm.subjectId || "",
+        classId: editForm.classId || "",
       };
       body.dueDate = editForm.dueDate
         ? new Date(editForm.dueDate).toISOString()
@@ -442,21 +447,26 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
   return (
     <div className="animate-fade-in max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
         <div>
-          <Link
-            href={basePath}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-2"
-          >
-            <ArrowLeft className="size-4" /> Quay lại
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý Bài tập</h1>
+          <nav className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+            <Link href={basePath} className="hover:text-primary transition-colors">
+              Dashboard
+            </Link>
+            <span className="text-gray-300">›</span>
+            <span className="text-primary font-bold">Bài tập</span>
+          </nav>
+          <h2 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900">
+            Quản lý Bài tập
+          </h2>
           <p className="text-sm text-gray-500 mt-1">{assignments.length} bài tập · {totalSubmissions} bài nộp</p>
         </div>
-        <Button onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }} className="gap-2">
-          {showForm ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
-          {showForm ? "Thu gọn" : "Tạo bài tập"}
-        </Button>
+        <Link href="/teacher/assignments/create">
+          <Button className="gap-2 rounded-2xl shadow-lg shadow-primary/20 font-bold active:scale-[0.98] transition-transform px-6 py-3">
+            <Plus className="size-5" />
+            Tạo bài tập
+          </Button>
+        </Link>
       </div>
 
       {/* Create form */}
@@ -995,141 +1005,222 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
         </Card>
       </div>
 
-      {/* Assignments table */}
-      <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tiêu đề</TableHead>
-                <TableHead>Lớp</TableHead>
-                <TableHead className="text-center">Điểm tối đa</TableHead>
-                <TableHead>Hạn nộp</TableHead>
-                <TableHead className="text-center">Bài nộp</TableHead>
-                <TableHead className="w-28"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assignments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
-                    <ClipboardList className="size-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-400">Chưa có bài tập nào</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowForm(true)}>
-                      <Plus className="size-3 mr-1" /> Tạo bài tập đầu tiên
+      {/* Assignments Card List */}
+      <div className="grid grid-cols-1 gap-4">
+        {assignments.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+            <FileText className="size-12 text-gray-200 mx-auto mb-4" />
+            <p className="text-gray-400">Chưa có bài tập nào</p>
+            <Button variant="outline" size="sm" className="mt-3 rounded-xl" onClick={() => setShowForm(true)}>
+              <Plus className="size-3 mr-1" /> Tạo bài tập đầu tiên
+            </Button>
+          </div>
+        ) : (
+          assignments.map((a) => {
+            const className = getClassName(a.classId);
+            const totalAssigned = (() => {
+              if (a.studentIds) {
+                try { const ids = JSON.parse(a.studentIds); if (Array.isArray(ids) && ids.length > 0) return ids.length; } catch {}
+              }
+              return 0; // 0 = unknown (whole class)
+            })();
+            const progressPct = totalAssigned > 0
+              ? Math.min(Math.round((a.submissionCount / totalAssigned) * 100), 100)
+              : 0;
+            const showProgressBar = totalAssigned > 0;
+            return (
+              <div
+                key={a.id}
+                className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col lg:flex-row lg:items-center gap-6 hover:shadow-lg transition-all group"
+              >
+                {/* Icon */}
+                <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <FileText className="size-7" />
+                </div>
+                {/* Title + meta */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900 truncate">{a.title}</h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    {className && (
+                      <Badge variant="outline" className="text-xs">{className}</Badge>
+                    )}
+                    <span className="text-sm text-gray-500">
+                      Điểm tối đa: <span className="font-semibold">{a.maxScore}</span>
+                    </span>
+                    {a.dueDate && (
+                      <span className="text-sm text-gray-400 flex items-center gap-1">
+                        · Hạn: {new Date(a.dueDate).toLocaleDateString("vi-VN")}
+                      </span>
+                    )}
+                  </div>
+                  {/* Progress */}
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="h-1.5 flex-1 max-w-[200px] bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          showProgressBar ? "bg-primary" : a.submissionCount > 0 ? "bg-emerald-400" : "bg-gray-200"
+                        }`}
+                        style={{ width: showProgressBar ? `${Math.max(progressPct, 2)}%` : a.submissionCount > 0 ? "100%" : "0%" }}
+                      />
+                    </div>
+                    <Badge variant={a.submissionCount > 0 ? "default" : "outline"} className="text-xs">
+                      {a.submissionCount} bài nộp
+                    </Badge>
+                  </div>
+                </div>
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => handleEditClick(a)} className="text-primary hover:bg-primary/10 rounded-xl">
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Link href={`${basePath}/assignments/${a.id}`}>
+                    <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 rounded-xl">
+                      <Eye className="size-4" />
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assignments.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium text-gray-900">{a.title}</TableCell>
-                    <TableCell>
-                      {a.classId ? (
-                        <Badge variant="outline" className="text-xs">{getClassName(a.classId)}</Badge>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center text-gray-500">{a.maxScore}</TableCell>
-                    <TableCell className="text-gray-500 text-sm">
-                      {a.dueDate ? new Date(a.dueDate).toLocaleDateString("vi-VN") : "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={a.submissionCount > 0 ? "default" : "outline"} className="text-xs">
-                        {a.submissionCount}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="sm" onClick={() => handleEditClick(a)}>
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Link href={`${basePath}/assignments/${a.id}`}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="size-3" />
-                          </Button>
-                        </Link>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(a.id)}
-                          className="text-red-500 hover:text-red-700">
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </Link>
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(a.id)} className="text-red-500 hover:bg-red-50 rounded-xl">
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
-      {/* Edit dialog */}
+      {/* Edit dialog — Stitch style */}
       <Dialog open={!!editingAssignment} onOpenChange={(open) => { if (!open) { setEditingAssignment(null); setEditForm({}); setEditError(null); } }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingAssignment ? `Sửa: ${editingAssignment.title}` : "Sửa bài tập"}</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4">
-            {editError && <div className="p-3 bg-red-50 rounded-lg text-sm text-red-600">{editError}</div>}
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl p-0 gap-0 overflow-hidden rounded-2xl [&>button]:top-4 [&>button]:right-4">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-xl font-bold text-gray-900">Chỉnh sửa bài tập</h3>
+          </div>
+          {/* Body */}
+          <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+            {editError && <div className="p-3 bg-red-50 rounded-xl text-sm text-red-600">{editError}</div>}
+
+            {/* Tên bài tập */}
             <div>
-              <Label htmlFor="edit-title">Tiêu đề</Label>
-              <Input
-                id="edit-title"
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Tên bài tập</label>
+              <input
+                type="text"
                 value={editForm.title || ""}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                placeholder="Nhập tên bài tập"
               />
             </div>
-            <div>
-              <Label htmlFor="edit-desc">Mô tả</Label>
-              <Textarea
-                id="edit-desc"
-                value={editForm.description || ""}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-rubric">Tiêu chí chấm điểm</Label>
-              <Textarea
-                id="edit-rubric"
-                value={editForm.rubric || ""}
-                onChange={(e) => setEditForm({ ...editForm, rubric: e.target.value })}
-                rows={2}
-              />
-            </div>
+
+            {/* Môn học + Lớp học */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-score">Điểm tối đa</Label>
-                <Input
-                  id="edit-score"
-                  type="number"
-                  value={editForm.maxScore || "100"}
-                  onChange={(e) => setEditForm({ ...editForm, maxScore: e.target.value })}
-                  min={1}
-                />
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Môn học</label>
+                <select
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                  value={editForm.subjectId || ""}
+                  onChange={(e) => setEditForm({ ...editForm, subjectId: e.target.value })}
+                >
+                  <option value="">Chọn môn học</option>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <Label htmlFor="edit-due">Hạn nộp</Label>
-                <Input
-                  id="edit-due"
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Lớp học</label>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {editForm.classId && classes.find((c) => c.id === editForm.classId) ? (
+                    <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      {classes.find((c) => c.id === editForm.classId)?.name}
+                      <button type="button" onClick={() => setEditForm({ ...editForm, classId: "" })} className="hover:text-red-500 transition-colors ml-0.5">
+                        <MaterialIcon name="close" className="text-sm" />
+                      </button>
+                    </span>
+                  ) : (
+                    <select
+                      className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm flex-1"
+                      value=""
+                      onChange={(e) => setEditForm({ ...editForm, classId: e.target.value })}
+                    >
+                      <option value="">Chọn lớp học...</option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Hạn nộp */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Hạn nộp</label>
+              <div className="relative">
+                <MaterialIcon name="calendar_today" className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl" />
+                <input
                   type="datetime-local"
                   value={editForm.dueDate || ""}
                   onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                  className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="edit-resubmit"
-                checked={editForm.allowResubmit === "true"}
-                onChange={(e) => setEditForm({ ...editForm, allowResubmit: String(e.target.checked) })}
-                className="size-4 rounded border-gray-300"
+
+            {/* Mô tả */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Mô tả bài tập</label>
+              <textarea
+                value={editForm.description || ""}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm resize-none"
+                placeholder="Nhập mô tả bài tập..."
               />
-              <Label htmlFor="edit-resubmit" className="cursor-pointer">Cho phép nộp lại</Label>
             </div>
-            <Button onClick={handleEditSave} disabled={savingEdit} className="w-full">
+
+            {/* Điểm tối đa */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Điểm tối đa</label>
+              <input
+                type="number"
+                value={editForm.maxScore || "100"}
+                onChange={(e) => setEditForm({ ...editForm, maxScore: e.target.value })}
+                min={1}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+              />
+            </div>
+
+            {/* Toggle: Cho phép nộp muộn */}
+            <label className="flex items-center justify-between cursor-pointer pt-2">
+              <span className="text-base font-semibold text-gray-900">Cho phép nộp muộn</span>
+              <div className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={editForm.allowResubmit === "true"}
+                  onChange={(e) => setEditForm({ ...editForm, allowResubmit: String(e.target.checked) })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+              </div>
+            </label>
+          </div>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => { setEditingAssignment(null); setEditForm({}); setEditError(null); }}
+              className="px-6 py-2.5 border border-gray-300 text-gray-600 font-bold rounded-xl hover:bg-gray-100 transition-all"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={handleEditSave}
+              disabled={savingEdit}
+              className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
               {savingEdit ? "Đang lưu..." : "Lưu thay đổi"}
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>

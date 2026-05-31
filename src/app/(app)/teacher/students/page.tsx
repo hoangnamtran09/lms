@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Pencil, Check, X, Plus, ChevronUp, UserPlus } from "lucide-react";
+  import { ArrowLeft, Plus, ChevronUp, UserPlus } from "lucide-react";
+  import { MaterialIcon } from "@/components/ui/material-icon";
+  import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -289,44 +291,32 @@ export default function TeacherStudentsPage() {
                 </TableRow>
               ) : (
                 students.map((s) => {
-                  const isEditing = editingId === s.id;
                   return (
-                    <TableRow key={s.id} className={isEditing ? "bg-blue-50/50" : ""}>
-                      <TableCell className="font-medium text-gray-900">
-                        {isEditing ? <Input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} /> : s.fullName}
+                    <TableRow key={s.id} className="group hover:bg-gray-50/70 transition-colors">
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                            {s.fullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{s.fullName}</p>
+                            <p className="text-[12px] text-gray-400">{s.email || "—"}</p>
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-gray-500">
-                        {isEditing ? <Input value={editUsername} onChange={(e) => setEditUsername(e.target.value)} /> : s.username}
+                      <TableCell className="py-4 text-sm text-gray-600">{s.username}</TableCell>
+                      <TableCell className="py-4 text-sm text-gray-500">{s.email || "—"}</TableCell>
+                      <TableCell className="py-4">
+                        <Badge variant="outline" className="text-xs">{getClassName(s.classId) || "—"}</Badge>
                       </TableCell>
-                      <TableCell className="text-gray-500">
-                        {isEditing ? <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /> : s.email || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <Select value={editClassId} onValueChange={(v) => setEditClassId(v || "")}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Chọn lớp" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">-- Chưa chọn --</SelectItem>
-                              {filteredClasses(editGradeFilter).map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">{getClassName(s.classId) || "—"}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {isEditing ? (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => handleSave(s.id)} disabled={saving} className="text-emerald-600 hover:text-emerald-700"><Check className="size-3" /></Button>
-                              <Button variant="outline" size="sm" onClick={cancelEdit} disabled={saving}><X className="size-3" /></Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => startEdit(s)} disabled={editingId !== null || s.id === me?.id}><Pencil className="size-3" /></Button>
-                              <Button variant="outline" size="sm" onClick={() => handleDelete(s.id)} disabled={s.id === me?.id || editingId !== null} className="text-red-500 hover:text-red-700"><Trash2 className="size-3" /></Button>
-                            </>
-                          )}
+                      <TableCell className="py-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => startEdit(s)} disabled={s.id === me?.id} className="text-primary hover:bg-primary/10 rounded-lg" title="Sửa">
+                            <MaterialIcon name="edit" className="text-xl" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)} disabled={s.id === me?.id} className="text-red-500 hover:bg-red-50 rounded-lg" title="Xoá">
+                            <MaterialIcon name="delete" className="text-xl" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -337,6 +327,57 @@ export default function TeacherStudentsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit student dialog */}
+      <Dialog open={editingId !== null} onOpenChange={(open) => { if (!open) cancelEdit(); }}>
+        <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden rounded-2xl [&>button]:top-4 [&>button]:right-4">
+          <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-xl font-bold text-gray-900">Chỉnh sửa thông tin học sinh</h3>
+          </div>
+          <div className="px-6 py-6 space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Họ và tên</label>
+              <input type="text" value={editFullName} onChange={(e) => setEditFullName(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+              <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Tên đăng nhập</label>
+                <input type="text" value={editUsername} disabled
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-400 cursor-not-allowed text-sm font-medium" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Lớp học</label>
+                <select value={editClassId} onChange={(e) => setEditClassId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm">
+                  <option value="">-- Chưa chọn --</option>
+                  {filteredClasses(editGradeFilter).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {editError && <p className="text-sm text-red-500">{editError}</p>}
+            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3 items-start">
+              <MaterialIcon name="info" filled className="text-primary text-xl shrink-0" />
+              <p className="text-xs text-gray-600 leading-relaxed">Cập nhật thông tin học sinh sẽ có hiệu lực ngay lập tức.</p>
+            </div>
+          </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+            <button type="button" onClick={cancelEdit}
+              className="px-6 py-2.5 text-gray-600 font-semibold hover:bg-gray-100 transition-colors rounded-xl border border-gray-300">Hủy</button>
+            <button type="button" onClick={() => editingId && handleSave(editingId)} disabled={saving}
+              className="px-8 py-2.5 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/20 disabled:opacity-50">
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

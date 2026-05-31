@@ -54,24 +54,22 @@ func (s *Service) Generate(ctx context.Context, userID string, weekStart, weekEn
 	currentStr := s.formatDataForPrompt(currentData)
 	prevStr := s.formatDataForPrompt(prevData)
 
-	prompt := ai.BuildWeeklyReportPrompt(currentStr, prevStr)
+	var aiResp AIReportResponse
 
-	response, err := s.aiSvc.Chat([]ai.ChatMessage{
+	// Try AI first; fall back to rule-based if AI fails or is not configured
+	prompt := ai.BuildWeeklyReportPrompt(currentStr, prevStr)
+	response, aiErr := s.aiSvc.Chat([]ai.ChatMessage{
 		{Role: "system", Content: "Bạn là chuyên gia phân tích học tập. Chỉ trả về JSON, không thêm markdown hay text khác."},
 		{Role: "user", Content: prompt},
 	})
-	if err != nil {
-		return nil, fmt.Errorf("AI error: %w", err)
-	}
-
-	var aiResp AIReportResponse
-	cleaned := extractJSON(response)
-	if err := json.Unmarshal([]byte(cleaned), &aiResp); err != nil {
-		aiResp = AIReportResponse{
-			Title:             "Báo cáo tuần",
-			OverallAssessment: "neutral",
-			CoachMessage:      response,
+	if aiErr == nil {
+		cleaned := extractJSON(response)
+		if err := json.Unmarshal([]byte(cleaned), &aiResp); err != nil {
+			aiResp = generateSimpleReport(currentData, prevData)
 		}
+	} else {
+		// AI unavailable — use rule-based report
+		aiResp = generateSimpleReport(currentData, prevData)
 	}
 
 	reportJSON, _ := json.Marshal(ReportData{
@@ -230,6 +228,154 @@ func (s *Service) formatDataForPrompt(d gatheredData) string {
 	}
 
 	return sb.String()
+}
+
+// generateSimpleReport creates a coaching report from data without AI.
+func generateSimpleReport(current, previous gatheredData) AIReportResponse {
+	var (
+		totalMins      = current.totalMinutes
+		prevMins       = previous.totalMinutes
+		assignments    = current.completedAssignments
+		avgScore       = current.avgScore
+		diamonds       = current.diamonds
+		streak         = current.streak
+		weaknesses     = current.topWeaknesses
+	)
+
+	// --- Overall assessment ---
+	assessment := "neutral"
+	if totalMins >= 300 && avgScore >= 7.0 && len(weaknesses) <= 1 {
+		assessment = "great"
+	} else if totalMins < 60 || avgScore < 5.0 && assignments > 0 {
+		assessment = "needs_improvement"
+	} else if totalMins >= 120 || avgScore >= 6.0 {
+		assessment = "good"
+	}
+
+	// --- Title ---
+	title := "Báo cáo tuần"
+	if assessment == "great" {
+		title = "Tuần học xuất sắc!"
+	} else if assessment == "good" {
+		title = "Tuần học hiệu quả"
+	} else if assessment == "needs_improvement" {
+		title = "Cần cố gắng thêm"
+	}
+
+	// --- Coach message ---
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("📊 **Tổng thời gian học:** %d giờ %d phút", totalMins/60, totalMins%60))
+
+	if prevMins > 0 {
+		diff := totalMins - prevMins
+		if diff > 0 {
+			msg.WriteString(fmt.Sprintf(" (tăng %d phút so với tuần trước).\n", diff))
+		} else if diff < 0 {
+			msg.WriteString(fmt.Sprintf(" (giảm %d phút so với tuần trước).\n", -diff))
+		} else {
+			msg.WriteString(" (bằng tuần trước).\n")
+		}
+	} else {
+		msg.WriteString(".\n")
+	}
+
+	if assignments > 0 {
+		msg.WriteString(fmt.Sprintf("📝 **%d bài tập** đã hoàn thành, điểm trung bình **%.1f**.\n", assignments, avgScore))
+	}
+
+	msg.WriteString(fmt.Sprintf("💎 **%d kim cương** kiếm được tuần này.\n", diamonds))
+
+	if streak > 0 {
+		msg.WriteString(fmt.Sprintf("🔥 Streak học tập: **%d ngày liên tiếp**.\n", streak))
+	}
+
+	// --- Recommendations based on data ---
+	msg.WriteString("\n---\n\n")
+	if assessment == "great" {
+		msg.WriteString("🌟 Bạn đang có một tuần học rất tốt! Tiếp tục duy trì phong độ này nhé.\n")
+	} else if totalMins < 60 {
+		msg.WriteString("⏰ Hãy dành thêm thời gian học tập mỗi ngày. Mỗi ngày 30 phút sẽ tạo ra khác biệt lớn!\n")
+	}
+
+	if avgScore < 6.0 && assignments > 0 {
+		msg.WriteString("📚 Điểm trung bình còn thấp — hãy xem lại các câu sai và học từ những lỗi đó.\n")
+	}
+
+	if len(weaknesses) > 0 {
+		msg.WriteString("\n🎯 **Điểm cần cải thiện:**\n")
+		for _, w := range weaknesses {
+			msg.WriteString(fmt.Sprintf("  - **%s** (%d lỗi)\n", w.Topic, w.ErrorCount))
+		}
+	} else if assignments > 0 {
+		msg.WriteString("\n✅ Không có điểm yếu nào được ghi nhận — rất tốt!\n")
+	}
+
+	if prevMins > 0 && totalMins < prevMins {
+		msg.WriteString("\n📉 Thời gian học giảm so với tuần trước. Hãy lên lịch học cố định mỗi ngày để duy trì đều đặn.\n")
+	}
+
+	// Trend comparison
+	trend := "ổn định"
+	if previous.totalMinutes > 0 {
+		if totalMins > previous.totalMinutes {
+			trend = fmt.Sprintf("tăng %d phút so với tuần trước", totalMins-prevMins)
+		} else if totalMins < previous.totalMinutes {
+			trend = fmt.Sprintf("giảm %d phút so với tuần trước", prevMins-totalMins)
+		}
+	}
+
+	return AIReportResponse{
+		Title:             title,
+		OverallAssessment: assessment,
+		CoachMessage:      msg.String(),
+		Highlights:        buildHighlights(current, assessment),
+		TrendComparison:   trend,
+		Recommendations:   buildRecommendations(current),
+	}
+}
+
+func buildHighlights(d gatheredData, assessment string) []string {
+	var s []string
+	if d.totalMinutes >= 120 {
+		s = append(s, fmt.Sprintf("⏱️ %d phút học tập trong tuần", d.totalMinutes))
+	}
+	if d.avgScore >= 7.0 && d.completedAssignments > 0 {
+		s = append(s, fmt.Sprintf("📝 Điểm trung bình %.1f — làm tốt!", d.avgScore))
+	}
+	if d.streak >= 3 {
+		s = append(s, fmt.Sprintf("🔥 Streak %d ngày liên tiếp", d.streak))
+	}
+	if d.diamonds >= 20 {
+		s = append(s, fmt.Sprintf("💎 %d kim cương kiếm được", d.diamonds))
+	}
+	if len(s) == 0 {
+		s = append(s, "🚀 Đã bắt đầu hành trình học tập")
+	}
+	return s
+}
+
+func buildRecommendations(d gatheredData) []string {
+	var a []string
+	if d.totalMinutes < 120 {
+		a = append(a, "Đặt mục tiêu học ít nhất 20 phút mỗi ngày")
+	}
+	if d.completedAssignments == 0 {
+		a = append(a, "Hoàn thành ít nhất 1 bài tập mỗi tuần để củng cố kiến thức")
+	}
+	if d.avgScore < 6.0 && d.completedAssignments > 0 {
+		a = append(a, "Xem lại các câu sai và ghi chú kiến thức cần nhớ")
+	}
+	if len(d.topWeaknesses) > 2 {
+		a = append(a, "Dành thêm thời gian cho các chủ đề yếu")
+	}
+	if len(a) == 0 && d.totalMinutes >= 120 {
+		a = append(a, "Tiếp tục duy trì lịch học đều đặn")
+		a = append(a, "Thử thách bản thân với bài tập nâng cao")
+	}
+	if len(a) == 0 {
+		a = append(a, "Bắt đầu học ngay hôm nay — mỗi phút đều có giá trị!")
+	}
+	return a
 }
 
 func previousWeek(weekStart string) (string, string) {

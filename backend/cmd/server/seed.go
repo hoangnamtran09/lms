@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/lms/backend/internal/achievements"
 	"github.com/lms/backend/internal/assignments"
 	"github.com/lms/backend/internal/config"
 	"github.com/lms/backend/internal/users"
@@ -18,6 +20,28 @@ import (
 )
 
 func seed(db *gorm.DB, cfg *config.Config) error {
+	// Seed achievements — always run when table is empty (idempotent)
+	var achCount int64
+	db.Model(&achievements.Achievement{}).Count(&achCount)
+	if achCount == 0 {
+		defaultAchievements := []achievements.Achievement{
+			{ID: uuid.New().String(), Title: "Người mới bắt đầu", Description: "Hoàn thành bài học đầu tiên", Icon: "Star", RuleType: "lessons_completed", Threshold: 1, DiamondReward: 10, IsActive: true},
+			{ID: uuid.New().String(), Title: "Chăm chỉ", Description: "Đạt streak 3 ngày liên tiếp", Icon: "Flame", RuleType: "study_streak", Threshold: 3, DiamondReward: 20, IsActive: true},
+			{ID: uuid.New().String(), Title: "Siêng năng", Description: "Đạt streak 7 ngày liên tiếp", Icon: "Flame", RuleType: "study_streak", Threshold: 7, DiamondReward: 50, IsActive: true},
+			{ID: uuid.New().String(), Title: "Nhà thông thái", Description: "Học tổng cộng 10 bài học", Icon: "BookOpen", RuleType: "lessons_completed", Threshold: 10, DiamondReward: 100, IsActive: true},
+			{ID: uuid.New().String(), Title: "Vua trắc nghiệm", Description: "Vượt qua 5 bài kiểm tra", Icon: "Target", RuleType: "quizzes_passed", Threshold: 5, DiamondReward: 50, IsActive: true},
+			{ID: uuid.New().String(), Title: "Kim cương đầu tiên", Description: "Tích luỹ 50 kim cương", Icon: "Gem", RuleType: "diamonds_earned", Threshold: 50, DiamondReward: 20, IsActive: true},
+			{ID: uuid.New().String(), Title: "Chăm làm bài tập", Description: "Hoàn thành 5 bài tập", Icon: "Medal", RuleType: "assignments_done", Threshold: 5, DiamondReward: 30, IsActive: true},
+			{ID: uuid.New().String(), Title: "Cao thủ kim cương", Description: "Tích luỹ 200 kim cương", Icon: "Crown", RuleType: "diamonds_earned", Threshold: 200, DiamondReward: 50, IsActive: true},
+		}
+		for i := range defaultAchievements {
+			if err := db.Create(&defaultAchievements[i]).Error; err != nil {
+				return fmt.Errorf("seed achievement: %w", err)
+			}
+		}
+		log.Printf("Seeded %d default achievements", len(defaultAchievements))
+	}
+
 	var count int64
 	db.Model(&users.User{}).Where("username = ?", "admin").Count(&count)
 	if count > 0 {

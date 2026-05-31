@@ -243,7 +243,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			Post("/api/assignments", h.Assignments.Create)
 		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActWrite)).
 			Patch("/api/assignments/{id}", h.Assignments.Update)
-		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActManage)).
+		r.With(middleware.RequirePermission(permissions.ResAssignments, permissions.ActWrite)).
 			Delete("/api/assignments/{id}", h.Assignments.Delete)
 
 		// Assignment file upload (PDF)
@@ -380,6 +380,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.With(middleware.RequirePermission(permissions.ResAchievements, permissions.ActManage)).
 			Delete("/api/achievements/{id}", h.Achievements.Delete)
 		r.Get("/api/achievements/my", h.Achievements.MyAchievements)
+		r.Post("/api/achievements/evaluate", h.Achievements.Evaluate)
 		r.With(middleware.RequirePermission(permissions.ResAchievements, permissions.ActManage)).
 			Post("/api/achievements/award", h.Achievements.AwardAchievement)
 

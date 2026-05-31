@@ -99,6 +99,8 @@ export default function CreateAssignmentPage() {
   const [dueDate, setDueDate] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
 
   // AI-generated
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
@@ -552,71 +554,161 @@ export default function CreateAssignmentPage() {
               {/* === MODE: Thủ công === */}
               {creationMode === "manual" && (
                 <div className="space-y-6">
+                  {/* Step badge */}
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary text-white px-3 py-1 rounded-full text-xs font-bold uppercase">Bước 2</div>
+                    <h3 className="text-lg font-bold text-gray-900 uppercase tracking-wide">Nhập thông tin chi tiết</h3>
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="mtitle" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tiêu đề</Label>
-                        <Input id="mtitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nhập tiêu đề bài tập" className="rounded-xl" />
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Tiêu đề</label>
+                        <input
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="VD: Kiểm tra giữa kỳ Chương 1 - Giải tích"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        />
                       </div>
                       <div>
-                        <Label htmlFor="mdesc" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Mô tả / Câu hỏi</Label>
-                        <Textarea id="mdesc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Nhập nội dung câu hỏi hoặc yêu cầu bài tập" rows={5} className="rounded-xl" />
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Môn học</label>
+                        <select
+                          value={selectedSubjectId}
+                          onChange={(e) => setSelectedSubjectId(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        >
+                          <option value="">Chọn môn học</option>
+                          {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
                       </div>
                       <div>
-                        <Label htmlFor="mrubric" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tiêu chí chấm điểm</Label>
-                        <Textarea id="mrubric" value={rubric} onChange={(e) => setRubric(e.target.value)} placeholder="VD: Trả lời đúng ý chính: 50%, Lập luận rõ ràng: 30%, Trình bày: 20%" rows={3} className="rounded-xl" />
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Lớp học</label>
+                        <select
+                          value={classId}
+                          onChange={(e) => setClassId(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        >
+                          <option value="">Tất cả các lớp</option>
+                          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Hạn nộp</label>
+                        <input
+                          type="datetime-local"
+                          value={dueDate}
+                          onChange={(e) => setDueDate(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        />
                       </div>
                     </div>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="mscore" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Điểm tối đa</Label>
-                          <Input id="mscore" type="number" value={maxScore} onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)} min={1} max={100} className="rounded-xl" />
-                        </div>
-                        <div>
-                          <Label htmlFor="mclass" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Lớp (tuỳ chọn)</Label>
-                          <Select value={classId} onValueChange={(v) => setClassId(v ?? "")}>
-                            <SelectTrigger id="mclass" className="rounded-xl"><SelectValue placeholder="Tất cả" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">Tất cả</SelectItem>
-                              {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Điểm tối đa</label>
+                        <input
+                          type="number"
+                          value={maxScore}
+                          onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
+                          min={1} max={100}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        />
                       </div>
                       <div>
-                        <Label htmlFor="mdue" className="text-xs font-bold text-gray-400 uppercase tracking-wide">Hạn nộp (tuỳ chọn)</Label>
-                        <Input id="mdue" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="rounded-xl" />
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Mô tả bài tập</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Nhập nội dung câu hỏi hoặc yêu cầu bài tập"
+                          rows={5}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm resize-none"
+                        />
                       </div>
                       <div>
-                        <Label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tệp đính kèm (PDF, tuỳ chọn)</Label>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Tệp đính kèm (PDF, tuỳ chọn)</label>
                         {selectedFile ? (
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl">
                             <span className="text-sm text-gray-600 truncate flex-1">{selectedFile.name}</span>
-                            <Button variant="outline" size="sm" onClick={() => setSelectedFile(null)} className="text-red-500 hover:text-red-700 shrink-0 rounded-lg">Gỡ</Button>
+                            <button type="button" onClick={() => setSelectedFile(null)} className="text-red-500 hover:text-red-700 text-sm font-medium">Gỡ</button>
                           </div>
                         ) : (
-                          <Input type="file" accept="application/pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="rounded-xl" />
+                          <label className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                            <span>📎</span> Đính kèm file
+                            <input type="file" accept="application/pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+                          </label>
                         )}
-                      </div>
-                      <div>
-                        <Label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Học sinh nhận bài (để trống = cả lớp)</Label>
-                        <div className="max-h-48 overflow-y-auto border rounded-xl p-2 space-y-0.5 mt-1">
-                          {students.map((s) => (
-                            <label key={s.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded-lg cursor-pointer">
-                              <input type="checkbox" checked={selectedStudentIds.includes(s.supabaseId)} onChange={() => setSelectedStudentIds((prev) => prev.includes(s.supabaseId) ? prev.filter((id) => id !== s.supabaseId) : [...prev, s.supabaseId])} className="rounded" />
-                              <span className="text-sm">{s.fullName}</span>
-                            </label>
-                          ))}
-                        </div>
-                        {selectedStudentIds.length > 0 && <p className="text-xs text-gray-500 mt-1">Đã chọn {selectedStudentIds.length} học sinh</p>}
                       </div>
                     </div>
                   </div>
+
+                  {/* Student selection — search + tags */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Học sinh nhận bài (để trống = cả lớp)</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={studentSearch}
+                        onChange={(e) => { setStudentSearch(e.target.value); setShowStudentDropdown(true); }}
+                        onFocus={() => setShowStudentDropdown(true)}
+                        placeholder="Tìm kiếm tên học sinh..."
+                        className="w-full pl-4 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                      />
+                      {showStudentDropdown && studentSearch.trim() && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 max-h-40 overflow-y-auto">
+                          {students.filter((s) => {
+                            if (selectedStudentIds.includes(s.supabaseId)) return false;
+                            return s.fullName.toLowerCase().includes(studentSearch.toLowerCase());
+                          }).length === 0 ? (
+                            <div className="p-3 text-sm text-gray-400 text-center">Không tìm thấy</div>
+                          ) : (
+                            students.filter((s) => {
+                              if (selectedStudentIds.includes(s.supabaseId)) return false;
+                              return s.fullName.toLowerCase().includes(studentSearch.toLowerCase());
+                            }).slice(0, 10).map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => { setSelectedStudentIds((prev) => [...prev, s.supabaseId]); setStudentSearch(""); setShowStudentDropdown(false); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
+                              >
+                                {s.fullName}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Selected tags */}
+                    {selectedStudentIds.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedStudentIds.map((supabaseId) => {
+                          const student = students.find((s) => s.supabaseId === supabaseId);
+                          return student ? (
+                            <span key={supabaseId} className="inline-flex items-center gap-1 bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-semibold border border-primary/20">
+                              {student.fullName}
+                              <button type="button" onClick={() => setSelectedStudentIds((prev) => prev.filter((id) => id !== supabaseId))} className="hover:text-red-500 transition-colors ml-0.5">
+                                <span className="text-sm">×</span>
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentIds([])}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          Xoá tất cả
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-1.5">Chưa chọn học sinh — bài tập sẽ được giao cho cả lớp</p>
+                    )}
+                  </div>
+
                   {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{createError}</div>}
                   <div className="flex gap-3 pt-2">
-                    <Button onClick={handleCreate} disabled={submitting} className="gap-2 rounded-xl">
-                      {submitting ? <><Loader2 className="size-4 animate-spin" /> Đang lưu nháp...</> : <><Plus className="size-4" /> Lưu bản nháp</>}
+                    <Button onClick={handleCreate} disabled={submitting} className="gap-2 rounded-xl shadow-md">
+                      {submitting ? <><Loader2 className="size-4 animate-spin" /> Đang lưu...</> : <><Plus className="size-4" /> Tạo bài tập</>}
                     </Button>
                     <Button variant="outline" onClick={() => switchMode("manual")} className="rounded-xl">Huỷ</Button>
                   </div>

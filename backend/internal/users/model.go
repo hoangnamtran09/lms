@@ -16,6 +16,7 @@ type User struct {
 	Email        string    `gorm:"size:255" json:"email"`
 	Role         string    `gorm:"size:20;not null;default:STUDENT" json:"role"`
 	ClassID      string    `gorm:"size:36" json:"classId"`
+	Phone        string    `gorm:"size:20" json:"phone"`
 	AvatarURL    string    `gorm:"size:500" json:"avatarUrl"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`

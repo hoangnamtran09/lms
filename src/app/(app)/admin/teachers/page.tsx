@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -262,31 +261,29 @@ export default function AdminTeachersPage() {
                 </div>
                 <div>
                   <Label>Khối lớp (lọc)</Label>
-                  <Select value={createGradeFilter} onValueChange={(v) => { setCreateGradeFilter(v || ""); setNewClassId(""); }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Tất cả khối" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Tất cả khối</SelectItem>
-                      {gradeLevels.map((gl) => (
-                        <SelectItem key={gl.id} value={gl.id}>{gl.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={createGradeFilter}
+                    onChange={(e) => { setCreateGradeFilter(e.target.value); setNewClassId(""); }}
+                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none w-full"
+                  >
+                    <option value="">Tất cả khối</option>
+                    {gradeLevels.map((gl) => (
+                      <option key={gl.id} value={gl.id}>{gl.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <Label htmlFor="new-class">Lớp phụ trách (tuỳ chọn)</Label>
-                  <Select value={newClassId} onValueChange={(v) => setNewClassId(v || "")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn lớp" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">-- Chưa chọn --</SelectItem>
-                      {filteredClasses(createGradeFilter).map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={newClassId}
+                    onChange={(e) => setNewClassId(e.target.value)}
+                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none w-full"
+                  >
+                    <option value="">-- Chưa chọn --</option>
+                    {filteredClasses(createGradeFilter).map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button onClick={handleCreate} disabled={creating} className="gap-2">
@@ -363,17 +360,16 @@ export default function AdminTeachersPage() {
                       </TableCell>
                       <TableCell>
                         {isEditing ? (
-                          <Select value={editClassId} onValueChange={(v) => setEditClassId(v || "")}>
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Chọn lớp" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">-- Chưa chọn --</SelectItem>
-                              {filteredClasses(editGradeFilter).map((c) => (
-                                <SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <select
+                            value={editClassId}
+                            onChange={(e) => setEditClassId(e.target.value)}
+                            className="h-8 text-xs px-2 rounded border border-gray-200 w-full"
+                          >
+                            <option value="">-- Chưa chọn --</option>
+                            {filteredClasses(editGradeFilter).map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</option>
+                            ))}
+                          </select>
                         ) : (
                           <Badge variant="outline" className="text-xs">{getClassName(t.classId) || "—"}</Badge>
                         )}

@@ -81,6 +81,10 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) MyAchievements(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
+
+	// Auto-evaluate on each view to award any newly earned achievements
+	h.service.Evaluate(r.Context(), claims.UserID)
+
 	var earned []struct {
 		UserAchievement
 		Title       string `json:"title"`
@@ -125,6 +129,20 @@ func (h *Handler) AwardAchievement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOk(w, ua)
+}
+
+// Evaluate checks and awards any newly earned achievements for the current user.
+func (h *Handler) Evaluate(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
+	awarded, err := h.service.Evaluate(r.Context(), claims.UserID)
+	if err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if awarded == nil {
+		awarded = []string{}
+	}
+	jsonOk(w, map[string]any{"awarded": awarded})
 }
 
 func extractID(path string) string {

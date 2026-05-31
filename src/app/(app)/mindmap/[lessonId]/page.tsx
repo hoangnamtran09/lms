@@ -216,22 +216,27 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
 
   // Fetch data
   useEffect(() => {
+    let cancelled = false;
     async function fetchMindMap() {
       try {
         const data = await api<GraphResult>("/api/ai/mindmap", {
           method: "POST",
           body: JSON.stringify({ lessonId }),
         });
-        setResult(data);
-        // Start with only central expanded
-        setExpandedIds(new Set(["central"]));
+        if (!cancelled) {
+          setResult(data);
+          setExpandedIds(new Set(["central"]));
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Không thể tạo sơ đồ tư duy");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Không thể tạo sơ đồ tư duy");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchMindMap();
+    return () => { cancelled = true; };
   }, [lessonId]);
 
   // Rebuild React Flow nodes/edges when visibility changes
@@ -464,10 +469,11 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
       </div>
 
       {selectedNode && (
-        <div className="p-4 rounded-xl border border-gray-200 bg-white">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="p-5 rounded-xl border border-gray-200 bg-white space-y-3">
+          {/* Header */}
+          <div className="flex items-center gap-2">
             <span
-              className={`size-2.5 rounded-full ${
+              className={`size-3 rounded-full shrink-0 ${
                 selectedNode.mastery === "weak"
                   ? "bg-red-500"
                   : selectedNode.mastery === "learning"
@@ -480,19 +486,75 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
               {selectedNode.type === "concept" ? "Nhánh chính" : selectedNode.type === "subtopic" ? "Ý phụ" : "Chi tiết"}
             </span>
             {(childrenMap[selectedNode.id] || []).length > 0 && !expandedIds.has(selectedNode.id) && (
-              <span className="text-xs text-blue-500">
+              <button
+                onClick={() => toggleNode(selectedNode.id)}
+                className="text-xs text-primary hover:underline font-medium"
+              >
                 +{(childrenMap[selectedNode.id] || []).length} ý — nhấn để mở
-              </span>
+              </button>
             )}
           </div>
-          <p className="text-sm text-gray-500">
-            {selectedNode.description ||
-              (selectedNode.mastery === "weak"
-                ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
+
+          {/* Description */}
+          <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {selectedNode.description ||
+                (selectedNode.mastery === "weak"
+                  ? "Bạn đang gặp khó khăn với khái niệm này. Hãy ôn tập thêm."
+                  : selectedNode.mastery === "learning"
+                  ? "Bạn đang trong quá trình học khái niệm này."
+                  : "Bạn đã nắm vững khái niệm này.")}
+            </p>
+          </div>
+
+          {/* Children preview */}
+          {(childrenMap[selectedNode.id] || []).length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                Các ý liên quan
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(childrenMap[selectedNode.id] || []).map((childId) => {
+                  const child = result?.nodes.find((n) => n.id === childId);
+                  if (!child) return null;
+                  return (
+                    <span
+                      key={childId}
+                      className={`text-xs px-2 py-1 rounded-full border ${
+                        child.mastery === "weak"
+                          ? "bg-red-50 border-red-200 text-red-700"
+                          : child.mastery === "learning"
+                          ? "bg-blue-50 border-blue-200 text-blue-700"
+                          : "bg-green-50 border-green-200 text-green-700"
+                      }`}
+                    >
+                      {child.label.length > 30 ? child.label.slice(0, 30) + "..." : child.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mastery status */}
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>Trạng thái:</span>
+            <span
+              className={`font-semibold ${
+                selectedNode.mastery === "weak"
+                  ? "text-red-600"
+                  : selectedNode.mastery === "learning"
+                  ? "text-blue-600"
+                  : "text-green-600"
+              }`}
+            >
+              {selectedNode.mastery === "weak"
+                ? "Cần ôn tập"
                 : selectedNode.mastery === "learning"
-                ? "Bạn đang trong quá trình học khái niệm này."
-                : "Bạn đã nắm vững khái niệm này.")}
-          </p>
+                ? "Đang học"
+                : "Đã thành thạo"}
+            </span>
+          </div>
         </div>
       )}
     </div>

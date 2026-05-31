@@ -85,7 +85,7 @@ export async function api<T>(path: string, options?: RequestInit & { timeout?: n
   const authHeaders = await getAuthHeaders();
   const controller = new AbortController();
   const timeout = options?.timeout ?? REQUEST_TIMEOUT;
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const timeoutId = setTimeout(() => controller.abort(new DOMException("Request timeout", "TimeoutError")), timeout);
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     signal: controller.signal,

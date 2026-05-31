@@ -39,7 +39,7 @@ func (s *Service) List(ctx context.Context, scope ScopeFilter) ([]Assignment, er
 		}
 		// Show assignments where: (class-wide AND no student filter) OR (student is specifically selected)
 		q = q.Where(
-			"((class_id = ? AND (student_ids = '' OR student_ids IS NULL)) OR student_ids LIKE ?) AND status IN ?",
+			"((class_id IN (?, '') AND (student_ids = '' OR student_ids IS NULL)) OR student_ids LIKE ?) AND status IN ?",
 			classID, "%\""+scope.UserID+"\"%", []string{StatusAssigned, StatusReturned},
 		)
 	case "TEACHER":

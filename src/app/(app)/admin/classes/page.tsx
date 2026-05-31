@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Pencil, School, GraduationCap } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { api, ApiError } from "@/lib/api-client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -200,20 +200,22 @@ export default function AdminClassesPage() {
         <ArrowLeft className="size-4" /> Quay lại
       </Link>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+      {/* Tab switcher — Stitch pill style */}
+      <div className="flex gap-2 mb-8 p-1 bg-gray-100 w-fit rounded-2xl">
         {([
-          { key: "classes", label: "Lớp học", icon: School },
-          { key: "grade-levels", label: "Khối lớp", icon: GraduationCap },
-        ] as const).map(({ key, label, icon: Icon }) => (
+          { key: "classes", label: "Lớp học", icon: "school" },
+          { key: "grade-levels", label: "Khối lớp", icon: "layers" },
+        ] as const).map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setTab(key as Tab)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              tab === key
+                ? "bg-white text-primary font-semibold shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            <Icon className="size-4" />
+            <MaterialIcon name={icon} filled={tab === key} className="text-[20px]" />
             {label}
           </button>
         ))}
@@ -222,13 +224,17 @@ export default function AdminClassesPage() {
       {/* === TAB: Lớp học === */}
       {tab === "classes" && (
         <>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Quản lí lớp học</h1>
-              <p className="text-sm text-gray-500 mt-1">Tạo và quản lí các lớp học theo khối</p>
+              <button onClick={() => window.history.back()} className="flex items-center text-primary text-sm font-medium gap-1 mb-2 hover:underline">
+                <MaterialIcon name="arrow_back" className="text-lg" />
+                Quay lại
+              </button>
+              <h2 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900">Quản lí lớp học</h2>
+              <p className="text-sm text-gray-500">Tạo và quản lí các lớp học theo khối học của nhà trường.</p>
             </div>
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditing(null); setError(""); } }}>
-              <DialogTrigger render={<Button onClick={openAdd}><Plus className="size-4" />Thêm lớp học</Button>} />
+              <DialogTrigger render={<Button onClick={openAdd} className="shadow-lg shadow-primary/20 rounded-xl"><MaterialIcon name="add" className="text-xl mr-1.5" />Thêm lớp học</Button>} />
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>{editing ? "Sửa lớp học" : "Thêm lớp học"}</DialogTitle>
@@ -274,58 +280,127 @@ export default function AdminClassesPage() {
             </Dialog>
           </div>
 
-          <Card className="rounded-xl ring-1 ring-foreground/10">
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="p-4"><Skeleton className="h-40 w-full" /></div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên lớp</TableHead>
-                      <TableHead>Khối</TableHead>
-                      <TableHead>Giáo viên CN</TableHead>
-                      <TableHead className="w-24"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {classes.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-gray-400 py-8">Chưa có lớp học nào</TableCell>
+          {/* Class Table — Stitch style */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+            {loading ? (
+              <div className="p-6"><Skeleton className="h-40 w-full" /></div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50/80">
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500">Tên lớp</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500">Khối</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500">Giáo viên CN</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500 text-right">Thao tác</TableHead>
                       </TableRow>
-                    ) : (
-                      classes.map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium text-gray-900">{c.name}</TableCell>
-                          <TableCell className="text-gray-500">{c.gradeLevelName || "—"}</TableCell>
-                          <TableCell className="text-gray-500">{c.teacherName || "—"}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="outline" size="sm" onClick={() => openEdit(c)}><Pencil className="size-3" /></Button>
-                              <Button variant="outline" size="sm" onClick={() => handleDeleteClass(c.id)} className="text-red-500 hover:text-red-700"><Trash2 className="size-3" /></Button>
-                            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {classes.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-gray-400 py-12">
+                            Chưa có lớp học nào
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                      ) : (
+                        classes.map((c) => (
+                          <TableRow key={c.id} className="group hover:bg-gray-50/70 transition-colors">
+                            <TableCell className="py-5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                                  {c.name.slice(0, 4)}
+                                </div>
+                                <span className="text-sm font-semibold text-gray-900">{c.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-5">
+                              <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">
+                                {c.gradeLevelName || "—"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-5">
+                              {c.teacherName ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold">
+                                    {c.teacherName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <span className="text-sm text-gray-700">{c.teacherName}</span>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-5">
+                              <div className="flex items-center justify-end gap-1">
+                                <Link href={`/admin/students?classId=${c.id}`} className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors inline-flex" title="Xem học sinh">
+                                  <MaterialIcon name="visibility" className="text-xl" />
+                                </Link>
+                                <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 rounded-lg" title="Sửa" onClick={() => openEdit(c)}>
+                                  <MaterialIcon name="edit" className="text-xl" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 rounded-lg" title="Xoá" onClick={() => handleDeleteClass(c.id)}>
+                                  <MaterialIcon name="delete" className="text-xl" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                {/* Footer */}
+                <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-sm text-gray-500">Hiển thị {classes.length} lớp học</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Stats Bento */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 flex items-start justify-between shadow-sm hover:shadow-md transition-all group">
+              <div>
+                <p className="text-gray-500 font-medium mb-1">Tổng số lớp</p>
+                <h3 className="text-3xl font-bold text-gray-900">{classes.length}</h3>
+              </div>
+              <div className="p-3 bg-primary/10 text-primary rounded-xl group-hover:rotate-6 transition-transform">
+                <MaterialIcon name="meeting_room" className="text-[28px]" />
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 flex items-start justify-between shadow-sm hover:shadow-md transition-all group">
+              <div>
+                <p className="text-gray-500 font-medium mb-1">Khối lớp</p>
+                <h3 className="text-3xl font-bold text-gray-900">{gradeLevels.length}</h3>
+              </div>
+              <div className="p-3 bg-pink-50 text-pink-600 rounded-xl group-hover:rotate-6 transition-transform">
+                <MaterialIcon name="layers" className="text-[28px]" />
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-gray-200 flex items-start justify-between shadow-sm hover:shadow-md transition-all group">
+              <div>
+                <p className="text-gray-500 font-medium mb-1">Giáo viên</p>
+                <h3 className="text-3xl font-bold text-gray-900">{teachers.length}</h3>
+              </div>
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:rotate-6 transition-transform">
+                <MaterialIcon name="person_check" className="text-[28px]" />
+              </div>
+            </div>
+          </div>
         </>
       )}
 
       {/* === TAB: Khối lớp === */}
       {tab === "grade-levels" && (
         <>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Quản lí khối lớp</h1>
-              <p className="text-sm text-gray-500 mt-1">Tạo và quản lí các khối lớp (lớp 1, lớp 2, ...)</p>
+              <h2 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900">Quản lí khối lớp</h2>
+              <p className="text-sm text-gray-500">Tạo và quản lí các khối lớp (lớp 10, lớp 11, ...)</p>
             </div>
             <Dialog open={glDialogOpen} onOpenChange={(open) => { setGlDialogOpen(open); if (!open) { setEditingGl(null); setGlError(""); } }}>
-              <DialogTrigger render={<Button onClick={openAddGl}><Plus className="size-4" />Thêm khối lớp</Button>} />
+              <DialogTrigger render={<Button onClick={openAddGl} className="shadow-lg shadow-primary/20 rounded-xl"><MaterialIcon name="add" className="text-xl mr-1.5" />Thêm khối lớp</Button>} />
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>{editingGl ? "Sửa khối lớp" : "Thêm khối lớp"}</DialogTitle>
@@ -348,33 +423,39 @@ export default function AdminClassesPage() {
             </Dialog>
           </div>
 
-          <Card className="rounded-xl ring-1 ring-foreground/10">
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="p-4"><Skeleton className="h-40 w-full" /></div>
-              ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+            {loading ? (
+              <div className="p-6"><Skeleton className="h-40 w-full" /></div>
+            ) : (
+              <>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Tên khối</TableHead>
-                      <TableHead className="text-center">Cấp độ</TableHead>
-                      <TableHead className="w-24"></TableHead>
+                    <TableRow className="bg-gray-50/80">
+                      <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500">Tên khối</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500 text-center">Cấp độ</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-500 text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {gradeLevels.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-gray-400 py-8">Chưa có khối lớp nào</TableCell>
+                        <TableCell colSpan={3} className="text-center text-gray-400 py-12">Chưa có khối lớp nào</TableCell>
                       </TableRow>
                     ) : (
                       gradeLevels.map((gl) => (
-                        <TableRow key={gl.id}>
-                          <TableCell className="font-medium text-gray-900">{gl.name}</TableCell>
-                          <TableCell className="text-center text-gray-500">{gl.level}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="outline" size="sm" onClick={() => openEditGl(gl)}><Pencil className="size-3" /></Button>
-                              <Button variant="outline" size="sm" onClick={() => handleDeleteGl(gl.id)} className="text-red-500 hover:text-red-700"><Trash2 className="size-3" /></Button>
+                        <TableRow key={gl.id} className="group hover:bg-gray-50/70 transition-colors">
+                          <TableCell className="py-5 font-semibold text-gray-900">{gl.name}</TableCell>
+                          <TableCell className="py-5 text-center">
+                            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">{gl.level}</span>
+                          </TableCell>
+                          <TableCell className="py-5">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 rounded-lg" title="Sửa" onClick={() => openEditGl(gl)}>
+                                <MaterialIcon name="edit" className="text-xl" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 rounded-lg" title="Xoá" onClick={() => handleDeleteGl(gl.id)}>
+                                <MaterialIcon name="delete" className="text-xl" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -382,11 +463,14 @@ export default function AdminClassesPage() {
                     )}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+                <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-sm text-gray-500">Hiển thị {gradeLevels.length} khối lớp</p>
+                </div>
+              </>
+            )}
+          </div>
+          </>
+        )}
     </div>
   );
 }

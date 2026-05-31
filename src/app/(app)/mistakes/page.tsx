@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, TrendingUp, BookOpen, CheckCircle, HelpCircle, FileText, UserCheck, Clock, ChevronDown, ChevronUp, Dumbbell, Loader2 } from "lucide-react";
+import { TrendingUp, CheckCircle, ChevronDown, Loader2, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface WeaknessProfile {
   id: string;
@@ -34,12 +35,34 @@ interface LessonContext {
   gradeLevel: number;
 }
 
-const sourceConfig: Record<string, { icon: typeof HelpCircle; label: string; color: string }> = {
-  quiz: { icon: HelpCircle, label: "Quiz", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  exercise: { icon: FileText, label: "Bài tập", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  profile: { icon: UserCheck, label: "GV thiết lập", color: "bg-red-50 text-red-700 border-red-200" },
-  progress: { icon: Clock, label: "Kẹt bài", color: "bg-orange-50 text-orange-700 border-orange-200" },
+const sourceConfig: Record<string, { label: string; color: string }> = {
+  quiz: { label: "Quiz", color: "bg-blue-50 text-blue-700" },
+  exercise: { label: "Bài tập", color: "bg-purple-50 text-purple-700" },
+  profile: { label: "GV thiết lập", color: "bg-red-50 text-red-700" },
+  progress: { label: "Kẹt bài", color: "bg-orange-50 text-orange-700" },
 };
+
+function getSubjectColor(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("toán")) return "bg-blue-100 text-blue-600";
+  if (lower.includes("văn") || lower.includes("việt")) return "bg-pink-100 text-pink-600";
+  if (lower.includes("anh")) return "bg-emerald-100 text-emerald-600";
+  if (lower.includes("lý")) return "bg-purple-100 text-purple-600";
+  if (lower.includes("hóa")) return "bg-indigo-100 text-indigo-600";
+  if (lower.includes("sinh")) return "bg-teal-100 text-teal-600";
+  return "bg-amber-100 text-amber-600";
+}
+
+function getSubjectIcon(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("toán")) return "functions";
+  if (lower.includes("văn") || lower.includes("việt")) return "menu_book";
+  if (lower.includes("anh")) return "translate";
+  if (lower.includes("lý")) return "bolt";
+  if (lower.includes("hóa")) return "science";
+  if (lower.includes("sinh")) return "biotech";
+  return "book_4";
+}
 
 export default function MistakesPage() {
   const router = useRouter();
@@ -141,11 +164,17 @@ export default function MistakesPage() {
     );
   }
 
+  const resolvedCount = profiles.filter((p) => p.resolved).length || 0;
+  const totalErrors = profiles.reduce((s, p) => s + p.errorCount, 0);
+
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Điểm yếu & Cải thiện</h1>
-        <p className="text-sm text-gray-500 mt-1">Những chủ đề bạn cần ôn luyện thêm, gom theo môn học</p>
+    <div className="animate-fade-in max-w-[1280px] mx-auto px-4 md:px-8 py-8">
+      {/* Header */}
+      <div className="mb-10">
+        <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-2">
+          Điểm yếu & Cải thiện
+        </h1>
+        <p className="text-base text-gray-500">Những chủ đề bạn cần ôn luyện thêm, gom theo môn học</p>
       </div>
 
       {error && (
@@ -153,139 +182,191 @@ export default function MistakesPage() {
       )}
 
       {profiles.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-lg border">
-          <TrendingUp className="size-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">Bạn chưa có điểm yếu nào được ghi nhận</p>
-          <p className="text-sm text-gray-400 mt-1">Tiếp tục làm bài tập để hệ thống phân tích</p>
+        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100">
+          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <MaterialIcon name="verified" className="text-4xl text-green-400" />
+          </div>
+          <p className="text-lg font-semibold text-gray-500">Bạn chưa có điểm yếu nào được ghi nhận</p>
+          <p className="text-sm text-gray-400 mt-1">Bạn đang làm rất tốt! Tiếp tục phát huy nhé.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {[...bySubject.entries()].map(([subjectName, lessons]) => {
-            const subjectKey = subjectName;
-            const isSubjectCollapsed = collapsed[subjectKey] || false;
-            const total = [...lessons.values()].flat().length;
+        <>
+          <div className="space-y-4">
+            {[...bySubject.entries()].map(([subjectName, lessons]) => {
+              const subjectKey = subjectName;
+              const isSubjectCollapsed = collapsed[subjectKey] || false;
+              const total = [...lessons.values()].flat().length;
+              const iconColor = getSubjectColor(subjectName);
+              const iconName = getSubjectIcon(subjectName);
 
-            return (
-              <div key={subjectKey} className="bg-white rounded-lg border">
-                {/* Subject header */}
-                <button
-                  onClick={() => toggleCollapse(subjectKey)}
-                  className="w-full px-4 py-3 flex items-center gap-2.5 hover:bg-gray-50 transition-colors rounded-lg"
-                >
-                  <BookOpen className="size-4 text-indigo-600 shrink-0" />
-                  <h2 className="font-semibold text-gray-900 text-left">{subjectName}</h2>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {total} điểm yếu
-                  </Badge>
-                  <div className="flex-1" />
-                  {isSubjectCollapsed ? (
-                    <ChevronDown className="size-4 text-gray-400 shrink-0" />
-                  ) : (
-                    <ChevronUp className="size-4 text-gray-400 shrink-0" />
-                  )}
-                </button>
+              return (
+                <div key={subjectKey} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                  {/* Subject Header — Accordion trigger */}
+                  <button
+                    onClick={() => toggleCollapse(subjectKey)}
+                    className="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconColor}`}>
+                        <MaterialIcon name={iconName} className="text-2xl" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-3">
+                          {subjectName}
+                          <span className="bg-red-50 text-red-700 text-[11px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                            {total} điểm yếu
+                          </span>
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {[...lessons.entries()].length} bài học cần cải thiện
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`size-5 text-gray-400 transition-transform duration-200 ${
+                        isSubjectCollapsed ? "" : "rotate-180"
+                      }`}
+                    />
+                  </button>
 
-                {!isSubjectCollapsed && (
-                  <div className="border-t">
-                    {[...lessons.entries()].map(([lessonId, items]) => {
-                      const ctx = lessonContext[lessonId];
-                      const lessonTitle = ctx?.lessonTitle || `#${lessonId.slice(0, 8)}`;
+                  {/* Accordion Content */}
+                  {!isSubjectCollapsed && (
+                    <div className="border-t border-gray-100">
+                      {[...lessons.entries()].map(([lessonId, items]) => {
+                        const ctx = lessonContext[lessonId];
+                        const lessonTitle = ctx?.lessonTitle || `#${lessonId.slice(0, 8)}`;
 
-                      return (
-                        <div key={lessonId}>
-                          {/* Lesson sub-header */}
-                          <div className="px-4 py-1.5 bg-gray-50/80 flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-700">
-                              {lessonTitle}
-                            </span>
-                            <Badge variant="outline" className="text-xs py-0 text-gray-400">
-                              {items.length}
-                            </Badge>
-                          </div>
+                        return (
+                          <div key={lessonId}>
+                            {/* Lesson group header */}
+                            <div className="px-6 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
+                              <span className="font-bold text-gray-700 text-sm">{lessonTitle}</span>
+                              <span className="bg-gray-200 text-gray-500 text-[11px] px-2 py-0.5 rounded-full font-medium">
+                                {items.length}
+                              </span>
+                            </div>
 
-                          {/* Weakness rows */}
-                          <div className="divide-y">
-                            {items.map((p) => (
-                              <div key={p.id} className={`px-4 py-2.5 ${p.resolved ? "bg-green-50/30" : ""}`}>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {p.resolved ? (
-                                    <CheckCircle className="size-3.5 text-green-600 shrink-0" />
-                                  ) : (
-                                    <AlertCircle className="size-3.5 text-amber-500 shrink-0" />
-                                  )}
-                                  <span className={`font-medium text-sm ${p.resolved ? "text-gray-400 line-through" : "text-gray-900"}`}>
-                                    <MathText text={p.topic} />
-                                  </span>
-                                  <Badge variant="destructive" className="text-xs py-0">
-                                    {p.errorCount} lần
-                                  </Badge>
-                                  {p.source && sourceConfig[p.source] && (
-                                    <Badge variant="outline" className={`text-xs py-0 ${sourceConfig[p.source].color}`}>
-                                      {sourceConfig[p.source].label}
-                                    </Badge>
-                                  )}
-                                  {p.weight > 0 && (
-                                    <Badge variant="outline" className="text-xs py-0 bg-gray-50 text-gray-600 border-gray-200">
-                                      {p.weight.toFixed(1)}đ
-                                    </Badge>
-                                  )}
-                                  {p.improvementScore > 0 && (
-                                    <Badge variant="outline" className="text-xs py-0">
-                                      <TrendingUp className="size-3 mr-0.5" />
-                                      {p.improvementScore}
-                                    </Badge>
-                                  )}
-                                  {p.lastErrorAt && (
-                                    <span className="text-xs text-gray-400">
-                                      {new Date(p.lastErrorAt).toLocaleDateString("vi-VN")}
-                                    </span>
-                                  )}
-                                  <div className="flex-1" />
-                                  {!p.resolved && (
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleGenerateExercise(p)}
-                                        disabled={generatingId === p.id}
-                                        className="text-xs text-primary hover:text-primary/80 hover:bg-primary/5 h-7 px-2"
-                                      >
-                                        {generatingId === p.id ? (
-                                          <Loader2 className="size-3 mr-1 animate-spin" />
-                                        ) : (
-                                          <Dumbbell className="size-3 mr-1" />
-                                        )}
-                                        Tạo bài tập
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleResolve(p.id)}
-                                        className="text-xs text-green-600 hover:text-green-700 hover:bg-green-50 h-7 px-2"
-                                      >
-                                        <CheckCircle className="size-3 mr-1" />
-                                        Đã hiểu
-                                      </Button>
+                            {/* Error items */}
+                            <div className="divide-y divide-gray-100">
+                              {items.map((p) => {
+                                const src = p.source ? sourceConfig[p.source] : null;
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="px-8 py-4 flex flex-wrap items-center justify-between gap-4 group hover:bg-gray-50/50 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-4 flex-1 min-w-[300px]">
+                                      <MaterialIcon
+                                        name="error"
+                                        filled
+                                        className={p.resolved ? "text-green-500 text-xl" : "text-red-500 text-xl"}
+                                      />
+                                      <div>
+                                        <p className={`text-sm font-medium ${p.resolved ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                                          <MathText text={p.topic} />
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                          <span className="bg-red-50 text-red-700 text-[11px] px-2 py-0.5 rounded-md font-bold">
+                                            {p.errorCount} lần
+                                          </span>
+                                          {src && (
+                                            <span className={`text-[11px] px-2 py-0.5 rounded-md font-bold ${src.color}`}>
+                                              {src.label}
+                                            </span>
+                                          )}
+                                          {p.weight > 0 && (
+                                            <span className="bg-gray-100 text-gray-600 text-[11px] px-2 py-0.5 rounded-md">
+                                              {p.weight.toFixed(1)}đ
+                                            </span>
+                                          )}
+                                          {p.lastErrorAt && (
+                                            <span className="text-[11px] text-gray-400">
+                                              {new Date(p.lastErrorAt).toLocaleDateString("vi-VN")}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                  )}
-                                </div>
-                                {p.coachNotes && (
-                                  <div className="mt-1.5 ml-5 p-2 bg-blue-50 rounded text-sm text-blue-700">
-                                    <span className="font-medium">GV:</span> <MathText text={p.coachNotes} />
+
+                                    {/* Actions */}
+                                    {!p.resolved && (
+                                      <div className="flex items-center gap-3">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleGenerateExercise(p)}
+                                          disabled={generatingId === p.id}
+                                          className="text-xs text-primary font-bold hover:text-primary/80 hover:bg-primary/5 h-8 px-3"
+                                        >
+                                          {generatingId === p.id ? (
+                                            <Loader2 className="size-3.5 mr-1 animate-spin" />
+                                          ) : (
+                                            <MaterialIcon name="link" className="text-base mr-1" />
+                                          )}
+                                          Tạo bài tập
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleResolve(p.id)}
+                                          className="text-xs text-emerald-600 font-bold hover:text-emerald-700 hover:bg-emerald-50 h-8 px-3"
+                                        >
+                                          <MaterialIcon name="check_circle" className="text-base mr-1" />
+                                          Đã hiểu
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Stats Bento */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 bg-primary/10 rounded-3xl flex flex-col justify-between overflow-hidden relative group">
+              <div className="relative z-10">
+                <h4 className="text-lg font-semibold text-primary/80 mb-2">Đã giải quyết</h4>
+                <p className="text-4xl font-extrabold text-primary">{resolvedCount}</p>
+                <p className="text-xs text-primary/60 mt-1">Lỗi sai được xử lý</p>
               </div>
-            );
-          })}
-        </div>
+              <CheckCircle className="absolute -bottom-4 -right-4 size-32 text-primary/10 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="p-6 bg-pink-50 rounded-3xl flex flex-col justify-between overflow-hidden relative group">
+              <div className="relative z-10">
+                <h4 className="text-lg font-semibold text-pink-700/80 mb-2">Tổng lỗi</h4>
+                <p className="text-4xl font-extrabold text-pink-700">{totalErrors}</p>
+                <p className="text-xs text-pink-600/60 mt-1">Cần cải thiện thêm</p>
+              </div>
+              <TrendingUp className="absolute -bottom-4 -right-4 size-32 text-pink-600/10 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="bg-white border border-gray-200 rounded-3xl p-6 flex items-center gap-5 shadow-sm">
+              <div className="flex-1">
+                <h4 className="font-bold text-gray-900 mb-1">Cần hỗ trợ?</h4>
+                <p className="text-sm text-gray-500 mb-4">Kết nối với giáo viên để trao đổi về các bài tập khó.</p>
+                <Button
+                  size="sm"
+                  className="bg-primary text-white text-xs font-bold px-4 py-2 rounded-full hover:shadow-lg"
+                  onClick={() => router.push("/messages")}
+                >
+                  <MessageCircle className="size-3.5 mr-1.5" />
+                  Gửi tin nhắn
+                </Button>
+              </div>
+              <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center shrink-0">
+                <MaterialIcon name="school" className="text-4xl text-gray-400" />
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

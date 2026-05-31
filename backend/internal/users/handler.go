@@ -31,6 +31,7 @@ type createUserRequest struct {
 	Password string `json:"password"`
 	FullName string `json:"fullName"`
 	Email    string `json:"email"`
+	Phone    string `json:"phone"`
 	Role     string `json:"role"`
 	ClassID  string `json:"classId"`
 }
@@ -98,6 +99,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Username:   req.Username,
 		FullName:   req.FullName,
 		Email:      req.Email,
+		Phone:      req.Phone,
 		Role:       req.Role,
 		ClassID:    req.ClassID,
 	}
