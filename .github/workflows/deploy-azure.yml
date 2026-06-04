@@ -11,6 +11,7 @@ env:
   AZURE_RESOURCE_GROUP: lms-rg
   AZURE_CONTAINER_APP: lms-backend
   ACR_NAME: lmsacr
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy:
@@ -26,9 +27,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: azure/docker-login@v2
+      - uses: docker/login-action@v4
         with:
-          login-server: ${{ env.ACR_NAME }}.azurecr.io
+          registry: ${{ env.ACR_NAME }}.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
