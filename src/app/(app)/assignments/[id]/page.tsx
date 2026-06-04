@@ -316,9 +316,11 @@ export default function AssignmentDetailPage({
             texts[q.id] = a.answer || "";
           }
         });
-        setMcqSelections(selections);
-        setPerQuestionAnswers(texts);
-        setMySubmitted(true);
+        queueMicrotask(() => {
+          setMcqSelections(selections);
+          setPerQuestionAnswers(texts);
+          setMySubmitted(true);
+        });
         try { sessionStorage.setItem(`submitted-${id}`, "true"); } catch {}
       }
     } catch {}

@@ -53,7 +53,7 @@ export default function TeacherParentsPage() {
 
   const fetchLinks = () => {
     setLoading(true);
-    api<LinkRow[]>("/api/admin/parent-links")
+    api<LinkRow[]>("/api/teacher/parent-links")
       .then(setLinks)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -61,7 +61,7 @@ export default function TeacherParentsPage() {
 
   useEffect(() => {
     Promise.all([
-      api<LinkRow[]>("/api/admin/parent-links"),
+      api<LinkRow[]>("/api/teacher/parent-links"),
       api<UserRow[]>("/api/users?role=PARENT"),
       api<UserRow[]>("/api/users?role=STUDENT"),
     ])
@@ -78,7 +78,7 @@ export default function TeacherParentsPage() {
     setError("");
     setSaving(true);
     try {
-      await api("/api/admin/parent-links", {
+      await api("/api/teacher/parent-links", {
         method: "POST",
         body: JSON.stringify(form),
       });
@@ -95,7 +95,7 @@ export default function TeacherParentsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Xoá liên kết này?")) return;
     try {
-      await api(`/api/admin/parent-links/${id}`, { method: "DELETE" });
+      await api(`/api/teacher/parent-links/${id}`, { method: "DELETE" });
       fetchLinks();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Xoá thất bại");
