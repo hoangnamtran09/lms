@@ -41,9 +41,13 @@ export default function TeacherMistakesPage() {
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
 
   useEffect(() => {
+    const classSummaryPromise = user?.classId
+      ? api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${user.classId}`).catch(() => [] as WeaknessTopic[])
+      : Promise.resolve([] as WeaknessTopic[]);
+
     Promise.all([
-      api<WeaknessTopic[]>(`/api/weaknesses/class-summary${user?.classId ? `?classId=${user.classId}` : ""}`).catch(() => []),
-      api<StudentBrief[]>("/api/teacher/students").catch(() => []),
+      classSummaryPromise,
+      api<StudentBrief[]>("/api/teacher/students").catch(() => [] as StudentBrief[]),
     ])
       .then(async ([topics, studentList]) => {
         // Fetch weakness counts per student
