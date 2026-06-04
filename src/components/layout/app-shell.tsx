@@ -14,6 +14,7 @@ import { StreakBadge } from "@/components/gamification/streak-badge";
 import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 import { bridge } from "@/lib/study-session-bridge";
 import { ActiveQuizProvider, useActiveQuiz } from "@/lib/active-quiz-context";
+import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 import { SearchBar } from "@/components/search/search-bar";
@@ -56,8 +57,16 @@ function formatElapsed(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+interface ClassItem {
+  id: string;
+  name: string;
+  gradeLevelId: string;
+  gradeLevelName?: string;
+}
+
 function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
   const { user, logout } = useAuth();
+  const [className, setClassName] = useState<string | null>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
   const initials = user?.fullName
     ? user.fullName
@@ -78,6 +87,17 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
     }, 1000);
     return () => clearInterval(interval);
   }, [isLessonViewer]);
+
+  useEffect(() => {
+    if (!user?.classId) return;
+    api<ClassItem[]>("/api/classes")
+      .then((classes) => {
+        const arr = Array.isArray(classes) ? classes : [];
+        const c = arr.find((c) => c.id === user.classId);
+        setClassName(c ? c.name : null);
+      })
+      .catch(() => {});
+  }, [user?.classId]);
 
   const handleEnd = () => {
     bridge.endSession?.();
@@ -121,7 +141,7 @@ function Header({ isLessonViewer }: { isLessonViewer: boolean }) {
               {user?.fullName || "Người dùng"}
             </p>
             <p className="text-xs text-gray-500">
-              {user?.classId ? `Lớp ${user.classId}` : user?.role || ""}
+              {user?.classId ? `Lớp ${className || user.classId}` : user?.role || ""}
             </p>
           </div>
           <DropdownMenu>
