@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, CheckCircle, ChevronDown, Loader2, MessageCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -64,6 +63,159 @@ function getSubjectIcon(name: string): string {
   return "book_4";
 }
 
+// ─── Quiz Panel per lesson (student) ───
+
+function LessonQuizPanel({
+  items,
+  subjectName,
+  lessonTitle,
+  onClose,
+}: {
+  items: WeaknessProfile[];
+  subjectName: string;
+  lessonTitle: string;
+  onClose: () => void;
+}) {
+  const [state, setState] = useState<{ loading: boolean; questions: any[]; error?: string }>({ loading: true, questions: [] });
+  const [answering, setAnswering] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ questions: any[] }>("/api/ai/generate-weakness-quiz", {
+      method: "POST",
+      body: JSON.stringify({
+        weaknesses: items.map((p) => ({ id: p.id, topic: p.topic })),
+        subjectName,
+        lessonTitle,
+      }),
+    })
+      .then((data) => {
+        if (!cancelled) setState({ loading: false, questions: data.questions.map((q: any) => ({ ...q, answered: false, correct: false })) });
+      })
+      .catch((e: any) => {
+        if (!cancelled) setState({ loading: false, questions: [], error: e.message });
+      });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const answer = async (qIdx: number, weaknessId: string, selectedIdx: number, correctIdx: number) => {
+    const key = `${qIdx}`;
+    setAnswering((p) => ({ ...p, [key]: true }));
+    const correct = selectedIdx === correctIdx;
+    try {
+      if (correct) await api(`/api/weaknesses/${weaknessId}/improve`, { method: "POST" });
+    } catch { /* ignore */ }
+    setState((prev) => {
+      const updated = prev.questions.map((q: any, i: number) =>
+        i === qIdx ? { ...q, answered: true, correct, selectedIdx } : q
+      );
+      return { ...prev, questions: updated };
+    });
+    setAnswering((p) => ({ ...p, [key]: false }));
+  };
+
+  if (state.loading) {
+    return (
+      <div className="px-6 py-4 border-t border-gray-100">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Loader2 className="size-4 animate-spin" />
+          AI đang tạo bài tập khắc phục...
+        </div>
+      </div>
+    );
+  }
+
+  if (state.error) {
+    return (
+      <div className="px-6 py-4 border-t border-gray-100">
+        <div className="text-sm text-red-600">Lỗi: {state.error}</div>
+        <button className="text-xs text-primary underline mt-1" onClick={onClose}>Thử lại</button>
+      </div>
+    );
+  }
+
+  const answeredCount = state.questions.filter((q: any) => q.answered).length;
+  const correctCount = state.questions.filter((q: any) => q.correct).length;
+
+  return (
+    <div className="border-t border-gray-100">
+      <div className="px-6 py-3 flex items-center justify-between bg-gray-50/80">
+        <div className="flex items-center gap-2">
+          <MaterialIcon name="assignment" className="text-primary text-lg" />
+          <span className="font-bold text-gray-700 text-sm">
+            Bài tập khắc phục ({state.questions.length} câu)
+          </span>
+          {answeredCount > 0 && (
+            <span className="text-xs text-gray-500">
+              — {correctCount}/{answeredCount} đúng
+            </span>
+          )}
+        </div>
+        <button className="text-xs text-gray-400 hover:text-gray-600" onClick={onClose}>
+          <MaterialIcon name="close" className="text-lg" />
+        </button>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {state.questions.map((q: any, qIdx: number) => {
+          const correctIdx = q.options?.findIndex((o: any) => o.isCorrect) ?? -1;
+          return (
+            <div key={q.id || qIdx} className={`px-6 py-4 ${q.answered ? (q.correct ? "bg-green-50/50" : "bg-red-50/50") : ""}`}>
+              <div className="flex items-start gap-3">
+                <MaterialIcon
+                  name={q.answered ? (q.correct ? "check_circle" : "cancel") : "radio_button_unchecked"}
+                  className={`text-xl shrink-0 mt-0.5 ${q.answered ? (q.correct ? "text-green-600" : "text-red-500") : "text-gray-400"}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 mb-1">
+                    <span className="text-gray-400 mr-2">#{qIdx + 1}</span>
+                    <MathText text={q.question} />
+                  </p>
+                  <p className="text-xs text-pink-600 mb-2">
+                    Khắc phục: <MathText text={q.weaknessTopic || ""} />
+                  </p>
+                  <div className="space-y-1">
+                    {q.options?.map((opt: any, oIdx: number) => (
+                      <button
+                        key={oIdx}
+                        disabled={q.answered || answering[`${qIdx}`]}
+                        onClick={() => answer(qIdx, q.weaknessId, oIdx, correctIdx)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                          q.answered
+                            ? oIdx === correctIdx
+                              ? "bg-green-100 text-green-800 font-semibold"
+                              : oIdx === q.selectedIdx
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-400"
+                            : "bg-gray-100 hover:bg-blue-50 text-gray-700 hover:text-blue-700"
+                        }`}
+                      >
+                        <span className="font-semibold mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                        {opt.text}
+                        {q.answered && oIdx === correctIdx && " ✓"}
+                        {q.answered && oIdx === q.selectedIdx && oIdx !== correctIdx && " ✗"}
+                      </button>
+                    ))}
+                  </div>
+                  {q.answered && q.explanation && (
+                    <p className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded-lg">
+                      💡 <MathText text={q.explanation} />
+                    </p>
+                  )}
+                  {q.answered && q.correct && (
+                    <p className="mt-1 text-xs text-green-600 font-semibold">✅ Điểm yếu này đã được cải thiện!</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ───
+
 export default function MistakesPage() {
   const router = useRouter();
   const [profiles, setProfiles] = useState<WeaknessProfile[]>([]);
@@ -71,7 +223,7 @@ export default function MistakesPage() {
   const [error, setError] = useState<string | null>(null);
   const [lessonContext, setLessonContext] = useState<Record<string, LessonContext>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api<WeaknessProfile[]>("/api/weaknesses")
@@ -102,40 +254,6 @@ export default function MistakesPage() {
       api<WeaknessProfile[]>("/api/weaknesses")
         .then((data) => setProfiles(data.filter((p) => !p.resolved)))
         .catch(() => {});
-    }
-  };
-
-  const handleGenerateExercise = async (p: WeaknessProfile) => {
-    setGeneratingId(p.id);
-    try {
-      const result = await api<{
-        exercises: { type: string; question: string }[];
-        weaknessId: string;
-        topic: string;
-        subjectId: string;
-        gradeLevel: number;
-      }>("/api/ai/remediation", {
-        method: "POST",
-        body: JSON.stringify({ weaknessId: p.id }),
-      });
-
-      const newAssignment = await api<{ id: string }>("/api/assignments", {
-        method: "POST",
-        body: JSON.stringify({
-          title: `Ôn tập: ${result.topic}`,
-          description: JSON.stringify(result.exercises),
-          source: "weakness",
-          subjectId: result.subjectId,
-          gradeLevel: result.gradeLevel,
-          maxScore: 10,
-        }),
-      });
-
-      router.push(`/assignments/${newAssignment.id}?weaknessId=${result.weaknessId}`);
-    } catch {
-      // Error is handled silently — user can retry
-    } finally {
-      setGeneratingId(null);
     }
   };
 
@@ -171,7 +289,7 @@ export default function MistakesPage() {
     <div className="animate-fade-in max-w-[1280px] mx-auto px-4 md:px-8 py-8">
       {/* Header */}
       <div className="mb-10">
-        <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-2">
+        <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-2 leading-tight">
           Điểm yếu & Cải thiện
         </h1>
         <p className="text-base text-gray-500">Những chủ đề bạn cần ôn luyện thêm, gom theo môn học</p>
@@ -182,7 +300,7 @@ export default function MistakesPage() {
       )}
 
       {profiles.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100">
+        <div className="text-center py-24 bg-white rounded-3xl border border-gray-100">
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <MaterialIcon name="verified" className="text-4xl text-green-400" />
           </div>
@@ -191,7 +309,7 @@ export default function MistakesPage() {
         </div>
       ) : (
         <>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {[...bySubject.entries()].map(([subjectName, lessons]) => {
               const subjectKey = subjectName;
               const isSubjectCollapsed = collapsed[subjectKey] || false;
@@ -218,14 +336,13 @@ export default function MistakesPage() {
                           </span>
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {[...lessons.entries()].length} bài học cần cải thiện
+                          {lessons.size} bài học cần cải thiện
                         </p>
                       </div>
                     </div>
-                    <ChevronDown
-                      className={`size-5 text-gray-400 transition-transform duration-200 ${
-                        isSubjectCollapsed ? "" : "rotate-180"
-                      }`}
+                    <MaterialIcon
+                      name="expand_more"
+                      className={`text-2xl text-gray-400 transition-transform duration-200 ${isSubjectCollapsed ? "" : "rotate-180"}`}
                     />
                   </button>
 
@@ -235,25 +352,57 @@ export default function MistakesPage() {
                       {[...lessons.entries()].map(([lessonId, items]) => {
                         const ctx = lessonContext[lessonId];
                         const lessonTitle = ctx?.lessonTitle || `#${lessonId.slice(0, 8)}`;
+                        const activeItems = items.filter(p => !p.resolved);
 
                         return (
                           <div key={lessonId}>
-                            {/* Lesson group header */}
-                            <div className="px-6 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
-                              <span className="font-bold text-gray-700 text-sm">{lessonTitle}</span>
-                              <span className="bg-gray-200 text-gray-500 text-[11px] px-2 py-0.5 rounded-full font-medium">
-                                {items.length}
-                              </span>
+                            {/* Lesson header bar */}
+                            <div className="px-6 py-3 bg-gray-50/80 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-700 text-sm">{lessonTitle}</span>
+                                <span className="bg-gray-200 text-gray-500 text-[11px] px-2 py-0.5 rounded-full font-medium">
+                                  {items.length}
+                                </span>
+                              </div>
+                              {activeItems.length > 0 && (
+                                quizOpen[lessonId] ? (
+                                  <button
+                                    className="flex items-center gap-2 px-4 py-1.5 text-gray-400 hover:text-gray-600 rounded-full text-xs font-bold transition-colors"
+                                    onClick={() => setQuizOpen((p) => ({ ...p, [lessonId]: false }))}
+                                  >
+                                    <MaterialIcon name="visibility_off" className="text-sm" />
+                                    Ẩn bài tập
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-primary text-white rounded-full text-xs font-bold hover:shadow-md transition-all active:scale-95"
+                                    onClick={() => setQuizOpen((p) => ({ ...p, [lessonId]: true }))}
+                                  >
+                                    <MaterialIcon name="assignment_add" className="text-sm" />
+                                    Tạo bài tập cho toàn bộ bài học
+                                  </button>
+                                )
+                              )}
                             </div>
 
-                            {/* Error items */}
+                            {/* Quiz panel */}
+                            {quizOpen[lessonId] && activeItems.length > 0 && (
+                              <LessonQuizPanel
+                                items={activeItems}
+                                subjectName={subjectName}
+                                lessonTitle={lessonTitle}
+                                onClose={() => setQuizOpen((p) => ({ ...p, [lessonId]: false }))}
+                              />
+                            )}
+
+                            {/* Weakness items */}
                             <div className="divide-y divide-gray-100">
                               {items.map((p) => {
                                 const src = p.source ? sourceConfig[p.source] : null;
                                 return (
                                   <div
                                     key={p.id}
-                                    className="px-8 py-4 flex flex-wrap items-center justify-between gap-4 group hover:bg-gray-50/50 transition-colors"
+                                    className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 group hover:bg-gray-50/50 transition-colors"
                                   >
                                     <div className="flex items-center gap-4 flex-1 min-w-[300px]">
                                       <MaterialIcon
@@ -294,20 +443,6 @@ export default function MistakesPage() {
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          onClick={() => handleGenerateExercise(p)}
-                                          disabled={generatingId === p.id}
-                                          className="text-xs text-primary font-bold hover:text-primary/80 hover:bg-primary/5 h-8 px-3"
-                                        >
-                                          {generatingId === p.id ? (
-                                            <Loader2 className="size-3.5 mr-1 animate-spin" />
-                                          ) : (
-                                            <MaterialIcon name="link" className="text-base mr-1" />
-                                          )}
-                                          Tạo bài tập
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
                                           onClick={() => handleResolve(p.id)}
                                           className="text-xs text-emerald-600 font-bold hover:text-emerald-700 hover:bg-emerald-50 h-8 px-3"
                                         >
@@ -338,7 +473,7 @@ export default function MistakesPage() {
                 <p className="text-4xl font-extrabold text-primary">{resolvedCount}</p>
                 <p className="text-xs text-primary/60 mt-1">Lỗi sai được xử lý</p>
               </div>
-              <CheckCircle className="absolute -bottom-4 -right-4 size-32 text-primary/10 group-hover:scale-110 transition-transform" />
+              <MaterialIcon name="task_alt" className="absolute -bottom-4 -right-4 text-9xl text-primary/10 group-hover:scale-110 transition-transform" />
             </div>
             <div className="p-6 bg-pink-50 rounded-3xl flex flex-col justify-between overflow-hidden relative group">
               <div className="relative z-10">
@@ -346,7 +481,7 @@ export default function MistakesPage() {
                 <p className="text-4xl font-extrabold text-pink-700">{totalErrors}</p>
                 <p className="text-xs text-pink-600/60 mt-1">Cần cải thiện thêm</p>
               </div>
-              <TrendingUp className="absolute -bottom-4 -right-4 size-32 text-pink-600/10 group-hover:scale-110 transition-transform" />
+              <MaterialIcon name="trending_up" className="absolute -bottom-4 -right-4 text-9xl text-pink-600/10 group-hover:scale-110 transition-transform" />
             </div>
             <div className="bg-white border border-gray-200 rounded-3xl p-6 flex items-center gap-5 shadow-sm">
               <div className="flex-1">
@@ -357,7 +492,7 @@ export default function MistakesPage() {
                   className="bg-primary text-white text-xs font-bold px-4 py-2 rounded-full hover:shadow-lg"
                   onClick={() => router.push("/messages")}
                 >
-                  <MessageCircle className="size-3.5 mr-1.5" />
+                  <MaterialIcon name="chat" className="text-sm mr-1.5" />
                   Gửi tin nhắn
                 </Button>
               </div>
