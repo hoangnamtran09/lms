@@ -46,7 +46,6 @@ jobs:
           acrName: ${{ env.ACR_NAME }}
           environmentVariables: |
             PORT=8080
-            SKIP_DB_MIGRATE=1
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}

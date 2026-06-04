@@ -3,7 +3,6 @@ package teacher
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -166,96 +165,6 @@ func (h *Handler) LinkParent(w http.ResponseWriter, r *http.Request) {
 	jsonOk(w, map[string]string{"id": linkID, "status": "linked"})
 }
 
-type LinkRow struct {
-	ID         string `json:"id"`
-	ParentID   string `json:"parentId"`
-	ParentName string `json:"parentName"`
-	ChildID    string `json:"childId"`
-	ChildName  string `json:"childName"`
-}
-
-// ListLinks lists all parent-student links for the teacher's class.
-func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-
-	// Get students in teacher's class
-	var studentIDs []string
-	h.db.Table("users").Where("role = ? AND class_id = ?", "STUDENT", claims.ClassID).Pluck("id", &studentIDs)
-	if len(studentIDs) == 0 {
-		jsonOk(w, []LinkRow{})
-		return
-	}
-
-	type rawLink struct {
-		ID       string
-		ParentID string
-		ChildID  string
-	}
-	var links []rawLink
-	h.db.Table("child_links").Where("child_id IN ?", studentIDs).Select("id, parent_id, child_id").Find(&links)
-	if len(links) == 0 {
-		jsonOk(w, []LinkRow{})
-		return
-	}
-
-	// Collect parent IDs for name lookup
-	userIDs := make(map[string]bool)
-	for _, l := range links {
-		userIDs[l.ParentID] = true
-		userIDs[l.ChildID] = true
-	}
-	ids := make([]string, 0, len(userIDs))
-	for id := range userIDs {
-		ids = append(ids, id)
-	}
-
-	type UserRow struct {
-		ID       string
-		FullName string
-	}
-	var users []UserRow
-	h.db.Table("users").Where("id IN ?", ids).Select("id, full_name").Find(&users)
-	nameMap := make(map[string]string, len(users))
-	for _, u := range users {
-		nameMap[u.ID] = u.FullName
-	}
-
-	result := make([]LinkRow, len(links))
-	for i, l := range links {
-		result[i] = LinkRow{
-			ID:         l.ID,
-			ParentID:   l.ParentID,
-			ParentName: nameMap[l.ParentID],
-			ChildID:    l.ChildID,
-			ChildName:  nameMap[l.ChildID],
-		}
-	}
-	jsonOk(w, result)
-}
-
-// DeleteLink deletes a parent-student link, scoped to the teacher's class.
-func (h *Handler) DeleteLink(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	linkID := extractID(r.URL.Path)
-
-	// Verify the link's child is in teacher's class
-	var childID string
-	if err := h.db.Table("child_links").Where("id = ?", linkID).Select("child_id").Scan(&childID).Error; err != nil || childID == "" {
-		jsonError(w, "Không tìm thấy liên kết", http.StatusNotFound)
-		return
-	}
-
-	var classID string
-	h.db.Table("users").Where("id = ? AND role = ?", childID, "STUDENT").Select("class_id").Scan(&classID)
-	if classID != claims.ClassID {
-		jsonError(w, "Học sinh không thuộc lớp của bạn", http.StatusForbidden)
-		return
-	}
-
-	h.db.Table("child_links").Where("id = ?", linkID).Delete(nil)
-	jsonOk(w, map[string]string{"status": "deleted"})
-}
-
 func jsonError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -265,9 +174,4 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 func jsonOk(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
-}
-
-func extractID(path string) string {
-	parts := strings.Split(strings.TrimSuffix(path, "/"), "/")
-	return parts[len(parts)-1]
 }

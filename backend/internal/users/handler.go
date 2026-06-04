@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/lms/backend/internal/middleware"
@@ -35,8 +34,6 @@ type createUserRequest struct {
 	Phone    string `json:"phone"`
 	Role     string `json:"role"`
 	ClassID  string `json:"classId"`
-	DOB      string `json:"dob"`
-	Gender   string `json:"gender"`
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
@@ -74,22 +71,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Role = "STUDENT"
 	}
 
-	// Role-based access control for user creation
-	if claims := middleware.GetClaims(r.Context()); claims != nil {
-		switch claims.Role {
-		case "SUPER_ADMIN", "ADMIN":
-			// Full access - can create any role
-		case "TEACHER":
-			if req.Role != "STUDENT" && req.Role != "PARENT" {
-				jsonError(w, "Giáo viên chỉ có thể tạo tài khoản Học sinh hoặc Phụ huynh", http.StatusForbidden)
-				return
-			}
-			if claims.ClassID != "" {
-				req.ClassID = claims.ClassID
-			}
-		default:
-			jsonError(w, "Không có quyền tạo tài khoản", http.StatusForbidden)
+	// Teacher scoping: only allow creating STUDENT/PARENT, auto-set ClassID
+	if claims := middleware.GetClaims(r.Context()); claims != nil && claims.Role == "TEACHER" {
+		if req.Role != "STUDENT" && req.Role != "PARENT" {
+			jsonError(w, "Giáo viên chỉ có thể tạo tài khoản Học sinh hoặc Phụ huynh", http.StatusForbidden)
 			return
+		}
+		if claims.ClassID != "" {
+			req.ClassID = claims.ClassID
 		}
 	}
 
@@ -110,13 +99,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dob *time.Time
-	if req.DOB != "" {
-		if parsed, err := time.Parse("2006-01-02", req.DOB); err == nil {
-			dob = &parsed
-		}
-	}
-
 	user := User{
 		ID:         uuid.New().String(),
 		SupabaseID: supabaseID,
@@ -126,8 +108,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Phone:      req.Phone,
 		Role:       req.Role,
 		ClassID:    req.ClassID,
-		DOB:        dob,
-		Gender:     req.Gender,
 	}
 
 	if err := h.service.Create(r.Context(), &user); err != nil {

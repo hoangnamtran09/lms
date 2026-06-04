@@ -102,7 +102,7 @@ func New(
 	lessonsH := lessons.NewHandler(lessonsSvc)
 		cacheSvc := ai.NewCacheService(db)
 		aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, cacheSvc, progressSvc, db)
-	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc, weaknessSvc)
+	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
 	// Wire R2 delete callbacks
@@ -229,7 +229,8 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		// Users
 		r.Get("/api/users", h.Users.List)
 		r.Get("/api/users/{id}", h.Users.Get)
-		r.Post("/api/users", h.Users.Create)
+		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
+			Post("/api/users", h.Users.Create)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
 			Patch("/api/users/{id}", h.Users.Update)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
@@ -439,8 +440,6 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)
 		r.Get("/api/teacher/students", h.Teacher.ListStudents)
 		r.Post("/api/teacher/link-parent", h.Teacher.LinkParent)
-		r.Get("/api/teacher/parent-links", h.Teacher.ListLinks)
-		r.Delete("/api/teacher/parent-links/{id}", h.Teacher.DeleteLink)
 
 		// Attendance
 		r.With(middleware.RequirePermission(permissions.ResAttendance, permissions.ActRead)).
@@ -473,4 +472,3 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 }
-// force deploy: remove RequirePermission from POST /api/users

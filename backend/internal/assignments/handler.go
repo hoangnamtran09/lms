@@ -10,17 +10,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/lms/backend/internal/ai"
 	"github.com/lms/backend/internal/middleware"
-	"github.com/lms/backend/internal/weaknesses"
 )
 
 type Handler struct {
-	service         *Service
-	aiService       *ai.Service
-	weaknessService *weaknesses.Service
+	service   *Service
+	aiService *ai.Service
 }
 
-func NewHandler(service *Service, aiSvc *ai.Service, weaknessSvc *weaknesses.Service) *Handler {
-	return &Handler{service: service, aiService: aiSvc, weaknessService: weaknessSvc}
+func NewHandler(service *Service, aiSvc *ai.Service) *Handler {
+	return &Handler{service: service, aiService: aiSvc}
 }
 
 // --- Assignments ---
@@ -293,11 +291,6 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 			Feedback:      feedback,
 			CorrectAnswer: expectedAns,
 		})
-
-		// Track weakness when answer is wrong
-		if feedback == "Sai" && qText != "" {
-			h.weaknessService.UpsertWeakness(r.Context(), claims.UserID, qText, "quiz")
-		}
 	}
 
 	// Cap total score at assignment maxScore
