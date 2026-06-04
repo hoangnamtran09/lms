@@ -439,6 +439,8 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Get("/api/teacher/dashboard", h.Teacher.Dashboard)
 		r.Get("/api/teacher/students", h.Teacher.ListStudents)
 		r.Post("/api/teacher/link-parent", h.Teacher.LinkParent)
+		r.Get("/api/teacher/parent-links", h.Teacher.ListLinks)
+		r.Delete("/api/teacher/parent-links/{id}", h.Teacher.DeleteLink)
 
 		// Attendance
 		r.With(middleware.RequirePermission(permissions.ResAttendance, permissions.ActRead)).
