@@ -1680,3 +1680,110 @@ Chỉ trả về đoạn văn bản, không thêm tiêu đề hay định dạng
 
 	jsonOk(w, map[string]string{"summary": strings.TrimSpace(response)})
 }
+
+// POST /api/ai/generate-weakness-quiz
+type weaknessRef struct {
+	ID    string `json:"id"`
+	Topic string `json:"topic"`
+}
+
+type generateWeaknessQuizInput struct {
+	Weaknesses  []weaknessRef `json:"weaknesses"`
+	SubjectName string        `json:"subjectName"`
+	LessonTitle string        `json:"lessonTitle"`
+}
+
+func (h *Handler) GenerateWeaknessQuiz(w http.ResponseWriter, r *http.Request) {
+	var req generateWeaknessQuizInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Weaknesses) == 0 {
+		jsonErr(w, "weaknesses is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Weaknesses) > 10 {
+		jsonErr(w, "Tối đa 10 điểm yếu mỗi lần", http.StatusBadRequest)
+		return
+	}
+
+	// Build prompt: one question per weakness topic
+	var topicList strings.Builder
+	for i, w := range req.Weaknesses {
+		topicList.WriteString(fmt.Sprintf("%d. %s\n", i+1, w.Topic))
+	}
+
+	prompt := fmt.Sprintf(`Tạo bài tập khắc phục cho học sinh. Có %d điểm yếu cần khắc phục:
+
+%s
+Mỗi điểm yếu cần ĐÚNG 1 câu hỏi trắc nghiệm (4 đáp án, 1 đúng). Trả về MẢNG JSON:
+
+[
+  {
+    "question": "Câu hỏi về chủ đề?",
+    "options": [
+      {"text": "A. ...", "isCorrect": false},
+      {"text": "B. ...", "isCorrect": true},
+      {"text": "C. ...", "isCorrect": false},
+      {"text": "D. ...", "isCorrect": false}
+    ],
+    "explanation": "Giải thích ngắn gọn tại sao đáp án đúng."
+  },
+  ...
+]
+
+Yêu cầu:
+- Mảng JSON có ĐÚNG %d phần tử, tương ứng %d điểm yếu theo đúng thứ tự
+- Mỗi câu hỏi tập trung vào chủ đề tương ứng
+- Dùng $...$ cho công thức toán. Trong JSON escape: \\frac, \\sqrt, \\alpha
+- Tiếng Việt, ngắn gọn, súc tích
+- Chỉ trả về MẢNG JSON, không thêm text hay markdown.`,
+		len(req.Weaknesses), topicList.String(), len(req.Weaknesses), len(req.Weaknesses))
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là giáo viên tạo đề. Chỉ trả về MẢNG JSON thuần, không markdown, không text ngoài JSON."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cleaned := extractJSON(response)
+	var questions []map[string]interface{}
+	if err := json.Unmarshal([]byte(cleaned), &questions); err != nil {
+		// Try wrapping in case AI added extra wrapping
+		var wrapper map[string]interface{}
+		if err2 := json.Unmarshal([]byte(cleaned), &wrapper); err2 == nil {
+			for _, v := range wrapper {
+				if arr, ok := v.([]interface{}); ok {
+					for _, item := range arr {
+						if m, ok := item.(map[string]interface{}); ok {
+							questions = append(questions, m)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	if len(questions) == 0 {
+		jsonErr(w, "AI không tạo được câu hỏi. Vui lòng thử lại.", http.StatusInternalServerError)
+		return
+	}
+
+	// Attach weaknessId to each question by position
+	result := make([]map[string]interface{}, 0)
+	for i, q := range questions {
+		q["id"] = uuid.New().String()
+		if i < len(req.Weaknesses) {
+			q["weaknessId"] = req.Weaknesses[i].ID
+			q["weaknessTopic"] = req.Weaknesses[i].Topic
+		}
+		result = append(result, q)
+	}
+
+	jsonOk(w, map[string]interface{}{"questions": result})
+}

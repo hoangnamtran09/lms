@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, AlertCircle, TrendingUp, BookOpen, CheckCircle, HelpCircle, FileText, UserCheck, Clock, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, TrendingUp, BookOpen, CheckCircle, HelpCircle, FileText, UserCheck, Clock, ChevronDown, ChevronUp, Loader2, Sparkles } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,56 @@ export default function TeacherStudentMistakesPage({
   const [error, setError] = useState<string | null>(null);
   const [lessonContext, setLessonContext] = useState<Record<string, LessonContext>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [lessonQuiz, setLessonQuiz] = useState<Record<string, { loading: boolean; questions: any[]; error?: string }>>({});
+  const [answering, setAnswering] = useState<Record<string, boolean>>({});
+
+  const generateQuiz = async (lessonId: string, items: WeaknessProfile[]) => {
+    setLessonQuiz((prev) => ({ ...prev, [lessonId]: { loading: true, questions: [] } }));
+    try {
+      const data = await api<{ questions: any[] }>("/api/ai/generate-weakness-quiz", {
+        method: "POST",
+        body: JSON.stringify({
+          weaknesses: items.map((p) => ({ id: p.id, topic: p.topic })),
+          subjectName: lessonContext[lessonId]?.subjectName || "",
+          lessonTitle: lessonContext[lessonId]?.lessonTitle || "",
+        }),
+      });
+      setLessonQuiz((prev) => ({ ...prev, [lessonId]: { loading: false, questions: data.questions.map((q: any) => ({ ...q, answered: false, correct: false })) } }));
+    } catch (e: any) {
+      setLessonQuiz((prev) => ({ ...prev, [lessonId]: { loading: false, questions: [], error: e.message } }));
+    }
+  };
+
+  const answerQuestion = async (lessonId: string, qIdx: number, weaknessId: string, selectedIdx: number, correctIdx: number) => {
+    const key = `${lessonId}-${qIdx}`;
+    setAnswering((prev) => ({ ...prev, [key]: true }));
+    const correct = selectedIdx === correctIdx;
+    try {
+      if (correct) {
+        await api(`/api/weaknesses/${weaknessId}/improve`, { method: "POST" });
+      }
+      setLessonQuiz((prev) => {
+        const quiz = prev[lessonId];
+        if (!quiz) return prev;
+        const updated = quiz.questions.map((q: any, i: number) =>
+          i === qIdx ? { ...q, answered: true, correct, selectedIdx } : q
+        );
+        return { ...prev, [lessonId]: { ...quiz, questions: updated } };
+      });
+    } catch {
+      // still mark as answered
+      setLessonQuiz((prev) => {
+        const quiz = prev[lessonId];
+        if (!quiz) return prev;
+        const updated = quiz.questions.map((q: any, i: number) =>
+          i === qIdx ? { ...q, answered: true, correct, selectedIdx } : q
+        );
+        return { ...prev, [lessonId]: { ...quiz, questions: updated } };
+      });
+    } finally {
+      setAnswering((prev) => ({ ...prev, [key]: false }));
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -222,6 +272,118 @@ export default function TeacherStudentMistakesPage({
                             subjectName={subjectName}
                             lessonTitle={lessonTitle}
                           />
+
+                          {/* Generate remediation quiz button */}
+                          <div className="px-4 py-2 border-t border-gray-100">
+                            {!lessonQuiz[lessonId] ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                onClick={() => generateQuiz(lessonId, items.filter(p => !p.resolved))}
+                              >
+                                <Sparkles className="size-3.5" />
+                                Tạo bài tập khắc phục ({items.filter(p => !p.resolved).length} câu)
+                              </Button>
+                            ) : lessonQuiz[lessonId].loading ? (
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <Loader2 className="size-3 animate-spin" />
+                                AI đang tạo bài tập...
+                              </div>
+                            ) : lessonQuiz[lessonId].error ? (
+                              <div className="text-xs text-red-500">
+                                Lỗi: {lessonQuiz[lessonId].error}
+                                <button
+                                  className="ml-2 underline hover:text-red-700"
+                                  onClick={() => setLessonQuiz((prev) => { const next = { ...prev }; delete next[lessonId]; return next; })}
+                                >
+                                  Thử lại
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-indigo-700">
+                                    📝 Bài tập khắc phục ({lessonQuiz[lessonId].questions.length} câu)
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    — Mỗi câu tương ứng 1 điểm yếu
+                                  </span>
+                                </div>
+                                {lessonQuiz[lessonId].questions.map((q: any, qIdx: number) => {
+                                  const correctIdx = q.options?.findIndex((o: any) => o.isCorrect) ?? -1;
+                                  const key = `${lessonId}-${qIdx}`;
+                                  return (
+                                    <div
+                                      key={q.id || qIdx}
+                                      className={`p-3 rounded-lg border text-sm ${
+                                        q.answered
+                                          ? q.correct
+                                            ? "bg-green-50 border-green-200"
+                                            : "bg-red-50 border-red-200"
+                                          : "bg-white border-gray-200"
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-2 mb-2">
+                                        <span className="text-xs font-bold text-gray-400 shrink-0 mt-0.5">
+                                          #{qIdx + 1}
+                                        </span>
+                                        <div className="flex-1">
+                                          <p className="font-medium text-gray-900">
+                                            <MathText text={q.question} />
+                                          </p>
+                                          <p className="text-xs text-purple-500 mt-0.5">
+                                            Khắc phục: <MathText text={q.weaknessTopic || ""} />
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="ml-5 space-y-1">
+                                        {q.options?.map((opt: any, oIdx: number) => (
+                                          <button
+                                            key={oIdx}
+                                            disabled={q.answered || answering[key]}
+                                            onClick={() => answerQuestion(lessonId, qIdx, q.weaknessId, oIdx, correctIdx)}
+                                            className={`w-full text-left px-3 py-2 rounded-md text-xs transition-colors ${
+                                              q.answered
+                                                ? oIdx === correctIdx
+                                                  ? "bg-green-100 text-green-800 font-semibold"
+                                                  : oIdx === q.selectedIdx
+                                                    ? "bg-red-100 text-red-800"
+                                                    : "bg-gray-50 text-gray-400"
+                                                : "bg-gray-50 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700"
+                                            }`}
+                                          >
+                                            <span className="font-semibold mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                                            {opt.text}
+                                            {q.answered && oIdx === correctIdx && " ✓"}
+                                            {q.answered && oIdx === q.selectedIdx && oIdx !== correctIdx && " ✗"}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {q.answered && q.explanation && (
+                                        <div className="ml-5 mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                                          💡 <MathText text={q.explanation} />
+                                        </div>
+                                      )}
+                                      {q.answered && q.correct && (
+                                        <div className="ml-5 mt-1 text-xs text-green-600 font-medium">
+                                          ✅ Điểm yếu này đã được cải thiện!
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs text-gray-400"
+                                  onClick={() => setLessonQuiz((prev) => { const next = { ...prev }; delete next[lessonId]; return next; })}
+                                >
+                                  Ẩn bài tập
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
