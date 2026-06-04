@@ -247,8 +247,12 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", s.apiURL+"/chat/completions", bytes.NewReader(body))
+	url := s.apiURL + "/chat/completions"
+	log.Printf("[Chat] Calling %s model=%s messages=%d", url, s.model, len(messages))
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
+		log.Printf("[Chat] Request creation error: %v", err)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -258,24 +262,39 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", err
+		log.Printf("[Chat] HTTP call error: %v", err)
+		return "", fmt.Errorf("AI API unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("[Chat] Response: status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
+
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[Chat] API error %d: %s", resp.StatusCode, string(errBody))
 		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("[Chat] Read body error: %v", err)
 		return "", err
 	}
+	log.Printf("[Chat] Response body: %d bytes", len(raw))
+
 	content := tryExtractContent(json.RawMessage(raw))
 	if content != "" {
 		return content, nil
 	}
+	log.Printf("[Chat] Empty/unsupported response: %s", string(raw[:min(len(raw), 300)]))
 	return "", fmt.Errorf("empty response")
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GradeSubmission uses AI to grade a student's answer.
