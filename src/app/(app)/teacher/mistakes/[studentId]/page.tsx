@@ -2,12 +2,13 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, AlertCircle, TrendingUp, BookOpen, CheckCircle, HelpCircle, FileText, UserCheck, Clock, ChevronDown, ChevronUp, Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 interface WeaknessProfile {
   id: string;
@@ -34,11 +35,11 @@ interface LessonContext {
   gradeLevel: number;
 }
 
-const sourceConfig: Record<string, { icon: typeof HelpCircle; label: string; color: string }> = {
-  quiz: { icon: HelpCircle, label: "Quiz", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  exercise: { icon: FileText, label: "Bài tập", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  profile: { icon: UserCheck, label: "GV thiết lập", color: "bg-red-50 text-red-700 border-red-200" },
-  progress: { icon: Clock, label: "Kẹt bài", color: "bg-orange-50 text-orange-700 border-orange-200" },
+const sourceConfig: Record<string, { icon: string; label: string; color: string }> = {
+  quiz: { icon: "help", label: "Quiz", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  exercise: { icon: "description", label: "Bài tập", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  profile: { icon: "person_check", label: "GV thiết lập", color: "bg-red-50 text-red-700 border-red-200" },
+  progress: { icon: "schedule", label: "Kẹt bài", color: "bg-orange-50 text-orange-700 border-orange-200" },
 };
 
 export default function TeacherStudentMistakesPage({
@@ -161,7 +162,7 @@ export default function TeacherStudentMistakesPage({
         href="/teacher/mistakes"
         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 mb-4"
       >
-        <ArrowLeft className="size-4" /> Quay lại danh sách
+        <MaterialIcon name="arrow_back" className="size-4" /> Quay lại danh sách
       </Link>
 
       <div className="mb-6">
@@ -179,7 +180,7 @@ export default function TeacherStudentMistakesPage({
 
       {profiles.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-lg border">
-          <TrendingUp className="size-12 text-gray-300 mx-auto mb-4" />
+          <MaterialIcon name="trending_up" className="size-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">Học sinh này không có điểm yếu nào đang hoạt động</p>
         </div>
       ) : (
@@ -195,16 +196,16 @@ export default function TeacherStudentMistakesPage({
                   onClick={() => toggleCollapse(subjectKey)}
                   className="w-full px-4 py-3 flex items-center gap-2.5 hover:bg-gray-50 transition-colors rounded-lg"
                 >
-                  <BookOpen className="size-4 text-indigo-600 shrink-0" />
+                  <MaterialIcon name="menu_book" className="size-4 text-indigo-600 shrink-0" />
                   <h2 className="font-semibold text-gray-900 text-left">{subjectName}</h2>
                   <Badge variant="outline" className="text-xs shrink-0">
                     {total} điểm yếu
                   </Badge>
                   <div className="flex-1" />
                   {isSubjectCollapsed ? (
-                    <ChevronDown className="size-4 text-gray-400 shrink-0" />
+                    <MaterialIcon name="expand_more" className="size-4 text-gray-400 shrink-0" />
                   ) : (
-                    <ChevronUp className="size-4 text-gray-400 shrink-0" />
+                    <MaterialIcon name="expand_less" className="size-4 text-gray-400 shrink-0" />
                   )}
                 </button>
 
@@ -226,9 +227,9 @@ export default function TeacherStudentMistakesPage({
                               <div key={p.id} className={`px-4 py-2.5 ${p.resolved ? "bg-green-50/30" : ""}`}>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {p.resolved ? (
-                                    <CheckCircle className="size-3.5 text-green-600 shrink-0" />
+                                    <MaterialIcon name="check_circle" className="size-3.5 text-green-600 shrink-0" />
                                   ) : (
-                                    <AlertCircle className="size-3.5 text-amber-500 shrink-0" />
+                                    <MaterialIcon name="error" className="size-3.5 text-amber-500 shrink-0" />
                                   )}
                                   <span className={`font-medium text-sm ${p.resolved ? "text-gray-400 line-through" : "text-gray-900"}`}>
                                     <MathText text={p.topic} />
@@ -248,7 +249,7 @@ export default function TeacherStudentMistakesPage({
                                   )}
                                   {p.improvementScore > 0 && (
                                     <Badge variant="outline" className="text-xs py-0">
-                                      <TrendingUp className="size-3 mr-0.5" />
+                                      <MaterialIcon name="trending_up" className="size-3 mr-0.5" />
                                       {p.improvementScore}
                                     </Badge>
                                   )}
@@ -282,7 +283,7 @@ export default function TeacherStudentMistakesPage({
                                 className="text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                                 onClick={() => generateQuiz(lessonId, items.filter(p => !p.resolved))}
                               >
-                                <Sparkles className="size-3.5" />
+                                <MaterialIcon name="auto_awesome" className="size-3.5" />
                                 Tạo bài tập khắc phục ({items.filter(p => !p.resolved).length} câu)
                               </Button>
                             ) : lessonQuiz[lessonId].loading ? (
