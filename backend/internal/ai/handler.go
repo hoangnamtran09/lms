@@ -1643,3 +1643,40 @@ func sanitizeJSONString(s string) string {
 	}
 	return b.String()
 }
+
+// POST /api/ai/summarize-weaknesses
+func (h *Handler) SummarizeWeaknesses(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Topics      []string `json:"topics"`
+		SubjectName string   `json:"subjectName"`
+		LessonTitle string   `json:"lessonTitle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonErr(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Topics) == 0 {
+		jsonOk(w, map[string]string{"summary": "Không có điểm yếu nào."})
+		return
+	}
+
+	prompt := fmt.Sprintf(`Học sinh có các điểm yếu sau trong bài học:
+- Môn: %s
+- Bài: %s
+- Các điểm yếu: %s
+
+Hãy viết 1-2 câu tiếng Việt ngắn gọn phân tích tổng quan: học sinh đang gặp vấn đề gì, các điểm yếu này có liên quan với nhau không, và gợi ý nên tập trung ôn gì trước.
+Chỉ trả về đoạn văn bản, không thêm tiêu đề hay định dạng.`,
+		req.SubjectName, req.LessonTitle, strings.Join(req.Topics, ", "))
+
+	response, err := h.aiService.Chat([]ChatMessage{
+		{Role: "system", Content: "Bạn là trợ lý giáo dục phân tích điểm yếu học sinh. Chỉ trả về 1-2 câu tiếng Việt ngắn gọn, súc tích."},
+		{Role: "user", Content: prompt},
+	})
+	if err != nil {
+		jsonErr(w, "Lỗi AI: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonOk(w, map[string]string{"summary": strings.TrimSpace(response)})
+}

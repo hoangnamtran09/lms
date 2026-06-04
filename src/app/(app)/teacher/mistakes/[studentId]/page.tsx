@@ -216,6 +216,12 @@ export default function TeacherStudentMistakesPage({
                               </div>
                             ))}
                           </div>
+                          {/* AI weakness summary per lesson */}
+                          <LessonWeaknessSummary
+                            topics={items.filter(p => !p.resolved).map(p => p.topic)}
+                            subjectName={subjectName}
+                            lessonTitle={lessonTitle}
+                          />
                         </div>
                       );
                     })}
@@ -226,6 +232,52 @@ export default function TeacherStudentMistakesPage({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// LessonWeaknessSummary calls AI to summarize weaknesses for a specific lesson
+function LessonWeaknessSummary({
+  topics,
+  subjectName,
+  lessonTitle,
+}: {
+  topics: string[];
+  subjectName: string;
+  lessonTitle: string;
+}) {
+  const [result, setResult] = useState<{ loading: boolean; summary: string | null }>({
+    loading: topics.length > 0,
+    summary: null,
+  });
+
+  useEffect(() => {
+    if (topics.length === 0) return;
+    let cancelled = false;
+    api<{ summary: string }>("/api/ai/summarize-weaknesses", {
+      method: "POST",
+      body: JSON.stringify({ topics, subjectName, lessonTitle }),
+    })
+      .then((data) => { if (!cancelled) setResult({ loading: false, summary: data.summary }); })
+      .catch(() => { if (!cancelled) setResult({ loading: false, summary: null }); });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (topics.length === 0) return null;
+
+  return (
+    <div className="px-4 py-2.5 bg-gradient-to-r from-indigo-50/60 to-purple-50/60 border-t border-indigo-100">
+      {result.loading ? (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Loader2 className="size-3 animate-spin" />
+          AI đang phân tích điểm yếu...
+        </div>
+      ) : result.summary ? (
+        <div className="text-xs text-gray-700 leading-relaxed">
+          <span className="font-semibold text-indigo-700">🤖 AI nhận xét: </span>
+          {result.summary}
+        </div>
+      ) : null}
     </div>
   );
 }
