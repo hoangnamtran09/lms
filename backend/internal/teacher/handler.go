@@ -71,7 +71,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Order("s.submitted_at DESC").Limit(10).Find(&recentSubs)
 
 	jsonOk(w, map[string]interface{}{
-		"students":       students,
+		"students":        students,
 		"assignmentCount": assignmentCount,
 		"pendingGrading":  pendingGrading,
 		"recentSubmissions": recentSubs,
@@ -84,6 +84,7 @@ func (h *Handler) ListStudents(w http.ResponseWriter, r *http.Request) {
 
 	type StudentRow struct {
 		ID         string `json:"id"`
+		SupabaseID string `json:"supabaseId"`
 		FullName   string `json:"fullName"`
 		Username   string `json:"username"`
 		Email      string `json:"email"`
@@ -94,7 +95,7 @@ func (h *Handler) ListStudents(w http.ResponseWriter, r *http.Request) {
 	var students []StudentRow
 	h.db.Table("users").
 		Where("role = ? AND class_id = ?", "STUDENT", claims.ClassID).
-		Select("id, full_name, username, email, class_id, 0 as total_study, 0 as streak").
+		Select("id, supabase_id, full_name, username, email, class_id, 0 as total_study, 0 as streak").
 		Find(&students)
 
 	for i := range students {

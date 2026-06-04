@@ -255,6 +255,11 @@ func (s *Service) FindStudentIDsByClassAndTopic(ctx context.Context, classID, to
 	return ids, nil
 }
 
+// FindStudentClassID retrieves the class_id of a student by their supabase_id.
+func (s *Service) FindStudentClassID(ctx context.Context, userID string, dest *string) error {
+	return s.db.WithContext(ctx).Table("users").Where("supabase_id = ? AND role = ?", userID, "STUDENT").Select("class_id").Scan(dest).Error
+}
+
 // FindByUserAndTopic returns the first weakness matching userID + topic (fuzzy match on topic prefix).
 func (s *Service) FindByUserAndTopic(ctx context.Context, userID, topic string) (*WeaknessProfile, error) {
 	var profile WeaknessProfile

@@ -52,10 +52,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := extractID(r.URL.Path)
-	user, err := h.service.FindByID(r.Context(), id)
+	user, err := h.service.FindBySupabaseID(r.Context(), id)
 	if err != nil {
-		jsonError(w, "Not found", http.StatusNotFound)
-		return
+		user, err = h.service.FindByID(r.Context(), id)
+		if err != nil {
+			jsonError(w, "Not found", http.StatusNotFound)
+			return
+		}
 	}
 	jsonRespond(w, user, http.StatusOK)
 }

@@ -21,6 +21,7 @@ interface WeaknessTopic {
 
 interface StudentBrief {
   id: string;
+  supabaseId: string;
   fullName: string;
   weaknessCount?: number;
 }
@@ -49,7 +50,7 @@ export default function TeacherMistakesPage() {
         const studentsWithCounts = await Promise.all(
           studentList.map(async (s) => {
             try {
-              const weaknesses = await api<{ id: string; resolved: boolean }[]>(`/api/weaknesses?userId=${s.id}`);
+              const weaknesses = await api<{ id: string; resolved: boolean }[]>(`/api/weaknesses?userId=${s.supabaseId}`);
               return {
                 ...s,
                 weaknessCount: Array.isArray(weaknesses) ? weaknesses.filter((w) => !(w as any).resolved).length : 0,
@@ -239,7 +240,7 @@ export default function TeacherMistakesPage() {
             {filteredStudents.map((s) => (
               <Link
                 key={s.id}
-                href={`/teacher/mistakes/${s.id}`}
+                href={`/teacher/mistakes/${s.supabaseId}`}
                 className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-all group"
               >
                 <div className="flex items-center gap-3">

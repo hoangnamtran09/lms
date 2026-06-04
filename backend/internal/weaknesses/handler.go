@@ -35,7 +35,30 @@ func (h *Handler) ClassSummary(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
-	profiles, err := h.service.ListByUser(r.Context(), claims.UserID)
+	targetUserID := r.URL.Query().Get("userId")
+
+	// If no userId param, default to current user (student viewing own weaknesses)
+	if targetUserID == "" {
+		targetUserID = claims.UserID
+	}
+
+	// If requesting another user's weaknesses, verify permission (teacher/admin)
+	if targetUserID != claims.UserID {
+		if claims.Role != "TEACHER" && claims.Role != "ADMIN" {
+			jsonErr(w, "Không có quyền xem điểm yếu của học sinh này", http.StatusForbidden)
+			return
+		}
+		// Teacher can only view students in their own class
+		if claims.Role == "TEACHER" && claims.ClassID != "" {
+			var studentClassID string
+			if err := h.service.FindStudentClassID(r.Context(), targetUserID, &studentClassID); err != nil || studentClassID != claims.ClassID {
+				jsonErr(w, "Học sinh không thuộc lớp của bạn", http.StatusForbidden)
+				return
+			}
+		}
+	}
+
+	profiles, err := h.service.ListByUser(r.Context(), targetUserID)
 	if err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
