@@ -27,7 +27,6 @@ const allNavItems: NavItem[] = [
   { label: "Báo cáo tuần", href: "/reports", icon: "assessment", roles: ["STUDENT", "PARENT"] },
   // Teacher
   { label: "Tổng quan", href: "/teacher", icon: "co_present", roles: ["TEACHER"] },
-  { label: "Môn học", href: "/teacher/courses", icon: "menu_book", roles: ["TEACHER"] },
   { label: "Bài tập", href: "/teacher/assignments", icon: "assignment", roles: ["TEACHER"] },
   { label: "Bảng xếp hạng", href: "/teacher/leaderboard", icon: "leaderboard", roles: ["TEACHER"] },
   { label: "Học sinh", href: "/teacher/students", icon: "group", roles: ["TEACHER"] },
