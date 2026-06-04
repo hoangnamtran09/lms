@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import { WeaknessSummary } from "@/components/ai/weakness-summary";
 
 interface WeaknessProfile {
   id: string;
@@ -430,6 +431,12 @@ export default function TeacherStudentMistakesPage({
                               </div>
                             ))}
                           </div>
+                          {/* AI nhận xét */}
+                          <WeaknessSummary
+                            topics={items.filter(p => !p.resolved).map(p => p.topic)}
+                            subjectName={subjectName}
+                            lessonTitle={lessonTitle}
+                          />
                         </div>
                       );
                     })}

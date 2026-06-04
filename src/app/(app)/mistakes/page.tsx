@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import { WeaknessSummary } from "@/components/ai/weakness-summary";
 
 interface WeaknessProfile {
   id: string;
@@ -455,6 +456,12 @@ export default function MistakesPage() {
                                 );
                               })}
                             </div>
+                            {/* AI nhận xét */}
+                            <WeaknessSummary
+                              topics={items.filter(p => !p.resolved).map(p => p.topic)}
+                              subjectName={subjectName}
+                              lessonTitle={lessonTitle}
+                            />
                           </div>
                         );
                       })}
