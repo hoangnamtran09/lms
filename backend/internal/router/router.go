@@ -472,3 +472,4 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 }
+
