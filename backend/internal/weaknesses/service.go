@@ -73,6 +73,8 @@ func (s *Service) RecordError(ctx context.Context, userID, lessonID, topic, sour
 	existing.ErrorCount++
 	existing.Weight += weight
 	existing.LastErrorAt = &now
+	existing.Resolved = false      // re-open if previously auto-resolved
+	existing.ImprovementScore = 0  // reset improvement counter on new errors
 	// Update source if new weight tier is higher than current source
 	if sourceWeightPriority(source) > sourceWeightPriority(existing.Source) {
 		existing.Source = source
@@ -101,6 +103,31 @@ func sourceWeightPriority(source string) int {
 
 // UpdateQuizStats increments quiz tracking counters for the weakness (correct or wrong).
 // Creates the weakness profile lazily if it doesn't exist yet.
+// UpsertWeakness creates or increments a weakness profile for a user+topic.
+func (s *Service) UpsertWeakness(ctx context.Context, userID, topic, source string) error {
+	now := time.Now()
+	var existing WeaknessProfile
+	err := s.db.WithContext(ctx).Where("user_id = ? AND topic = ?", userID, topic).First(&existing).Error
+	if err != nil {
+		w := &WeaknessProfile{
+			ID:          uuid.New().String(),
+			UserID:      userID,
+			Topic:       topic,
+			Source:      source,
+			ErrorCount:  1,
+			Weight:      1.0,
+			LastErrorAt: &now,
+		}
+		return s.db.WithContext(ctx).Create(w).Error
+	}
+	existing.ErrorCount++
+	existing.Weight += 1.0
+	existing.LastErrorAt = &now
+	existing.Resolved = false      // re-open if previously auto-resolved
+	existing.ImprovementScore = 0  // reset improvement counter on new errors
+	return s.db.WithContext(ctx).Save(&existing).Error
+}
+
 func (s *Service) UpdateQuizStats(ctx context.Context, userID, lessonID, topic string, correct bool) (*WeaknessProfile, error) {
 	now := time.Now()
 	var existing WeaknessProfile
