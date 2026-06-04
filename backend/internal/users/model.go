@@ -8,18 +8,20 @@ import (
 )
 
 type User struct {
-	ID           string    `gorm:"primaryKey;size:36" json:"id"`
-	SupabaseID   string    `gorm:"size:36;uniqueIndex" json:"supabaseId"`
-	Username     string    `gorm:"uniqueIndex;size:100" json:"username"`
-	PasswordHash string    `gorm:"size:255" json:"-"`
-	FullName     string    `gorm:"size:255;not null" json:"fullName"`
-	Email        string    `gorm:"size:255" json:"email"`
-	Role         string    `gorm:"size:20;not null;default:STUDENT" json:"role"`
-	ClassID      string    `gorm:"size:36" json:"classId"`
-	Phone        string    `gorm:"size:20" json:"phone"`
-	AvatarURL    string    `gorm:"size:500" json:"avatarUrl"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID           string     `gorm:"primaryKey;size:36" json:"id"`
+	SupabaseID   string     `gorm:"size:36;uniqueIndex" json:"supabaseId"`
+	Username     string     `gorm:"uniqueIndex;size:100" json:"username"`
+	PasswordHash string     `gorm:"size:255" json:"-"`
+	FullName     string     `gorm:"size:255;not null" json:"fullName"`
+	Email        string     `gorm:"size:255" json:"email"`
+	Role         string     `gorm:"size:20;not null;default:STUDENT" json:"role"`
+	ClassID      string     `gorm:"size:36" json:"classId"`
+	Phone        string     `gorm:"size:20" json:"phone"`
+	AvatarURL    string     `gorm:"size:500" json:"avatarUrl"`
+	DOB          *time.Time `json:"dob,omitempty"`
+	Gender       string     `gorm:"size:10" json:"gender,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 type Service struct {

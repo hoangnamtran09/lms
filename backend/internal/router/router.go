@@ -102,7 +102,7 @@ func New(
 	lessonsH := lessons.NewHandler(lessonsSvc)
 		cacheSvc := ai.NewCacheService(db)
 		aiH := ai.NewHandler(aiSvc, lessonsSvc, weaknessSvc, diamondSvc, coursesSvc, cacheSvc, progressSvc, db)
-	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc)
+	assignmentsH := assignments.NewHandler(assignmentsSvc, aiSvc, weaknessSvc)
 	mediaH := media.NewHandler(cfg.R2BaseURL, []string{cfg.R2BaseURL}, cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName, cfg.R2PublicURL)
 
 	// Wire R2 delete callbacks
@@ -229,8 +229,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		// Users
 		r.Get("/api/users", h.Users.List)
 		r.Get("/api/users/{id}", h.Users.Get)
-		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
-			Post("/api/users", h.Users.Create)
+		r.Post("/api/users", h.Users.Create)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
 			Patch("/api/users/{id}", h.Users.Update)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).

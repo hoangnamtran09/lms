@@ -17,6 +17,8 @@ import {
   MessageSquare,
   AlertTriangle,
   ThumbsUp,
+  Paperclip,
+  ExternalLink,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -573,6 +575,57 @@ export default function SubmissionDetailPage({
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left: Questions List */}
         <div className="flex-1 space-y-6">
+          {/* Student file attachment */}
+          {submission.fileUrl && (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="size-5 text-blue-500" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Bài làm đính kèm
+                  </h3>
+                </div>
+              </div>
+              <div className="p-6">
+                {/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(
+                  submission.fileUrl
+                ) ? (
+                  <a
+                    href={submission.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={submission.fileUrl}
+                      alt="Bài làm của học sinh"
+                      className="max-w-full max-h-[500px] object-contain rounded-xl border border-gray-100 mx-auto hover:opacity-90 transition-opacity cursor-pointer"
+                    />
+                  </a>
+                ) : (
+                  <a
+                    href={submission.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-3 px-5 py-4 bg-blue-50 rounded-xl text-blue-700 font-bold hover:bg-blue-100 transition-colors"
+                  >
+                    <ExternalLink className="size-5" />
+                    <span>Xem file đính kèm</span>
+                  </a>
+                )}
+                <a
+                  href={submission.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  <ExternalLink className="size-3.5" />
+                  Mở trong tab mới
+                </a>
+              </div>
+            </div>
+          )}
+
           {questions.map((q, qi) => {
             const grade = gradeMap.get(q.id);
             const studentAns = answerMap.get(q.id) || "";

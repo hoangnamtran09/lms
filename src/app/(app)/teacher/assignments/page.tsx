@@ -573,17 +573,6 @@ export default function TeacherAssignmentsPage() {
           })
         )}
 
-        {/* Empty state card — always shown at the bottom */}
-        <Link href="/teacher/assignments/create">
-          <button className="w-full border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-all group">
-            <div className="size-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-              <Plus className="size-7" />
-            </div>
-            <span className="text-lg font-semibold">
-              Thêm bài tập mới cho học sinh
-            </span>
-          </button>
-        </Link>
       </div>
 
       {/* Pagination */}

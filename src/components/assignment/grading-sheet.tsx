@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Check, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Clock, Hash, MessageSquareText } from "lucide-react";
+import { Check, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Clock, Hash, MessageSquareText, Paperclip, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -399,6 +399,51 @@ export function GradingSheet({
           {rubric && (
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-sm text-gray-700">
               <span className="font-semibold text-amber-800">Tiêu chí chấm:</span> {rubric}
+            </div>
+          )}
+
+          {/* Student file attachment */}
+          {sub?.fileUrl && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
+                <Paperclip className="size-4 text-blue-500" />
+                <span className="text-sm font-semibold text-gray-700">Bài làm đính kèm</span>
+              </div>
+              <div className="p-4">
+                {/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(sub.fileUrl) ? (
+                  <a
+                    href={sub.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={sub.fileUrl}
+                      alt="Bài làm của học sinh"
+                      className="max-w-full max-h-[300px] object-contain rounded-lg border border-gray-100 mx-auto hover:opacity-90 transition-opacity"
+                    />
+                  </a>
+                ) : (
+                  <a
+                    href={sub.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 rounded-lg text-blue-700 font-bold text-sm hover:bg-blue-100 transition-colors"
+                  >
+                    <ExternalLink className="size-4" />
+                    Xem file đính kèm
+                  </a>
+                )}
+                <a
+                  href={sub.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 ml-3 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  <ExternalLink className="size-3" />
+                  Mở trong tab mới
+                </a>
+              </div>
             </div>
           )}
 

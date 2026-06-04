@@ -89,6 +89,7 @@ export default function CreateAssignmentPage() {
   const [topics, setTopics] = useState<WeaknessTopic[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<WeaknessTopic | null>(null);
+  const [manualTopic, setManualTopic] = useState("");
 
   // Manual mode
   const [title, setTitle] = useState("");
@@ -137,10 +138,10 @@ export default function CreateAssignmentPage() {
 
   // Load weakness topics
   useEffect(() => {
-    if (!selectedClassId) { setTopics([]); return; }
+    if (!selectedClassId) { setTopics([]); setManualTopic(""); return; }
     setLoadingTopics(true);
     api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${selectedClassId}`)
-      .then((d) => { setSelectedTopic(null); setTopics(d || []); })
+      .then((d) => { setSelectedTopic(null); setTopics(d || []); setManualTopic(""); })
       .catch(() => { setSelectedTopic(null); setTopics([]); })
       .finally(() => setLoadingTopics(false));
   }, [selectedClassId]);
@@ -153,7 +154,7 @@ export default function CreateAssignmentPage() {
     setTitle(""); setDescription(""); setRubric(""); setMaxScore(100);
     setClassId(""); setDueDate(""); setSelectedFile(null); setSelectedStudentIds([]);
     setSelectedSubjectId(""); setSelectedLessonId("");
-    setSelectedClassId(""); setSelectedTopic(null); setTopics([]);
+    setSelectedClassId(""); setSelectedTopic(null); setTopics([]); setManualTopic("");
     setWizardStep("config"); setTestMatrix(null);
   };
 
@@ -263,7 +264,7 @@ export default function CreateAssignmentPage() {
     setDueDate(""); setSelectedFile(null); setSelectedStudentIds([]);
     setGeneratedQuestions([]); setGeneratedTitle(""); setGenerateError(null);
     setSelectedSubjectId(""); setSelectedLessonId("");
-    setSelectedClassId(""); setSelectedTopic(null); setTopics([]);
+    setSelectedClassId(""); setSelectedTopic(null); setTopics([]); setManualTopic("");
     setTestMatrix(null); setWizardStep("config");
   };
 
@@ -500,8 +501,10 @@ export default function CreateAssignmentPage() {
                       ) : topics.length === 0 ? (
                         <div className="p-10 text-center bg-gray-50 rounded-2xl">
                           <Brain className="size-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-sm font-medium text-gray-500">Lớp này không có điểm yếu nào</p>
-                          <p className="text-xs text-gray-400 mt-1">Tất cả học sinh đều đang học tốt</p>
+                          <p className="text-sm font-medium text-gray-500">Chưa có dữ liệu điểm yếu cho lớp này</p>
+                          <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto leading-relaxed">
+                            Điểm yếu được ghi nhận khi học sinh làm quiz trả lời sai, nộp bài tập bị chấm sai, hoặc làm bài luyện tập dưới 50%. Hãy cho học sinh làm quiz/bài tập trước, hoặc nhập chủ đề thủ công bên dưới.
+                          </p>
                         </div>
                       ) : (
                         <Table>
@@ -544,6 +547,36 @@ export default function CreateAssignmentPage() {
                       <Button onClick={handleGenerateRemediation} disabled={generatingQuestions} className="gap-2 rounded-xl">
                         {generatingQuestions ? <><Loader2 className="size-4 animate-spin" /> Đang tạo...</> : <><Sparkles className="size-4" /> Tạo bài tập khắc phục & Gán tự động</>}
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Manual topic entry — always available as fallback */}
+                  {!selectedTopic && (
+                    <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200">
+                      <p className="text-sm font-medium text-gray-700 mb-3">
+                        Hoặc nhập chủ đề thủ công để AI tạo bài tập khắc phục:
+                      </p>
+                      <div className="flex gap-3">
+                        <Input
+                          value={manualTopic}
+                          onChange={(e) => setManualTopic(e.target.value)}
+                          placeholder="VD: Phương trình bậc hai, Thì hiện tại hoàn thành..."
+                          className="flex-1 rounded-xl"
+                          onKeyDown={(e) => { if (e.key === "Enter" && manualTopic.trim()) { setSelectedTopic({ topic: manualTopic.trim(), totalErrors: 0, studentCount: 0, studentIds: [] }); } }}
+                        />
+                        <Button
+                          variant="outline"
+                          disabled={!manualTopic.trim()}
+                          onClick={() => { setSelectedTopic({ topic: manualTopic.trim(), totalErrors: 0, studentCount: 0, studentIds: [] }); }}
+                          className="rounded-xl gap-1.5"
+                        >
+                          <Sparkles className="size-4" />
+                          Chọn
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        AI sẽ tạo câu hỏi cho chủ đề này và gán cho tất cả học sinh trong lớp.
+                      </p>
                     </div>
                   )}
 

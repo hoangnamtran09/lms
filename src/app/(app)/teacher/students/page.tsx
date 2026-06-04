@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-  import { ArrowLeft, Plus, ChevronUp, UserPlus } from "lucide-react";
-  import { MaterialIcon } from "@/components/ui/material-icon";
-  import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ArrowLeft, Plus } from "lucide-react";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -34,11 +31,6 @@ interface ClassItem {
   gradeLevelName?: string;
 }
 
-interface GradeLevel {
-  id: string;
-  name: string;
-}
-
 export default function TeacherStudentsPage() {
   const { user: me } = useAuth();
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -53,18 +45,8 @@ export default function TeacherStudentsPage() {
   const [editError, setEditError] = useState<string | null>(null);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+  const [classesLoading, setClassesLoading] = useState(true);
   const [editGradeFilter, setEditGradeFilter] = useState("");
-  const [createGradeFilter, setCreateGradeFilter] = useState("");
-
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newFullName, setNewFullName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newClassId, setNewClassId] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchStudents = () => {
     api<StudentRow[]>("/api/users?role=STUDENT")
@@ -75,13 +57,10 @@ export default function TeacherStudentsPage() {
 
   useEffect(() => {
     fetchStudents();
-    Promise.all([
-      api<ClassItem[]>("/api/classes"),
-      api<GradeLevel[]>("/api/grade-levels"),
-    ]).then(([cls, gl]) => {
-      setClasses(Array.isArray(cls) ? cls : []);
-      setGradeLevels(Array.isArray(gl) ? gl : []);
-    }).catch(() => {});
+    api<ClassItem[]>("/api/classes")
+      .then((d) => setClasses(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setClassesLoading(false));
   }, []);
 
   const filteredClasses = (gradeFilter: string) =>
@@ -144,40 +123,7 @@ export default function TeacherStudentsPage() {
     }
   };
 
-  const handleCreate = async () => {
-    if (!newUsername.trim() || !newPassword.trim() || !newFullName.trim()) {
-      setCreateError("Tên đăng nhập, mật khẩu và họ tên không được để trống");
-      return;
-    }
-    setCreating(true);
-    setCreateError(null);
-    try {
-      await api("/api/users", {
-        method: "POST",
-        body: JSON.stringify({
-          username: newUsername.trim(),
-          password: newPassword,
-          fullName: newFullName.trim(),
-          email: newEmail.trim(),
-          classId: newClassId.trim(),
-          role: "STUDENT",
-        }),
-      });
-      setNewUsername("");
-      setNewPassword("");
-      setNewFullName("");
-      setNewEmail("");
-      setNewClassId("");
-      setShowCreateForm(false);
-      fetchStudents();
-    } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "Tạo học sinh thất bại");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  if (loading) {
+  if (loading || classesLoading) {
     return (
       <div className="space-y-4">
         <Skeleton delay={0} className="h-8 w-48" />
@@ -199,74 +145,13 @@ export default function TeacherStudentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Quản lí Học sinh</h1>
           <p className="text-sm text-gray-500 mt-1">{students.length} học sinh</p>
         </div>
-        <Button onClick={() => { setShowCreateForm(!showCreateForm); setCreateError(null); }} className="gap-2">
-          {showCreateForm ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
-          {showCreateForm ? "Thu gọn" : "Tạo học sinh"}
-        </Button>
+        <Link href="/teacher/students/new">
+          <Button className="gap-2">
+            <Plus className="size-4" />
+            Tạo học sinh
+          </Button>
+        </Link>
       </div>
-
-      {createError && (
-        <div className="mb-4 p-3 bg-red-50 rounded-lg text-sm text-red-600">{createError}</div>
-      )}
-
-      {showCreateForm && (
-        <Card className="rounded-2xl border-0 ring-1 ring-gray-200/60 shadow-sm mb-6">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="flex items-center justify-center size-8 rounded-lg bg-emerald-100">
-                <UserPlus className="size-4 text-emerald-600" />
-              </div>
-              <h2 className="text-lg font-bold text-gray-900">Tạo học sinh mới</h2>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="new-username">Tên đăng nhập</Label>
-                  <Input id="new-username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="Nhập tên đăng nhập" />
-                </div>
-                <div>
-                  <Label htmlFor="new-password">Mật khẩu</Label>
-                  <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nhập mật khẩu" />
-                </div>
-                <div>
-                  <Label htmlFor="new-fullname">Họ tên</Label>
-                  <Input id="new-fullname" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} placeholder="Nhập họ tên học sinh" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="new-email">Email (tuỳ chọn)</Label>
-                  <Input id="new-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Nhập email" />
-                </div>
-                <div>
-                  <Label>Khối lớp (lọc)</Label>
-                  <Select value={createGradeFilter} onValueChange={(v) => { setCreateGradeFilter(v || ""); setNewClassId(""); }}>
-                    <SelectTrigger><SelectValue placeholder="Tất cả khối" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Tất cả khối</SelectItem>
-                      {gradeLevels.map((gl) => (<SelectItem key={gl.id} value={gl.id}>{gl.name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="new-class">Lớp (tuỳ chọn)</Label>
-                  <Select value={newClassId} onValueChange={(v) => setNewClassId(v || "")}>
-                    <SelectTrigger><SelectValue placeholder="Chọn lớp" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">-- Chưa chọn --</SelectItem>
-                      {filteredClasses(createGradeFilter).map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}{c.gradeLevelName ? ` (${c.gradeLevelName})` : ""}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button onClick={handleCreate} disabled={creating} className="gap-2"><Plus className="size-4" />{creating ? "Đang tạo..." : "Tạo học sinh"}</Button>
-                  <Button variant="outline" onClick={() => { setShowCreateForm(false); setCreateError(null); }}>Huỷ</Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {editError && (
         <div className="mb-4 p-3 bg-red-50 rounded-lg text-sm text-red-600">{editError}</div>
