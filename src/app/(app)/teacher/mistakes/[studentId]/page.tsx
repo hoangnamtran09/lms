@@ -431,15 +431,14 @@ export default function TeacherStudentMistakesPage({
                               </div>
                             ))}
                           </div>
-                          {/* AI nhận xét */}
-                          <WeaknessSummary
-                            topics={items.filter(p => !p.resolved).map(p => p.topic)}
-                            subjectName={subjectName}
-                            lessonTitle={lessonTitle}
-                          />
                         </div>
                       );
                     })}
+                    {/* AI nhận xét cho toàn bộ môn học */}
+                    <WeaknessSummary
+                      topics={[...lessons.values()].flat().filter(p => !p.resolved).map(p => p.topic)}
+                      subjectName={subjectName}
+                    />
                   </div>
                 )}
               </div>
