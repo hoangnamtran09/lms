@@ -473,3 +473,4 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 }
+// force deploy: remove RequirePermission from POST /api/users
