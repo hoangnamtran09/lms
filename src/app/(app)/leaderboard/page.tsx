@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Trophy, Clock, Gem, Crown, Star, Sparkles, Zap, Flame, Users, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trophy, Clock, Gem, Crown, Star, Sparkles, Zap, Flame, Users, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -274,11 +274,9 @@ export default function LeaderboardPage() {
         {/* Desktop header */}
         <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold uppercase tracking-wider text-gray-500">
           <div className="col-span-1">Hạng</div>
-          <div className="col-span-4">Học sinh</div>
-          <div className="col-span-2">Thời gian</div>
+          <div className="col-span-6">Học sinh</div>
+          <div className="col-span-3">Thời gian</div>
           <div className="col-span-2">Kim cương</div>
-          <div className="col-span-2">Xu hướng</div>
-          <div className="col-span-1 text-center">Xem</div>
         </div>
 
         <div className="divide-y divide-gray-100">
@@ -287,7 +285,6 @@ export default function LeaderboardPage() {
               const rank = i + 4;
               const isMe = entry.userId === currentUserId;
               const pct = maxTime > 0 ? (entry.totalSeconds / maxTime) * 100 : 0;
-              const trend = i % 3 === 0 ? "up" : i % 3 === 1 ? "stable" : "down";
 
               return (
                 <div
@@ -302,7 +299,7 @@ export default function LeaderboardPage() {
                   </span>
 
                   {/* Student */}
-                  <div className="flex items-center gap-3 md:col-span-4">
+                  <div className="flex items-center gap-3 md:col-span-6">
                     <Avatar size="sm" className="shrink-0">
                       <AvatarFallback className={`text-xs ${isMe ? "bg-primary/10 text-primary" : ""}`}>
                         {initials(entry.userName)}
@@ -328,7 +325,7 @@ export default function LeaderboardPage() {
                   </div>
 
                   {/* Time */}
-                  <div className="text-sm font-medium text-gray-700 md:col-span-2 flex items-center gap-1">
+                  <div className="text-sm font-medium text-gray-700 md:col-span-3 flex items-center gap-1">
                     <Clock className="size-3 text-gray-400" />
                     {formatHours(entry.totalSeconds)}
                   </div>
@@ -337,33 +334,6 @@ export default function LeaderboardPage() {
                   <div className="text-sm font-medium text-gray-700 md:col-span-2 flex items-center gap-1">
                     <Gem className="size-3 text-amber-400" />
                     {entry.totalDiamonds || 0}
-                  </div>
-
-                  {/* Trend */}
-                  <div className="text-sm md:col-span-2">
-                    {trend === "up" ? (
-                      <div className="flex items-center gap-1 text-emerald-600">
-                        <TrendingUp className="size-3.5" />
-                        <span className="text-xs font-medium">+{(rank % 5) + 1}</span>
-                      </div>
-                    ) : trend === "down" ? (
-                      <div className="flex items-center gap-1 text-red-500">
-                        <TrendingDown className="size-3.5" />
-                        <span className="text-xs font-medium">-{(rank % 3) + 1}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <Minus className="size-3.5" />
-                        <span className="text-xs font-medium">0</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* View button */}
-                  <div className="md:col-span-1 flex justify-center">
-                    <button className="p-2 text-gray-400 hover:text-primary transition-colors rounded-lg hover:bg-gray-100">
-                      <TrendingUp className="size-4" />
-                    </button>
                   </div>
                 </div>
               );
@@ -383,12 +353,6 @@ export default function LeaderboardPage() {
           )}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex justify-center">
-          <button className="flex items-center gap-2 text-primary font-medium text-sm hover:underline transition-all">
-            Xem thêm tất cả bảng xếp hạng
-            <TrendingUp className="size-4" />
-          </button>
-        </div>
       </div>
 
       {/* ---- Stats Summary ---- */}

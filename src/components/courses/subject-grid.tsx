@@ -29,11 +29,36 @@ interface StreakInfo {
   longestStreak: number;
 }
 
+interface Achievement {
+  id: string;
+  achievementId: string;
+  title: string;
+  description: string;
+  icon: string;
+  earnedAt: string;
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Vừa xong";
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return date.toLocaleDateString("vi-VN");
+}
+
 export function SubjectGrid() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [grade, setGrade] = useState<string>("all");
   const [streak, setStreak] = useState(0);
+  const [recentAchievements, setRecentAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -48,6 +73,12 @@ export function SubjectGrid() {
     api<StreakInfo>("/api/streaks")
       .then((s) => setStreak(s.currentStreak))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api<Achievement[]>("/api/achievements/my")
+      .then((data) => setRecentAchievements((data || []).slice(0, 3)))
+      .catch(() => setRecentAchievements([]));
   }, []);
 
   const greeting = useMemo(() => getGreeting(), []);
@@ -119,14 +150,6 @@ export function SubjectGrid() {
                 <SubjectCard key={s.id} subject={s} />
               ))}
 
-              {/* Register more subjects placeholder */}
-              <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-200 p-8 text-center opacity-60 hover:opacity-100 hover:border-primary transition-all cursor-pointer min-h-[280px]">
-                <div className="flex size-16 items-center justify-center rounded-full bg-gray-100 mb-4">
-                  <BookOpen className="size-7 text-gray-400" />
-                </div>
-                <h4 className="text-lg font-bold text-gray-600">Đăng ký môn mới</h4>
-                <p className="text-sm text-gray-400 mt-1">Khám phá kho khóa học bổ trợ</p>
-              </div>
             </div>
           )}
         </div>
@@ -141,32 +164,35 @@ export function SubjectGrid() {
               </div>
               <h2 className="text-lg font-bold text-gray-900">Thành tích gần đây</h2>
             </div>
-            <div className="space-y-4">
-              <div className="flex gap-3 items-start">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                  <Trophy className="size-4" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold text-gray-900">Toán học:</span>{" "}
-                    Bạn vừa đạt điểm 10/10 bài trắc nghiệm!
-                  </p>
-                  <span className="text-[11px] text-gray-400">2 giờ trước</span>
-                </div>
+            {recentAchievements.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Trophy className="size-10 text-gray-300 mb-3" />
+                <p className="text-sm text-gray-500">
+                  Hãy bắt đầu học để mở khóa thành tích đầu tiên nhé!
+                </p>
               </div>
-              <div className="flex gap-3 items-start">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                  <BookOpen className="size-4" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-bold text-gray-900">Ngữ văn:</span>{" "}
-                    Đã hoàn thành 5 bài học trong tuần.
-                  </p>
-                  <span className="text-[11px] text-gray-400">1 ngày trước</span>
-                </div>
+            ) : (
+              <div className="space-y-4">
+                {recentAchievements.map((a) => (
+                  <div key={a.id} className="flex gap-3 items-start">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-lg">
+                      {a.icon || "🏆"}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-700">
+                        <span className="font-bold text-gray-900">{a.title}</span>
+                        {a.description && (
+                          <span className="text-gray-500"> — {a.description}</span>
+                        )}
+                      </p>
+                      <span className="text-[11px] text-gray-400">
+                        {formatRelativeTime(a.earnedAt)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </section>
 
           {/* Resource Promo Card */}
