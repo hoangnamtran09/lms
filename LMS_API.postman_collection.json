@@ -1,0 +1,87 @@
+{
+  "info": {
+    "name": "LMS API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "backend",
+      "value": "https://lms-backend.agreeableriver-a1dda4c6.southeastasia.azurecontainerapps.io"
+    },
+    {
+      "key": "token",
+      "value": "PASTE_YOUR_JWT_ACCESS_TOKEN_HERE"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "AI",
+      "item": [
+        {
+          "name": "Completion Quiz",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lessonId\": \"fa6449d0-6a2e-4bb9-843f-8a64fa9ba1f3\",\n  \"subjectId\": \"\",\n  \"sessionId\": \"postman-test\",\n  \"questionCount\": 2\n}"
+            },
+            "url": {
+              "raw": "{{backend}}/api/ai/completion-quiz",
+              "host": ["{{backend}}"],
+              "path": ["api", "ai", "completion-quiz"]
+            }
+          }
+        },
+        {
+          "name": "Validate Quiz",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"PASTE_QUESTION_TEXT\",\n  \"selectedIndex\": 0,\n  \"lessonId\": \"fa6449d0-6a2e-4bb9-843f-8a64fa9ba1f3\",\n  \"sessionId\": \"postman-test\"\n}"
+            },
+            "url": {
+              "raw": "{{backend}}/api/ai/validate-quiz",
+              "host": ["{{backend}}"],
+              "path": ["api", "ai", "validate-quiz"]
+            }
+          }
+        },
+        {
+          "name": "Chat Stream",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Xin chào\",\n  \"lessonId\": \"fa6449d0-6a2e-4bb9-843f-8a64fa9ba1f3\",\n  \"sessionId\": \"postman-test\"\n}"
+            },
+            "url": {
+              "raw": "{{backend}}/api/ai/chat-stream",
+              "host": ["{{backend}}"],
+              "path": ["api", "ai", "chat-stream"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

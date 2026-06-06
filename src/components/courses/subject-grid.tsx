@@ -61,12 +61,13 @@ export function SubjectGrid() {
   const [recentAchievements, setRecentAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const params = grade !== "all" ? `?gradeLevel=${grade}` : "";
     api<Subject[]>(`/api/subjects${params}`)
-      .then(setSubjects)
-      .catch(() => setSubjects([]))
-      .finally(() => setLoading(false));
+      .then((data) => { if (!cancelled) setSubjects(data); })
+      .catch(() => { if (!cancelled) setSubjects([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [grade]);
 
   useEffect(() => {
