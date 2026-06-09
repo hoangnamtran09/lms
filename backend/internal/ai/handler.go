@@ -122,47 +122,76 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
 	}, func() {
+		responseText := fullResponse.String()
+
 		// Parse :::weakness markers and record weakness signals
 		if claims != nil {
 			weaknessRe := regexp.MustCompile(`:::weakness topic="([^"]+)"`)
-			matches := weaknessRe.FindAllStringSubmatch(fullResponse.String(), -1)
+			matches := weaknessRe.FindAllStringSubmatch(responseText, -1)
 			for _, match := range matches {
 				topic := match[1]
 				h.weaknessService.RecordError(r.Context(), claims.UserID, req.LessonID, topic, "chat", 0.8)
 			}
 		}
 
-		// Parse :::quiz blocks and store answers server-side
-		quizRe := regexp.MustCompile(`:::quiz\s*(\{[\s\S]*?\})\s*:::`)
-		quizMatches := quizRe.FindAllStringSubmatch(fullResponse.String(), -1)
-		for _, m := range quizMatches {
-			var quizData struct {
-				Question    string       `json:"question"`
-				Options     []QuizOption `json:"options"`
-				Explanation string       `json:"explanation"`
-			}
-			jsonStr := m[1]
-			if err := json.Unmarshal([]byte(jsonStr), &quizData); err != nil {
-				continue
-			}
-			if quizData.Question != "" && len(quizData.Options) > 0 {
-				h.quizStore.Store(quizData.Question, quizData.Options, quizData.Explanation)
+		// Strip :::quiz blocks from response text (safety net — AI is told not to generate them)
+		quizStripRe := regexp.MustCompile(`:::quiz\s*\{[\s\S]*?\}\s*:::`)
+		cleanText := quizStripRe.ReplaceAllString(responseText, "")
+
+		// Generate a quiz separately based on the AI's response
+		if req.LessonID != "" && lessonTitle != "" {
+			quizPrompt := BuildChatQuizPrompt(lessonTitle, subjectName, lessonContent, gradeLevel, responseText)
+			quizResp, quizErr := h.aiService.Chat([]ChatMessage{
+				{Role: "system", Content: "Bạn là người tạo câu hỏi trắc nghiệm. Chỉ trả về JSON, không giải thích thêm."},
+				{Role: "user", Content: quizPrompt},
+			})
+			if quizErr == nil {
+				var quizData struct {
+					Question    string       `json:"question"`
+					Options     []QuizOption `json:"options"`
+					Explanation string       `json:"explanation"`
+				}
+				cleaned := extractJSON(quizResp)
+				if err := json.Unmarshal([]byte(cleaned), &quizData); err == nil {
+					if quizData.Question != "" && len(quizData.Options) > 0 {
+						// Store answers server-side
+						h.quizStore.Store(quizData.Question, quizData.Options, quizData.Explanation)
+						// Send quiz to client via SSE (without isCorrect)
+						safeOpts := make([]map[string]string, len(quizData.Options))
+						for i, o := range quizData.Options {
+							safeOpts[i] = map[string]string{"text": o.Text}
+						}
+						quizEvent, _ := json.Marshal(map[string]interface{}{
+							"quiz": map[string]interface{}{
+								"question":    quizData.Question,
+								"options":     safeOpts,
+								"explanation": quizData.Explanation,
+							},
+						})
+						fmt.Fprintf(w, "data: %s\n\n", quizEvent)
+						flusher.Flush()
+					}
+				} else {
+					log.Printf("[Chat] Failed to parse generated quiz: %v (response: %s)", err, cleaned)
+				}
+			} else {
+				log.Printf("[Chat] Quiz generation failed: %v", quizErr)
 			}
 		}
 
-			// Save chat history: user message + AI response (server-side)
-			if claims != nil && req.LessonID != "" {
-				now := time.Now()
-				records := []ChatMessageRecord{
-					{UserID: claims.UserID, LessonID: req.LessonID, Role: "user", Content: req.Message, CreatedAt: now},
-					{UserID: claims.UserID, LessonID: req.LessonID, Role: "assistant", Content: fullResponse.String(), CreatedAt: now},
-				}
-				if err := h.db.WithContext(r.Context()).Create(&records).Error; err != nil {
-					log.Printf("Failed to save chat history: %v", err)
-				}
+		// Save chat history: user message + AI response (without quiz blocks)
+		if claims != nil && req.LessonID != "" {
+			now := time.Now()
+			records := []ChatMessageRecord{
+				{UserID: claims.UserID, LessonID: req.LessonID, Role: "user", Content: req.Message, CreatedAt: now},
+				{UserID: claims.UserID, LessonID: req.LessonID, Role: "assistant", Content: cleanText, CreatedAt: now},
 			}
+			if err := h.db.WithContext(r.Context()).Create(&records).Error; err != nil {
+				log.Printf("Failed to save chat history: %v", err)
+			}
+		}
 
-			fmt.Fprintf(w, "data: [DONE]\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	})
 

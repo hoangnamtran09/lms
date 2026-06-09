@@ -117,6 +117,57 @@ func BuildCompletionQuizPrompt(lessonTitle, subjectName, lessonContent string, g
 	return fmt.Sprintf(completionQuizPrompt, questionCount, lessonTitle, subjectName, gradeLevel, content)
 }
 
+// ---- Chat Quiz Generator (called after each AI chat response) ----
+
+const chatQuizPrompt = `Bạn là giáo viên tạo câu hỏi trắc nghiệm cho LMS.
+
+Nhiệm vụ: tạo ĐÚNG 1 câu hỏi trắc nghiệm về chủ đề gia sư AI vừa thảo luận với học sinh.
+
+Yêu cầu:
+1. Câu hỏi phải liên quan trực tiếp đến nội dung AI vừa giải thích (xem "Phản hồi của AI" bên dưới).
+2. Có ĐÚNG 4 đáp án, CHỈ 1 đáp án đúng.
+3. Độ khó vừa phải, phù hợp với khối lớp.
+4. Explanation ngắn gọn, chỉ ra kiến thức cần nhớ.
+5. Không dùng đáp án kiểu "tất cả đều đúng" hoặc "cả A và B".
+6. Dùng $...$ cho công thức toán (VD: $u_1 = 3$, $\frac{a}{b}$, $x^2 + y^2 = r^2$).
+7. Trả về JSON hợp lệ, không thêm markdown.
+
+Ngữ cảnh:
+- Bài học: %s
+- Môn: %s
+- Khối lớp: %d
+- Phản hồi gần nhất của AI cho học sinh:
+---
+%s
+---
+
+Output JSON:
+{
+  "question": "Nội dung câu hỏi",
+  "options": [
+    {"text": "Đáp án A", "isCorrect": false},
+    {"text": "Đáp án B", "isCorrect": true},
+    {"text": "Đáp án C", "isCorrect": false},
+    {"text": "Đáp án D", "isCorrect": false}
+  ],
+  "explanation": "Giải thích ngắn gọn"
+}`
+
+func BuildChatQuizPrompt(lessonTitle, subjectName, lessonContent string, gradeLevel int, lastAIResponse string) string {
+	content := lessonContent
+	if len(content) > 2000 {
+		content = content[:2000] + "..."
+	}
+	if content == "" {
+		content = "Chưa có nội dung bài học"
+	}
+	aiResp := lastAIResponse
+	if len(aiResp) > 1000 {
+		aiResp = aiResp[:1000] + "..."
+	}
+	return fmt.Sprintf(chatQuizPrompt, lessonTitle, subjectName, gradeLevel, aiResp)
+}
+
 // ---- Learning Coach ----
 
 const learningCoachPrompt = `Bạn là Huấn luyện viên học tập của LMS, giúp học sinh theo dõi tiến độ và lập kế hoạch.

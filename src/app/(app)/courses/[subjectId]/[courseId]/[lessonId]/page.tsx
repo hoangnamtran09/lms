@@ -168,10 +168,11 @@ export default function LessonViewerPage({
         (err) => {
           setChatError(err.message);
           setStreaming(false);
-        }
+        },
+        (quiz: QuizData) => setActiveQuiz(quiz)
       );
     }
-  }, [chatUnlocked, streaming, lessonId, sessionId, subjectId, hasHistory]);
+  }, [chatUnlocked, streaming, lessonId, sessionId, subjectId, hasHistory, setActiveQuiz]);
 
   // PDF container width for page sizing
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -275,8 +276,13 @@ export default function LessonViewerPage({
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  // Quiz detection from AI response
+  // Quiz detection from AI response (fallback for :::quiz markers in text)
   const handleQuizDetected = useCallback((quiz: QuizData) => {
+    setActiveQuiz(quiz);
+  }, [setActiveQuiz]);
+
+  // Quiz received from dedicated SSE event (main path)
+  const handleStreamQuiz = useCallback((quiz: QuizData) => {
     setActiveQuiz(quiz);
   }, [setActiveQuiz]);
 
@@ -313,9 +319,10 @@ export default function LessonViewerPage({
       (err) => {
         setChatError(err.message);
         setStreaming(false);
-      }
+      },
+      handleStreamQuiz
     );
-  }, [lessonId, messages, sessionId]);
+  }, [lessonId, messages, sessionId, handleStreamQuiz]);
 
   const send = () => {
     const text = input.trim();

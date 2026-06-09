@@ -109,12 +109,19 @@ export async function api<T>(path: string, options?: RequestInit & { timeout?: n
   return res.json();
 }
 
+export interface QuizEvent {
+  question: string;
+  options: { text: string }[];
+  explanation: string;
+}
+
 export async function apiStream(
   path: string,
   body: unknown,
   onChunk: (text: string) => void,
   onDone: () => void,
-  onError: (err: Error) => void
+  onError: (err: Error) => void,
+  onQuiz?: (quiz: QuizEvent) => void
 ): Promise<void> {
   try {
     const authHeaders = await getAuthHeaders();
@@ -149,6 +156,8 @@ export async function apiStream(
         const parsed = JSON.parse(data);
         if (parsed.delta) {
           onChunk(parsed.delta);
+        } else if (parsed.quiz) {
+          onQuiz?.(parsed.quiz);
         } else if (parsed.error) {
           onError(new Error(parsed.error));
         }
