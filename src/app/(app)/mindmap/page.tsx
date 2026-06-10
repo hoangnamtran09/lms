@@ -76,6 +76,7 @@ export default function MindMapPage() {
   useEffect(() => {
     if (!selectedSubject) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCourses([]);
     setLessons([]);
     setSelectedLessonId("");

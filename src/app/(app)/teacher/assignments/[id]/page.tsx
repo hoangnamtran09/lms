@@ -39,99 +39,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GradingSheet } from "@/components/assignment/grading-sheet";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Assignment {
-  id: string;
-  title: string;
-  description: string;
-  rubric: string;
-  maxScore: number;
-  dueDate: string;
-  status: string;
-  source: string;
-  creatorName: string;
-  questions: string;
-  classId?: string;
-  studentIds?: string;
-  createdAt: string;
-}
-
-interface McqOption {
-  text: string;
-  isCorrect: boolean;
-}
-
-interface Question {
-  id: string;
-  question: string;
-  expectedAnswer: string;
-  score: number;
-  type?: "mcq" | "short_answer";
-  difficulty?: string;
-  options?: McqOption[];
-  explanation?: string;
-}
-
-const difficultyLabels: Record<string, string> = {
-  nhan_biet: "Nhận biết",
-  thong_hieu: "Thông hiểu",
-  van_dung: "Vận dụng",
-};
-
-const difficultyColors: Record<string, string> = {
-  nhan_biet: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  thong_hieu: "bg-blue-50 text-blue-700 border-blue-200",
-  van_dung: "bg-orange-50 text-orange-700 border-orange-200",
-};
-
-interface Submission {
-  id: string;
-  assignmentId: string;
-  studentId: string;
-  studentName: string;
-  content: string;
-  fileUrl: string;
-  score: number | null;
-  feedback: string;
-  status: string;
-  submittedAt: string;
-  gradedAt: string | null;
-  gradedBy: string;
-}
-
-interface ClassItem {
-  id: string;
-  name: string;
-}
-
-interface StudentBrief {
-  id: string;
-  supabaseId: string;
-  fullName: string;
-  username: string;
-}
-
-const statusLabel: Record<string, string> = {
-  DRAFT: "Bản nháp",
-  ASSIGNED: "Đã giao",
-  SUBMITTED: "Đang nhận bài",
-  GRADED: "Đã chấm xong",
-  RETURNED: "Cần sửa lại",
-  ACCEPTED: "Đã duyệt",
-};
-
-const statusStyle: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-600",
-  ASSIGNED: "bg-blue-50 text-blue-700",
-  SUBMITTED: "bg-amber-50 text-amber-700",
-  GRADED: "bg-emerald-50 text-emerald-700",
-  RETURNED: "bg-orange-50 text-orange-700",
-  ACCEPTED: "bg-emerald-50 text-emerald-700",
-};
+import { useQuestionEditor } from "./_hooks/use-question-editor";
+import type { Assignment, Question, Submission, ClassItem, StudentBrief } from "./_types";
+import { difficultyLabels, difficultyColors, statusLabel, statusStyle } from "./_types";
 
 // ---------------------------------------------------------------------------
 // Page
@@ -154,13 +64,38 @@ export default function TeacherAssignmentDetailPage({
 
   // Grading
   const [gradingSheetOpen, setGradingSheetOpen] = useState(false);
-  const [gradingSheetIndex, setGradingSheetIndex] = useState(0);
+  const [gradingSheetIndex] = useState(0);
+
+  // Derived: questions từ assignment JSON
+  const questions: Question[] = (() => {
+    if (!assignment?.questions) return [];
+    try {
+      const parsed = JSON.parse(assignment.questions);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
 
   // Question editing
-  const [editingQuestions, setEditingQuestions] = useState(false);
-  const [editedQuestions, setEditedQuestions] = useState<Question[]>([]);
-  const [savingQuestions, setSavingQuestions] = useState(false);
   const [questionsExpanded, setQuestionsExpanded] = useState(true);
+  const {
+    editingQuestions,
+    editedQuestions,
+    savingQuestions,
+    startEditing: startEditingQuestions,
+    cancelEditing: cancelEditingQuestions,
+    updateQuestion: updateEditedQuestion,
+    updateOption: updateEditedOption,
+    addOption,
+    removeOption,
+    setCorrectOption,
+    save: handleSaveQuestions,
+  } = useQuestionEditor({
+    assignmentId: id,
+    questions,
+    onSaved: loadData,
+  });
 
   // Publish
   const [publishing, setPublishing] = useState(false);
@@ -171,7 +106,7 @@ export default function TeacherAssignmentDetailPage({
   const [availableStudents, setAvailableStudents] = useState<StudentBrief[]>([]);
 
   // ---- Data loading ----
-  const loadData = () => {
+  function loadData() {
     Promise.all([
       api<Assignment>(`/api/assignments/${id}`),
       api<Submission[]>(`/api/assignments/${id}/submissions`),
@@ -246,95 +181,7 @@ export default function TeacherAssignmentDetailPage({
     }
   };
 
-  // ---- Question editing ----
-  const startEditingQuestions = () => {
-    setEditedQuestions(JSON.parse(JSON.stringify(questions)));
-    setEditingQuestions(true);
-  };
-
-  const cancelEditingQuestions = () => {
-    setEditedQuestions([]);
-    setEditingQuestions(false);
-  };
-
-  const updateEditedQuestion = (
-    index: number,
-    field: string,
-    value: unknown
-  ) => {
-    setEditedQuestions((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
-  };
-
-  const updateEditedOption = (
-    qIndex: number,
-    optIndex: number,
-    field: string,
-    value: unknown
-  ) => {
-    setEditedQuestions((prev) => {
-      const next = [...prev];
-      const options = [...(next[qIndex].options || [])];
-      options[optIndex] = { ...options[optIndex], [field]: value };
-      next[qIndex] = { ...next[qIndex], options };
-      return next;
-    });
-  };
-
-  const addOption = (qIndex: number) => {
-    setEditedQuestions((prev) => {
-      const next = [...prev];
-      const options = [
-        ...(next[qIndex].options || []),
-        { text: "", isCorrect: false },
-      ];
-      next[qIndex] = { ...next[qIndex], options };
-      return next;
-    });
-  };
-
-  const removeOption = (qIndex: number, optIndex: number) => {
-    setEditedQuestions((prev) => {
-      const next = [...prev];
-      const options = (next[qIndex].options || []).filter(
-        (_, i) => i !== optIndex
-      );
-      next[qIndex] = { ...next[qIndex], options };
-      return next;
-    });
-  };
-
-  const handleSaveQuestions = async () => {
-    setSavingQuestions(true);
-    try {
-      await api(`/api/assignments/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ questions: JSON.stringify(editedQuestions) }),
-      });
-      setEditingQuestions(false);
-      setEditedQuestions([]);
-      loadData();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Lỗi lưu câu hỏi");
-    } finally {
-      setSavingQuestions(false);
-    }
-  };
-
   // ---- Derived data ----
-  const questions: Question[] = (() => {
-    if (!assignment?.questions) return [];
-    try {
-      const parsed = JSON.parse(assignment.questions);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  })();
-
   const gradedCount = submissions.filter((s) => s.score != null).length;
   const ungradedCount = submissions.filter(
     (s) => s.status === "SUBMITTED" && s.score == null
@@ -781,22 +628,7 @@ export default function TeacherAssignmentDetailPage({
                                         type="radio"
                                         name={`correct-${q.id}`}
                                         checked={opt.isCorrect}
-                                        onChange={() => {
-                                          setEditedQuestions((prev) => {
-                                            const next = [...prev];
-                                            const opts = (
-                                              next[qi].options || []
-                                            ).map((o, i) => ({
-                                              ...o,
-                                              isCorrect: i === oi,
-                                            }));
-                                            next[qi] = {
-                                              ...next[qi],
-                                              options: opts,
-                                            };
-                                            return next;
-                                          });
-                                        }}
+                                        onChange={() => setCorrectOption(qi, oi)}
                                         className="size-4"
                                       />
                                       <Input

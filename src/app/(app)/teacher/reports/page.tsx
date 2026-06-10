@@ -6,7 +6,6 @@ import { BarChart3, Users, ChevronRight, Search, ArrowLeft } from "lucide-react"
 import { api } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/components/auth/auth-provider";
 
 interface StudentBrief {
   id: string;
@@ -16,7 +15,6 @@ interface StudentBrief {
 }
 
 export default function TeacherReportsPage() {
-  const { user } = useAuth();
   const [students, setStudents] = useState<StudentBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

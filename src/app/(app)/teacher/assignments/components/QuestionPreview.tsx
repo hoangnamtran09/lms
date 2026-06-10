@@ -101,7 +101,7 @@ export default function QuestionPreview({
             <div key={group.topic}>
               <h4 className="text-sm font-bold text-gray-600 mb-2 border-b pb-1.5">{group.topic}</h4>
               <div className="space-y-3">
-                {group.items.map((q, gi) => {
+                {group.items.map((q) => {
                   const i = questions.indexOf(q);
                   return (
                     <QuestionCard key={q.id} q={q} i={i} updateQuestion={updateQuestion} removeQuestion={removeQuestion} />

@@ -36,6 +36,7 @@ export default function TeacherLeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params = new URLSearchParams({ period });
     if (user?.classId) params.set("classId", user.classId);
@@ -103,7 +104,7 @@ export default function TeacherLeaderboardPage() {
                 "from-blue-400 to-blue-500",
                 "from-orange-400 to-orange-500",
               ];
-              const icons = [<Trophy className="size-5" />, <Medal className="size-5" />, <Medal className="size-5" />];
+              const icons = [<Trophy key="gold" className="size-5" />, <Medal key="silver" className="size-5" />, <Medal key="bronze" className="size-5" />];
               return (
                 <Card
                   key={entry.userId}

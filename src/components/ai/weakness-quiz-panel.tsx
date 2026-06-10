@@ -11,6 +11,29 @@ interface WeaknessProfile {
   topic: string;
 }
 
+export interface WeaknessOption {
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface WeaknessQuestion {
+  id?: string;
+  question: string;
+  weaknessTopic?: string;
+  weaknessId?: string;
+  options?: WeaknessOption[];
+  answered?: boolean;
+  correct?: boolean;
+  selectedIdx?: number;
+  explanation?: string;
+}
+
+interface QuizState {
+  loading: boolean;
+  questions: WeaknessQuestion[];
+  error?: string;
+}
+
 export function WeaknessQuizPanel({
   items,
   subjectName,
@@ -22,12 +45,12 @@ export function WeaknessQuizPanel({
   lessonTitle: string;
   onClose: () => void;
 }) {
-  const [state, setState] = useState<{ loading: boolean; questions: any[]; error?: string }>({ loading: true, questions: [] });
+  const [state, setState] = useState<QuizState>({ loading: true, questions: [] });
   const [answering, setAnswering] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
-    api<{ questions: any[] }>("/api/ai/generate-weakness-quiz", {
+    api<{ questions: WeaknessQuestion[] }>("/api/ai/generate-weakness-quiz", {
       method: "POST",
       body: JSON.stringify({
         weaknesses: items.map((p) => ({ id: p.id, topic: p.topic })),
@@ -36,23 +59,23 @@ export function WeaknessQuizPanel({
       }),
     })
       .then((data) => {
-        if (!cancelled) setState({ loading: false, questions: data.questions.map((q: any) => ({ ...q, answered: false, correct: false })) });
+        if (!cancelled) setState({ loading: false, questions: data.questions.map((q: WeaknessQuestion) => ({ ...q, answered: false, correct: false })) });
       })
-      .catch((e: any) => {
+      .catch((e: Error) => {
         if (!cancelled) setState({ loading: false, questions: [], error: e.message });
       });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const answer = async (qIdx: number, weaknessId: string, selectedIdx: number, correctIdx: number) => {
+  const answer = async (qIdx: number, weaknessId: string | undefined, selectedIdx: number, correctIdx: number) => {
     const key = `${qIdx}`;
     setAnswering((p) => ({ ...p, [key]: true }));
     const correct = selectedIdx === correctIdx;
     try {
-      if (correct) await api(`/api/weaknesses/${weaknessId}/improve`, { method: "POST" });
+      if (correct && weaknessId) await api(`/api/weaknesses/${weaknessId}/improve`, { method: "POST" });
     } catch { /* ignore */ }
     setState((prev) => {
-      const updated = prev.questions.map((q: any, i: number) =>
+      const updated = prev.questions.map((q: WeaknessQuestion, i: number) =>
         i === qIdx ? { ...q, answered: true, correct, selectedIdx } : q
       );
       return { ...prev, questions: updated };
@@ -80,8 +103,8 @@ export function WeaknessQuizPanel({
     );
   }
 
-  const answeredCount = state.questions.filter((q: any) => q.answered).length;
-  const correctCount = state.questions.filter((q: any) => q.correct).length;
+  const answeredCount = state.questions.filter((q: WeaknessQuestion) => q.answered).length;
+  const correctCount = state.questions.filter((q: WeaknessQuestion) => q.correct).length;
 
   return (
     <div className="border-t border-outline-variant bg-surface-container-lowest">
@@ -102,8 +125,8 @@ export function WeaknessQuizPanel({
         </button>
       </div>
       <div className="divide-y divide-outline-variant">
-        {state.questions.map((q: any, qIdx: number) => {
-          const correctIdx = q.options?.findIndex((o: any) => o.isCorrect) ?? -1;
+        {state.questions.map((q: WeaknessQuestion, qIdx: number) => {
+          const correctIdx = q.options?.findIndex((o: WeaknessOption) => o.isCorrect) ?? -1;
           return (
             <div key={q.id || qIdx} className={`px-6 py-4 ${q.answered ? (q.correct ? "bg-tertiary-fixed/30" : "bg-error-container/30") : ""}`}>
               <div className="flex items-start gap-3">
@@ -120,7 +143,7 @@ export function WeaknessQuizPanel({
                     Khắc phục: <MathText text={q.weaknessTopic || ""} />
                   </p>
                   <div className="space-y-1">
-                    {q.options?.map((opt: any, oIdx: number) => (
+                    {q.options?.map((opt: WeaknessOption, oIdx: number) => (
                       <button
                         key={oIdx}
                         disabled={q.answered || answering[`${qIdx}`]}

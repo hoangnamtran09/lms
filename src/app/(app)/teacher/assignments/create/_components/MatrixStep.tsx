@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import MatrixBuilder from "@/components/assignment/matrix-builder";
 import MatrixSummary from "./MatrixSummary";
-import { TestMatrix, createEmptyMatrix, PURPOSE_LABELS, FORMAT_LABELS, matrixToAIInstruction } from "@/lib/test-matrix";
+import { TestMatrix, createEmptyMatrix, PURPOSE_LABELS, FORMAT_LABELS } from "@/lib/test-matrix";
 
 interface Props {
   questionCount: number;
@@ -16,7 +16,7 @@ interface Props {
   loading: boolean;
 }
 
-export default function MatrixStep({ questionCount, onGenerate, onSkip, loading }: Props) {
+export default function MatrixStep({ onGenerate, onSkip, loading }: Props) {
   const [purpose, setPurpose] = useState("");
   const [format, setFormat] = useState("ket_hop");
   const [matrix, setMatrix] = useState<TestMatrix>(() =>

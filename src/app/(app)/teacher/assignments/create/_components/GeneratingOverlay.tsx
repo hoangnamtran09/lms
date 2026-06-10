@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Loader2, Sparkles, Clock } from "lucide-react";
+import { Sparkles, Clock } from "lucide-react";
 
 interface Props {
   loading: boolean;
@@ -24,6 +24,7 @@ export default function GeneratingOverlay({ loading, questionCount, hasMatrix }:
 
   useEffect(() => {
     if (!loading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setElapsed(0);
       setStatusIndex(0);
       if (intervalRef.current) clearInterval(intervalRef.current);

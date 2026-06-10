@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -114,7 +114,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 		req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	}
 
-	log.Printf("[ChatStream] Calling %s model=%s messages=%d", s.apiURL, s.model, len(messages))
+	slog.Info("[ChatStream] Calling", "url", s.apiURL, "model", s.model, "messages", len(messages))
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -124,7 +124,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
-		log.Printf("[ChatStream] API error %d: %s", resp.StatusCode, string(errBody))
+		slog.Error("[ChatStream] API error", "status", resp.StatusCode, "body", string(errBody))
 		return fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
@@ -135,7 +135,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 	}
 
 	contentType := resp.Header.Get("Content-Type")
-	log.Printf("[ChatStream] Response: status=%d content-type=%s bodyLen=%d", resp.StatusCode, contentType, len(raw))
+	slog.Info("[ChatStream] Response", "status", resp.StatusCode, "contentType", contentType, "bodyLen", len(raw))
 
 	if len(raw) == 0 {
 		return fmt.Errorf("AI provider returned empty response body (status=%d, content-type=%s)", resp.StatusCode, contentType)
@@ -189,7 +189,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 	// Strategy 2: Try JSON non-streaming parse (works regardless of Content-Type)
 	content := tryExtractContent(json.RawMessage(raw))
 	if content != "" {
-		log.Printf("[ChatStream] Extracted %d chars via JSON parse", len(content))
+		slog.Info("[ChatStream] Extracted via JSON parse", "chars", len(content))
 		onChunk(content)
 		onDone()
 		return nil
@@ -230,7 +230,7 @@ func (s *Service) ChatStream(messages []ChatMessage, onChunk func(text string), 
 	if len(snippet) > 500 {
 		snippet = snippet[:500]
 	}
-	log.Printf("[ChatStream] Failed to extract content from response. Snippet: %s", snippet)
+	slog.Error("[ChatStream] Failed to extract content from response", "snippet", snippet)
 	return fmt.Errorf("could not extract content from AI response: %s", snippet)
 }
 
@@ -248,11 +248,11 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 	}
 
 	url := s.apiURL + "/chat/completions"
-	log.Printf("[Chat] Calling %s model=%s messages=%d", url, s.model, len(messages))
+	slog.Info("[Chat] Calling", "url", url, "model", s.model, "messages", len(messages))
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("[Chat] Request creation error: %v", err)
+		slog.Error("[Chat] Request creation error", "error", err)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -262,31 +262,31 @@ func (s *Service) Chat(messages []ChatMessage) (string, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		log.Printf("[Chat] HTTP call error: %v", err)
+		slog.Error("[Chat] HTTP call error", "error", err)
 		return "", fmt.Errorf("AI API unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
-	log.Printf("[Chat] Response: status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	slog.Info("[Chat] Response", "status", resp.StatusCode, "contentType", resp.Header.Get("Content-Type"))
 
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
-		log.Printf("[Chat] API error %d: %s", resp.StatusCode, string(errBody))
+		slog.Error("[Chat] API error", "status", resp.StatusCode, "body", string(errBody))
 		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(errBody))
 	}
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("[Chat] Read body error: %v", err)
+		slog.Error("[Chat] Read body error", "error", err)
 		return "", err
 	}
-	log.Printf("[Chat] Response body: %d bytes", len(raw))
+	slog.Info("[Chat] Response body", "bytes", len(raw))
 
 	content := tryExtractContent(json.RawMessage(raw))
 	if content != "" {
 		return content, nil
 	}
-	log.Printf("[Chat] Empty/unsupported response: %s", string(raw[:min(len(raw), 300)]))
+	slog.Error("[Chat] Empty/unsupported response", "snippet", string(raw[:min(len(raw), 300)]))
 	return "", fmt.Errorf("empty response")
 }
 

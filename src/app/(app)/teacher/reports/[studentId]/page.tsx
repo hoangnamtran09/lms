@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, FileText, Clock, Award, Flame, Gem, TrendingUp } from "lucide-react";
+import { ArrowLeft, FileText, Clock, Award, Flame, Gem } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

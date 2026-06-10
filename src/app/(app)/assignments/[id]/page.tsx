@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Send,
@@ -29,92 +30,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RemediationExercise } from "@/components/ai/remediation-exercise";
 import type { RemediationQuestion, ExerciseAnswer } from "@/components/ai/remediation-exercise";
 import { MathText } from "@/components/ai/math-text";
-
-// ---- Interfaces -----------------------------------------------------------
-
-interface Assignment {
-  id: string;
-  title: string;
-  description: string;
-  rubric: string;
-  maxScore: number;
-  dueDate: string;
-  status: string;
-  source: string;
-  creatorName: string;
-  questions: string;
-  createdAt: string;
-}
-
-interface McqOption {
-  text: string;
-  isCorrect: boolean;
-}
-
-interface Question {
-  id: string;
-  question: string;
-  expectedAnswer: string;
-  score: number;
-  type?: "mcq" | "short_answer";
-  difficulty?: string;
-  options?: McqOption[];
-  explanation?: string;
-}
-
-interface QuestionResult {
-  questionId: string;
-  question: string;
-  score: number;
-  maxScore: number;
-  feedback: string;
-  correctAnswer?: string;
-}
-
-interface Submission {
-  id: string;
-  assignmentId: string;
-  studentId: string;
-  studentName: string;
-  content: string;
-  fileUrl: string;
-  score: number | null;
-  feedback: string;
-  status: string;
-  submittedAt: string;
-  gradedAt: string | null;
-  gradedBy: string;
-}
-
-// ---- Constants ------------------------------------------------------------
-
-const difficultyLabels: Record<string, string> = {
-  nhan_biet: "Nhận biết",
-  thong_hieu: "Thông hiểu",
-  van_dung: "Vận dụng",
-};
-
-const difficultyColors: Record<string, string> = {
-  nhan_biet: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  thong_hieu: "bg-blue-100 text-blue-700 border-blue-200",
-  van_dung: "bg-orange-100 text-orange-700 border-orange-200",
-};
-
-const statusLabel: Record<string, string> = {
-  ASSIGNED: "Chưa nộp",
-  SUBMITTED: "Đã nộp",
-  GRADED: "Đã chấm",
-  RETURNED: "Cần sửa lại",
-  ACCEPTED: "Đã duyệt",
-};
-
-const statusBadgeStyle: Record<string, string> = {
-  ASSIGNED: "bg-red-50 text-red-700",
-  SUBMITTED: "bg-gray-100 text-gray-600",
-  GRADED: "bg-emerald-50 text-emerald-700",
-  RETURNED: "bg-red-50 text-red-700 border-red-300",
-  ACCEPTED: "bg-emerald-50 text-emerald-700",
-};
+import type { Assignment, Question, Submission, QuestionResult, McqOption } from "./_types";
+import { difficultyLabels, difficultyColors, statusLabel, statusColor as statusBadgeStyle } from "./_types";
 
 // ---- Helpers --------------------------------------------------------------
 
@@ -293,7 +210,7 @@ export default function AssignmentDetailPage({
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadData(); }, [id]);
+  useEffect(() => { loadData(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (questions.length === 0) return;
@@ -766,12 +683,12 @@ export default function AssignmentDetailPage({
                   </div>
                 )}
                 {selectedFile && (
-                  <div className="mt-2 max-w-xs rounded-xl overflow-hidden border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                  <div className="mt-2 max-w-xs rounded-xl overflow-hidden border relative h-40">
+                    <Image
                       src={URL.createObjectURL(selectedFile)}
                       alt="Preview"
-                      className="w-full h-auto max-h-40 object-contain bg-gray-50"
+                      fill
+                      className="object-contain bg-gray-50"
                     />
                   </div>
                 )}
@@ -910,12 +827,12 @@ export default function AssignmentDetailPage({
                   </div>
                 )}
                 {selectedFile && (
-                  <div className="mt-2 max-w-xs rounded-xl overflow-hidden border">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                  <div className="mt-2 max-w-xs rounded-xl overflow-hidden border relative h-48">
+                    <Image
                       src={URL.createObjectURL(selectedFile)}
                       alt="Ảnh bài làm"
-                      className="w-full h-auto max-h-48 object-contain bg-gray-50"
+                      fill
+                      className="object-contain bg-gray-50"
                     />
                   </div>
                 )}
@@ -1175,13 +1092,13 @@ export default function AssignmentDetailPage({
                         href={mySubmission.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block max-w-sm rounded-xl overflow-hidden border hover:opacity-90 transition"
+                        className="block max-w-sm rounded-xl overflow-hidden border hover:opacity-90 transition relative h-64"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={mySubmission.fileUrl}
                           alt="Bài làm"
-                          className="w-full h-auto max-h-64 object-contain bg-gray-50"
+                          fill
+                          className="object-contain bg-gray-50"
                         />
                       </a>
                     </div>
@@ -1222,13 +1139,13 @@ export default function AssignmentDetailPage({
                         href={mySubmission.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block max-w-sm rounded-xl overflow-hidden border hover:opacity-90 transition"
+                        className="block max-w-sm rounded-xl overflow-hidden border hover:opacity-90 transition relative h-64"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={mySubmission.fileUrl}
                           alt="Bài làm"
-                          className="w-full h-auto max-h-64 object-contain bg-gray-50"
+                          fill
+                          className="object-contain bg-gray-50"
                         />
                       </a>
                     </div>

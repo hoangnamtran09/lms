@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -594,12 +595,13 @@ export default function SubmissionDetailPage({
                     href={submission.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block"
+                    className="block relative h-[500px]"
                   >
-                    <img
+                    <Image
                       src={submission.fileUrl}
                       alt="Bài làm của học sinh"
-                      className="max-w-full max-h-[500px] object-contain rounded-xl border border-gray-100 mx-auto hover:opacity-90 transition-opacity cursor-pointer"
+                      fill
+                      className="object-contain rounded-xl border border-gray-100 hover:opacity-90 transition-opacity cursor-pointer"
                     />
                   </a>
                 ) : (

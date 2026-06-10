@@ -46,15 +46,6 @@ export default function NewStudentPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Filled fields counter
-  const filledCount =
-    (fullName.trim() ? 1 : 0) +
-    (dob ? 1 : 0) +
-    (gender ? 1 : 0) +
-    (username.trim() ? 1 : 0) +
-    (password ? 1 : 0) +
-    (selectedClassId ? 1 : 0);
-
   useEffect(() => {
     api<ClassItem[]>("/api/classes")
       .then((d) => setClasses(Array.isArray(d) ? d : []))

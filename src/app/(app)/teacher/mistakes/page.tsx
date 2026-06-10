@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, BookOpen, AlertCircle, Users, ChevronRight, Search, BarChart3, Sparkles } from "lucide-react";
-import { MaterialIcon } from "@/components/ui/material-icon";
+import { ArrowLeft, BookOpen, AlertCircle, Users, ChevronRight, Search, Sparkles } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +37,6 @@ export default function TeacherMistakesPage() {
   const [students, setStudents] = useState<StudentBrief[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
 
   useEffect(() => {
     const classSummaryPromise = user?.classId
@@ -57,7 +55,7 @@ export default function TeacherMistakesPage() {
               const weaknesses = await api<{ id: string; resolved: boolean }[]>(`/api/weaknesses?userId=${s.supabaseId}`);
               return {
                 ...s,
-                weaknessCount: Array.isArray(weaknesses) ? weaknesses.filter((w) => !(w as any).resolved).length : 0,
+                weaknessCount: Array.isArray(weaknesses) ? weaknesses.filter((w) => !w.resolved).length : 0,
               };
             } catch {
               return { ...s, weaknessCount: 0 };

@@ -46,12 +46,6 @@ export default function AdminParentsPage({ basePath = "/admin" }: { basePath?: s
   const [error, setError] = useState("");
   const [form, setForm] = useState({ parentId: "", childId: "" });
 
-  const fetchParents = () => {
-    api<UserRow[]>("/api/users?role=PARENT")
-      .then(setParents)
-      .catch(() => {});
-  };
-
   const fetchLinks = () => {
     setLoading(true);
     api<LinkRow[]>("/api/admin/parent-links")

@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Plus,
   Search,
-  Eye,
   Pencil,
   Trash2,
   Clock,
@@ -58,15 +55,6 @@ interface ClassItem {
   name: string;
 }
 
-const statusLabel: Record<string, string> = {
-  DRAFT: "Nháp",
-  ASSIGNED: "Đã giao",
-  SUBMITTED: "Đã nộp",
-  GRADED: "Đã chấm",
-  RETURNED: "Đã trả",
-  ACCEPTED: "Đã nhận",
-};
-
 const subjectFromTitle = (title: string): string => {
   if (title.toLowerCase().includes("toán") || title.toLowerCase().includes("đạo hàm")) return "TOÁN HỌC";
   if (title.toLowerCase().includes("lý") || title.toLowerCase().includes("dòng điện")) return "VẬT LÝ";
@@ -98,7 +86,6 @@ const subjectColor = (subject: string) => {
 // ---------------------------------------------------------------------------
 
 export default function TeacherAssignmentsPage() {
-  const router = useRouter();
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

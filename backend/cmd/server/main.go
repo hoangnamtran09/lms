@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -26,7 +26,8 @@ func main() {
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 
 	// Auto-migrate and seed only when not explicitly skipped.
@@ -34,30 +35,32 @@ func main() {
 	if os.Getenv("SKIP_DB_MIGRATE") == "" {
 		// Auto-migrate all models
 		if err := migrate(db); err != nil {
-			log.Fatalf("Failed to migrate: %v", err)
+			slog.Error("Failed to migrate", "error", err)
+			os.Exit(1)
 		}
 
 		// Seed initial data
 		if err := seed(db, cfg); err != nil {
-			log.Printf("Seed warning: %v", err)
+			slog.Warn("Seed warning", "error", err)
 		}
 
 		// Seed demo data (opt-in via SEED_DEMO=true)
 		if os.Getenv("SEED_DEMO") == "true" {
 			if err := seedDemo(db, cfg); err != nil {
-				log.Printf("Demo seed warning: %v", err)
+				slog.Warn("Demo seed warning", "error", err)
 			}
 		}
 	} else {
-		log.Printf("SKIP_DB_MIGRATE set — skipping migrate and seed")
+		slog.Info("SKIP_DB_MIGRATE set — skipping migrate and seed")
 	}
 
 	r := router.New(db, cfg)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("Server starting on %s", addr)
+	slog.Info("Server starting", "addr", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		slog.Error("Server failed", "error", err)
+		os.Exit(1)
 	}
 }
 

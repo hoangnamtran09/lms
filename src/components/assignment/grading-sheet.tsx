@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { Check, X, Sparkles, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, GraduationCap, Clock, Hash, MessageSquareText, Paperclip, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
@@ -415,12 +416,13 @@ export function GradingSheet({
                     href={sub.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block"
+                    className="block relative w-full h-[300px]"
                   >
-                    <img
+                    <Image
                       src={sub.fileUrl}
                       alt="Bài làm của học sinh"
-                      className="max-w-full max-h-[300px] object-contain rounded-lg border border-gray-100 mx-auto hover:opacity-90 transition-opacity"
+                      fill
+                      className="object-contain rounded-lg border border-gray-100 hover:opacity-90 transition-opacity"
                     />
                   </a>
                 ) : (

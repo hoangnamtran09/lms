@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -39,7 +39,7 @@ func seed(db *gorm.DB, cfg *config.Config) error {
 				return fmt.Errorf("seed achievement: %w", err)
 			}
 		}
-		log.Printf("Seeded %d default achievements", len(defaultAchievements))
+		slog.Info("Seeded default achievements", "count", len(defaultAchievements))
 	}
 
 	var count int64

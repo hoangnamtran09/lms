@@ -122,6 +122,7 @@ export default function CreateAssignmentPage() {
 
   // Load lessons when subject changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedSubjectId) { setLessons([]); setSelectedLessonId(""); return; }
     setSelectedLessonId("");
     (async () => {
@@ -138,6 +139,7 @@ export default function CreateAssignmentPage() {
 
   // Load weakness topics
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedClassId) { setTopics([]); setManualTopic(""); return; }
     setLoadingTopics(true);
     api<WeaknessTopic[]>(`/api/weaknesses/class-summary?classId=${selectedClassId}`)

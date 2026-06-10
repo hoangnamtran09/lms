@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Plus, Search, Trash2, Edit3, Library, Loader2, X,
+  ArrowLeft, Plus, Search, Trash2, Edit3, Library, Loader2,
   ChevronLeft, ChevronRight
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
@@ -104,6 +104,7 @@ export default function QuestionBankPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchQuestions();
   }, [fetchQuestions]);
 

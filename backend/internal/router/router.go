@@ -27,7 +27,6 @@ import (
 	"github.com/lms/backend/internal/permissions"
 	"github.com/lms/backend/internal/progress"
 	"github.com/lms/backend/internal/questionbank"
-	"github.com/lms/backend/internal/quizzes"
 	"github.com/lms/backend/internal/reports"
 	"github.com/lms/backend/internal/search"
 	"github.com/lms/backend/internal/subjects"
@@ -85,7 +84,6 @@ func New(
 		subjectsSvc := subjects.NewService(db)
 	coursesSvc := courses.NewService(db)
 	lessonsSvc := lessons.NewService(db)
-	quizzesSvc := quizzes.NewService(db)
 	assignmentsSvc := assignments.NewService(db)
 	achievementsSvc := achievements.NewService(db)
 	diamondSvc := gamification.NewDiamondService(db)
@@ -160,8 +158,6 @@ func New(
 		Attendance:     attendanceH,
 		QuestionBank:   questionbankH,
 	}
-
-	_ = quizzesSvc
 
 	jwtSecret := cfg.SupabaseJWTSecret
 	if jwtSecret == "" {
