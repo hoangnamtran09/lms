@@ -170,7 +170,9 @@ type resetPasswordRequest struct {
 }
 
 func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	id := extractID(r.URL.Path)
+	// Path: /api/users/{id}/reset-password → parts[3] is the user ID
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	id := parts[len(parts)-2] // second-to-last segment
 	user, err := h.service.FindByID(r.Context(), id)
 	if err != nil {
 		jsonError(w, "Không tìm thấy người dùng", http.StatusNotFound)
