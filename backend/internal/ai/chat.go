@@ -110,44 +110,57 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		quizStripRe := regexp.MustCompile(`:::quiz\s*\{[\s\S]*?\}\s*:::`)
 		cleanText := quizStripRe.ReplaceAllString(responseText, "")
 
+		// Only generate quiz every ~3 user messages to keep conversation natural
+		shouldQuiz := false
 		if req.LessonID != "" && lessonTitle != "" {
-			quizPrompt := BuildChatQuizPrompt(lessonTitle, subjectName, lessonContent, gradeLevel, responseText)
-			quizResp, quizErr := h.aiService.Chat([]ChatMessage{
-				{Role: "system", Content: "Bạn là người tạo câu hỏi trắc nghiệm. Chỉ trả về JSON, không giải thích thêm."},
-				{Role: "user", Content: quizPrompt},
-			})
-			if quizErr == nil {
-				var quizData struct {
-					Question    string       `json:"question"`
-					Options     []QuizOption `json:"options"`
-					Explanation string       `json:"explanation"`
-				}
-				cleaned := extractJSON(quizResp)
-				if err := json.Unmarshal([]byte(cleaned), &quizData); err == nil {
-					if quizData.Question != "" && len(quizData.Options) > 0 {
+			if claims != nil {
+				var userMsgCount int64
+				h.db.WithContext(r.Context()).Model(&ChatMessageRecord{}).
+					Where("user_id = ? AND lesson_id = ? AND role = ?", claims.UserID, req.LessonID, "user").
+					Count(&userMsgCount)
+				// Generate quiz on 3rd, 6th, 9th... user message
+				shouldQuiz = (userMsgCount+1)%3 == 0
+			}
+		}
 
-						h.quizStore.Store(quizData.Question, quizData.Options, quizData.Explanation)
-
-						safeOpts := make([]map[string]string, len(quizData.Options))
-						for i, o := range quizData.Options {
-							safeOpts[i] = map[string]string{"text": o.Text}
+		if shouldQuiz {
+				quizPrompt := BuildChatQuizPrompt(lessonTitle, subjectName, lessonContent, gradeLevel, responseText)
+				quizResp, quizErr := h.aiService.Chat([]ChatMessage{
+					{Role: "system", Content: "Bạn là người tạo câu hỏi trắc nghiệm. Chỉ trả về JSON, không giải thích thêm."},
+					{Role: "user", Content: quizPrompt},
+				})
+				if quizErr == nil {
+					var quizData struct {
+						Question    string       `json:"question"`
+						Options     []QuizOption `json:"options"`
+						Explanation string       `json:"explanation"`
+					}
+					cleaned := extractJSON(quizResp)
+					if err := json.Unmarshal([]byte(cleaned), &quizData); err == nil {
+						if quizData.Question != "" && len(quizData.Options) > 0 {
+	
+							h.quizStore.Store(quizData.Question, quizData.Options, quizData.Explanation)
+	
+							safeOpts := make([]map[string]string, len(quizData.Options))
+							for i, o := range quizData.Options {
+								safeOpts[i] = map[string]string{"text": o.Text}
+							}
+							quizEvent, _ := json.Marshal(map[string]interface{}{
+								"quiz": map[string]interface{}{
+									"question":    quizData.Question,
+									"options":     safeOpts,
+									"explanation": quizData.Explanation,
+								},
+							})
+							fmt.Fprintf(w, "data: %s\n\n", quizEvent)
+							flusher.Flush()
 						}
-						quizEvent, _ := json.Marshal(map[string]interface{}{
-							"quiz": map[string]interface{}{
-								"question":    quizData.Question,
-								"options":     safeOpts,
-								"explanation": quizData.Explanation,
-							},
-						})
-						fmt.Fprintf(w, "data: %s\n\n", quizEvent)
-						flusher.Flush()
+					} else {
+						slog.Warn("[Chat] Failed to parse generated quiz", "error", err, "response", cleaned)
 					}
 				} else {
-					slog.Warn("[Chat] Failed to parse generated quiz", "error", err, "response", cleaned)
+					slog.Warn("[Chat] Quiz generation failed", "error", quizErr)
 				}
-			} else {
-				slog.Warn("[Chat] Quiz generation failed", "error", quizErr)
-			}
 		}
 
 		if claims != nil && req.LessonID != "" {
