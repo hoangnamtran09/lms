@@ -39,7 +39,7 @@ func (s *Service) List(ctx context.Context, scope ScopeFilter) ([]Assignment, er
 		}
 		// Show assignments where: (class-wide AND no student filter) OR (student is specifically selected)
 		q = q.Where(
-			"((class_id IN (?, '') AND (student_ids = '' OR student_ids IS NULL)) OR student_ids LIKE ?) AND status IN ?",
+			"((class_id = ? AND (student_ids = '' OR student_ids IS NULL)) OR student_ids LIKE ?) AND status IN ?",
 			classID, "%\""+scope.UserID+"\"%", []string{StatusAssigned, StatusReturned},
 		)
 	case "TEACHER":
@@ -106,27 +106,41 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 
 // --- Submissions ---
 
-func (s *Service) Submit(ctx context.Context, sub *Submission) error {
-	// Check for existing submission from this student for this assignment
+// CanSubmit checks if a student can submit (first time or resubmit allowed)
+func (s *Service) CanSubmit(ctx context.Context, assignmentID, studentID string) error {
 	var count int64
 	if err := s.db.WithContext(ctx).Model(&Submission{}).
-		Where("assignment_id = ? AND student_id = ?", sub.AssignmentID, sub.StudentID).
+		Where("assignment_id = ? AND student_id = ?", assignmentID, studentID).
 		Count(&count).Error; err != nil {
 		return err
 	}
+
 	if count > 0 {
-		// Check if assignment allows resubmission
+		// Student has submitted before, check if resubmit is allowed
 		var assignment Assignment
-		if err := s.db.WithContext(ctx).Where("id = ?", sub.AssignmentID).First(&assignment).Error; err != nil {
-			return err
+		if err := s.db.WithContext(ctx).Where("id = ?", assignmentID).First(&assignment).Error; err != nil {
+			return fmt.Errorf("bài tập không tồn tại")
 		}
 		if !assignment.AllowResubmit {
 			return fmt.Errorf("bạn đã nộp bài tập này rồi")
 		}
 	}
+	return nil
+}
+
+// CreateSubmission creates a new submission record
+func (s *Service) CreateSubmission(ctx context.Context, sub *Submission) error {
 	sub.Status = StatusSubmitted
 	sub.SubmittedAt = time.Now()
 	return s.db.WithContext(ctx).Create(sub).Error
+}
+
+// Submit is a convenience method that checks permission then creates submission
+func (s *Service) Submit(ctx context.Context, sub *Submission) error {
+	if err := s.CanSubmit(ctx, sub.AssignmentID, sub.StudentID); err != nil {
+		return err
+	}
+	return s.CreateSubmission(ctx, sub)
 }
 
 func (s *Service) ListSubmissionsByAssignment(ctx context.Context, assignmentID string) ([]Submission, error) {

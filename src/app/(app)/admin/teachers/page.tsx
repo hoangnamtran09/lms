@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Pencil, Check, X, Plus, ChevronUp, UserPlus } from "lucide-react";
+import { ArrowLeft, Trash2, Pencil, Check, X, Plus, ChevronUp, UserPlus, KeyRound } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/components/auth/auth-provider";
+import { ResetPasswordDialog } from "@/components/admin/reset-password-dialog";
 
 interface TeacherRow {
   id: string;
@@ -59,6 +60,8 @@ export default function AdminTeachersPage() {
   const [newClassId, setNewClassId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [resetPwUser, setResetPwUser] = useState<{ id: string; name: string } | null>(null);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
@@ -401,6 +404,16 @@ export default function AdminTeachersPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => setResetPwUser({ id: t.id, name: t.fullName })}
+                                disabled={t.id === me?.id || editingId !== null}
+                                className="text-amber-500 hover:text-amber-700"
+                                title="Đổi mật khẩu"
+                              >
+                                <KeyRound className="size-3" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => startEdit(t)}
                                 disabled={editingId !== null || t.id === me?.id}
                               >
@@ -427,6 +440,16 @@ export default function AdminTeachersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {resetPwUser && (
+        <ResetPasswordDialog
+          userId={resetPwUser.id}
+          userName={resetPwUser.name}
+          open={true}
+          onOpenChange={(open) => { if (!open) setResetPwUser(null); }}
+          onSuccess={fetchTeachers}
+        />
+      )}
     </div>
   );
 }

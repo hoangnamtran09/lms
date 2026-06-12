@@ -230,7 +230,8 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			Patch("/api/users/{id}", h.Users.Update)
 		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
 			Delete("/api/users/{id}", h.Users.Delete)
-
+		r.With(middleware.RequirePermission(permissions.ResUsers, permissions.ActWrite)).
+			Post("/api/users/{id}/reset-password", h.Users.ResetPassword)
 		// Assignments
 		r.Get("/api/assignments", h.Assignments.List)
 		r.Get("/api/assignments/{id}", h.Assignments.Get)

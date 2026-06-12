@@ -117,7 +117,19 @@ export default function CreateAssignmentPage() {
 
   useEffect(() => {
     const url = classId ? `/api/users?role=STUDENT&classId=${classId}` : "/api/users?role=STUDENT";
-    api<StudentBrief[]>(url).then((d) => { setSelectedStudentIds([]); setStudents(d || []); }).catch(() => { setSelectedStudentIds([]); setStudents([]); });
+    api<StudentBrief[]>(url)
+      .then((d) => {
+        setSelectedStudentIds([]);
+        setStudentSearch("");
+        setShowStudentDropdown(false);
+        setStudents(d || []);
+      })
+      .catch(() => {
+        setSelectedStudentIds([]);
+        setStudentSearch("");
+        setShowStudentDropdown(false);
+        setStudents([]);
+      });
   }, [classId]);
 
   // Load lessons when subject changes
@@ -221,10 +233,14 @@ export default function CreateAssignmentPage() {
       explanation: q.explanation || "",
       score: q.score || 1,
     }));
-    api("/api/question-bank/batch", { method: "POST", body: JSON.stringify(items) }).catch(() => {});
+    api("/api/question-bank/batch", { method: "POST", body: JSON.stringify(items) }).catch((e: unknown) => {
+      console.error("Save question bank failed:", e);
+      setGenerateError("Tạo câu hỏi thành công nhưng lưu vào ngân hàng câu hỏi thất bại. Bạn vẫn có thể tiếp tục lưu bài tập.");
+    });
   };
 
   const handleGenerateRemediation = async () => {
+    if (!selectedClassId) { setGenerateError("Vui lòng chọn lớp"); return; }
     if (!selectedTopic) { setGenerateError("Vui lòng chọn chủ đề điểm yếu"); return; }
     setGeneratingQuestions(true); setGenerateError(null);
     try {
@@ -233,7 +249,7 @@ export default function CreateAssignmentPage() {
       );
       sessionStorage.setItem("lastRemediationAssignmentId", result.assignmentId);
       setSuccessMsg(`Đã tạo bài tập và gán cho ${result.assignedStudentCount} học sinh.`);
-      resetForm(); setCreationMode(null);
+      resetForm();
     } catch (e: unknown) { setGenerateError(e instanceof Error ? e.message : "Lỗi tạo bài tập khắc phục"); }
     finally { setGeneratingQuestions(false); }
   };
@@ -244,30 +260,32 @@ export default function CreateAssignmentPage() {
     try {
       let attachmentUrl = "";
       if (selectedFile) { const uploadResult = await uploadFile("/api/assignments/upload", selectedFile); attachmentUrl = uploadResult.url; }
-      const totalScore = generatedQuestions.length > 0 ? generatedQuestions.reduce((s, q) => s + (q.score || 10), 0) : maxScore;
       const body: Record<string, unknown> = {
         title: title.trim() || generatedTitle || "Bài tập nháp", description: description.trim(),
-        rubric: rubric.trim(), maxScore: totalScore, classId: classId.trim(), attachmentUrl,
+        rubric: rubric.trim(), maxScore: maxScore, classId: classId.trim(), attachmentUrl,
         studentIds: selectedStudentIds.length > 0 ? JSON.stringify(selectedStudentIds) : "",
-        status: "DRAFT",
+        status: "ASSIGNED",
       };
       if (generatedQuestions.length > 0) body.questions = JSON.stringify(generatedQuestions);
       if (testMatrix) body.matrixMetadata = JSON.stringify(testMatrix);
       if (dueDate) body.dueDate = new Date(dueDate).toISOString();
       await api("/api/assignments", { method: "POST", body: JSON.stringify(body) });
-      setSuccessMsg("Đã lưu bản nháp thành công!");
+      setSuccessMsg("Đã giao bài tập thành công!");
       resetForm(); setCreationMode(null);
     } catch (e: unknown) { setCreateError(e instanceof Error ? e.message : "Tạo bài tập thất bại"); }
     finally { setSubmitting(false); }
   };
 
   const resetForm = () => {
+    setCreationMode(null);
     setTitle(""); setDescription(""); setRubric(""); setMaxScore(100); setClassId("");
     setDueDate(""); setSelectedFile(null); setSelectedStudentIds([]);
     setGeneratedQuestions([]); setGeneratedTitle(""); setGenerateError(null);
     setSelectedSubjectId(""); setSelectedLessonId("");
     setSelectedClassId(""); setSelectedTopic(null); setTopics([]); setManualTopic("");
     setTestMatrix(null); setWizardStep("config");
+    setStudentSearch(""); setShowStudentDropdown(false);
+    setCreateError(null); setSuccessMsg(null);
   };
 
   const updateQuestion = (index: number, field: keyof GeneratedQuestion, value: string | number) => {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Plus, Search, ChevronUp, UserPlus } from "lucide-react";
+import { ArrowLeft, Plus, Search, ChevronUp, UserPlus, KeyRound } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/components/auth/auth-provider";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import { ResetPasswordDialog } from "@/components/admin/reset-password-dialog";
 
 interface StudentRow {
   id: string;
@@ -73,6 +74,8 @@ export default function AdminStudentsPage({ basePath = "/admin" }: { basePath?: 
   const [newClassId, setNewClassId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [resetPwUser, setResetPwUser] = useState<{ id: string; name: string } | null>(null);
 
   const fetchStudents = () => {
     api<StudentRow[]>("/api/users?role=STUDENT")
@@ -446,6 +449,9 @@ export default function AdminStudentsPage({ basePath = "/admin" }: { basePath?: 
                       </TableCell>
                       <TableCell className="py-4">
                         <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => setResetPwUser({ id: s.id, name: s.fullName })} disabled={s.id === me?.id} className="text-amber-500 hover:bg-amber-50 rounded-lg" title="Đổi mật khẩu">
+                            <KeyRound className="size-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => startEdit(s)} disabled={s.id === me?.id} className="text-primary hover:bg-primary/10 rounded-lg" title="Sửa">
                             <MaterialIcon name="edit" className="text-xl" />
                           </Button>
@@ -540,6 +546,16 @@ export default function AdminStudentsPage({ basePath = "/admin" }: { basePath?: 
           </div>
         </DialogContent>
       </Dialog>
+
+      {resetPwUser && (
+        <ResetPasswordDialog
+          userId={resetPwUser.id}
+          userName={resetPwUser.name}
+          open={true}
+          onOpenChange={(open) => { if (!open) setResetPwUser(null); }}
+          onSuccess={fetchStudents}
+        />
+      )}
     </div>
   );
 }

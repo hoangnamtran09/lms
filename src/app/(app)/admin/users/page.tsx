@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, KeyRound } from "lucide-react";
 import { api, ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/components/auth/auth-provider";
+import { ResetPasswordDialog } from "@/components/admin/reset-password-dialog";
 
 interface UserRow {
   id: string;
@@ -81,6 +82,8 @@ export default function AdminUsersPage() {
     role: "STUDENT",
     classId: "",
   });
+
+  const [resetPwUser, setResetPwUser] = useState<{ id: string; name: string } | null>(null);
 
   const fetchUsers = () => {
     setIsLoading(true);
@@ -352,15 +355,27 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-gray-500 text-xs">{getClassName(u.classId) || "—"}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(u.id)}
-                        disabled={u.id === me?.id}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="size-3" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setResetPwUser({ id: u.id, name: u.fullName })}
+                          disabled={u.id === me?.id}
+                          className="text-amber-500 hover:text-amber-700"
+                          title="Đổi mật khẩu"
+                        >
+                          <KeyRound className="size-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(u.id)}
+                          disabled={u.id === me?.id}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -369,6 +384,16 @@ export default function AdminUsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {resetPwUser && (
+        <ResetPasswordDialog
+          userId={resetPwUser.id}
+          userName={resetPwUser.name}
+          open={true}
+          onOpenChange={(open) => { if (!open) setResetPwUser(null); }}
+          onSuccess={fetchUsers}
+        />
+      )}
     </div>
   );
 }

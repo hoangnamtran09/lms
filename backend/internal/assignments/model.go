@@ -1,6 +1,9 @@
 package assignments
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Status workflow: DRAFT → ASSIGNED → SUBMITTED → GRADED → RETURNED → ACCEPTED
 const (
@@ -11,6 +14,27 @@ const (
 	StatusReturned  = "RETURNED"
 	StatusAccepted  = "ACCEPTED"
 )
+
+// Question represents a single question in an assignment
+type Question struct {
+	ID             string          `json:"id"`
+	Question       string          `json:"question"`
+	Type           string          `json:"type"` // "mcq", "short_answer", "essay", etc.
+	Score          float64         `json:"score"`
+	ExpectedAnswer string          `json:"expectedAnswer"`
+	Options        json.RawMessage `json:"options"`
+}
+
+// SubmissionAnswer represents a student's answer to a question
+type SubmissionAnswer struct {
+	QuestionID string `json:"questionId"`
+	Answer     string `json:"answer"`
+}
+
+// SubmissionPayload is the request body for submitting an assignment
+type SubmissionPayload struct {
+	Answers []SubmissionAnswer `json:"answers"`
+}
 
 type Assignment struct {
 	ID               string    `gorm:"primaryKey;size:36" json:"id"`

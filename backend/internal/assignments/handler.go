@@ -300,7 +300,10 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Cap total score at assignment maxScore
+	// Cap total score at both totalMaxScore and assignment maxScore
+	if totalScore > totalMaxScore {
+		totalScore = totalMaxScore
+	}
 	if totalScore > assignment.MaxScore && assignment.MaxScore > 0 {
 		totalScore = assignment.MaxScore
 	}
@@ -313,7 +316,7 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 
 	// Store grading results in submission feedback
 	if len(results) > 0 {
-		summary := fmt.Sprintf("Tổng điểm: %d/%d", totalScore, totalMaxScore)
+		summary := fmt.Sprintf("Tổng điểm: %d/%d", totalScore, assignment.MaxScore)
 		detailJSON, _ := json.Marshal(results)
 		feedback := summary + "\n" + string(detailJSON)
 		totalScoreVal := totalScore

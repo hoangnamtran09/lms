@@ -165,6 +165,53 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	jsonRespond(w, map[string]string{"status": "ok"}, http.StatusOK)
 }
 
+type resetPasswordRequest struct {
+	NewPassword string `json:"newPassword"`
+}
+
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	id := extractID(r.URL.Path)
+	user, err := h.service.FindByID(r.Context(), id)
+	if err != nil {
+		jsonError(w, "Không tìm thấy người dùng", http.StatusNotFound)
+		return
+	}
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 6 {
+		jsonError(w, "Mật khẩu mới phải có ít nhất 6 ký tự", http.StatusBadRequest)
+		return
+	}
+
+	if user.SupabaseID == "" {
+		jsonError(w, "Tài khoản chưa được đồng bộ với Supabase", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.updateSupabasePassword(user.SupabaseID, req.NewPassword); err != nil {
+		jsonError(w, "Không thể đổi mật khẩu: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonRespond(w, map[string]string{"status": "ok", "message": "Đã đổi mật khẩu thành công"}, http.StatusOK)
+}
+
+func (h *Handler) updateSupabasePassword(supabaseID, password string) error {
+	if h.supabaseURL == "" || h.supabaseServiceRole == "" {
+		return fmt.Errorf("Supabase chưa được cấu hình")
+	}
+	body := map[string]interface{}{
+		"password": password,
+	}
+	bodyJSON, _ := json.Marshal(body)
+	_, err := h.supabaseRequest("PUT", "/auth/v1/admin/users/"+supabaseID, bodyJSON)
+	return err
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := extractID(r.URL.Path)
 	user, err := h.service.FindByID(r.Context(), id)
