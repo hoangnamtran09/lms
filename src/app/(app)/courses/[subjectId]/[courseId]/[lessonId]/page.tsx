@@ -62,9 +62,7 @@ export default function LessonViewerPage({
   const { activeQuiz, setActiveQuiz, lastQuizResult, clearLastQuizResult } = useActiveQuiz();
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [hasHistory, setHasHistory] = useState(false);
-
-  // Chat history is now saved server-side in the AI handler
+  const [hasHistory, setHasHistory] = useState<boolean | null>(null); // null = loading, true = unlocked, false = locked
 
   // Load chat history on mount
   useEffect(() => {
@@ -77,8 +75,10 @@ export default function LessonViewerPage({
       if (msgs.length > 0) {
         setMessages(msgs);
         setHasHistory(true);
+      } else {
+        setHasHistory(false);
       }
-    }).catch(() => {});
+    }).catch(() => { setHasHistory(false); });
   }, [lessonId]);
 
   // PDF state
@@ -112,7 +112,7 @@ export default function LessonViewerPage({
     cancelSession,
   } = useStudyTimer(true, visiblePages, lessonId);
 
-  const chatUnlocked = timerChatUnlocked || hasHistory;
+  const chatUnlocked = timerChatUnlocked || hasHistory === true;
 
   const elapsedRef = useRef(elapsedSeconds);
   useEffect(() => {
@@ -475,7 +475,13 @@ export default function LessonViewerPage({
                     <MessageCircle className="size-7 text-violet-400" />
                   </div>
                   <p className="text-sm font-medium text-gray-600">Gia sư AI sẵn sàng giúp bạn</p>
-                  <p className="text-xs text-gray-400 mt-1">Hãy đọc tài liệu để mở khoá chat</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {hasHistory === null
+                      ? "Đang tải lịch sử trò chuyện..."
+                      : chatUnlocked
+                        ? "Hãy đặt câu hỏi về bài học"
+                        : "Hãy đọc tài liệu để mở khoá chat"}
+                  </p>
                 </div>
               )}
               {messages.map((msg, i) => {
@@ -521,40 +527,47 @@ export default function LessonViewerPage({
 
             {/* Input / Lock */}
             {!chatUnlocked ? (
-              <div className="border-t px-3 py-2 shrink-0 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                  <Lock className="size-3" />
-                  <span>Hãy đọc bài để mở khoá trợ lý AI</span>
+              hasHistory === null ? (
+                <div className="border-t px-3 py-3 shrink-0 flex items-center justify-center">
+                  <Loader2 className="size-4 animate-spin text-gray-400" />
+                  <span className="text-xs text-gray-400 ml-2">Đang tải...</span>
                 </div>
+              ) : (
+                <div className="border-t px-3 py-2 shrink-0 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                    <Lock className="size-3" />
+                    <span>Hãy đọc bài để mở khoá trợ lý AI</span>
+                  </div>
 
-                {/* Time progress */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Thời gian đọc bài</span>
-                    <span className="tabular-nums">{elapsedSeconds}/{MIN_TOTAL_TIME}s</span>
+                  {/* Time progress */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>Thời gian đọc bài</span>
+                      <span className="tabular-nums">{elapsedSeconds}/{MIN_TOTAL_TIME}s</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (elapsedSeconds / MIN_TOTAL_TIME) * 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, (elapsedSeconds / MIN_TOTAL_TIME) * 100)}%` }}
-                    />
-                  </div>
-                </div>
 
-                {/* Page progress */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Số trang đã đọc (≥{MIN_PAGE_TIME}s/trang)</span>
-                    <span className="tabular-nums">{qualifiedPages.size}/{MIN_PAGES}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, (qualifiedPages.size / MIN_PAGES) * 100)}%` }}
-                    />
+                  {/* Page progress */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>Số trang đã đọc (≥{MIN_PAGE_TIME}s/trang)</span>
+                      <span className="tabular-nums">{qualifiedPages.size}/{MIN_PAGES}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (qualifiedPages.size / MIN_PAGES) * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
             ) : (
               <div className="border-t px-3 py-2 shrink-0">
                 {quizBlocked && (
