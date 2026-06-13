@@ -20,6 +20,29 @@ type chatInput struct {
 	History   []ChatMessage `json:"history"`
 }
 
+
+// isBalanceError checks if the AI response is actually an API balance/error message.
+func isBalanceError(text string) bool {
+	lower := strings.ToLower(text)
+	errorPatterns := []string{
+		"số dư tài khoản api không đủ",
+		"số dư không đủ",
+		"insufficient balance",
+		"insufficient quota",
+		"nạp thêm",
+		"platform.beeknoee.com/billing",
+		"api key không hợp lệ",
+		"invalid api key",
+		"rate limit",
+	}
+	for _, p := range errorPatterns {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	var req chatInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -163,7 +186,7 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 				}
 		}
 
-		if claims != nil && req.LessonID != "" {
+		if claims != nil && req.LessonID != "" && !isBalanceError(cleanText) {
 			now := time.Now()
 			records := []ChatMessageRecord{
 				{UserID: claims.UserID, LessonID: req.LessonID, Role: "user", Content: req.Message, CreatedAt: now},
