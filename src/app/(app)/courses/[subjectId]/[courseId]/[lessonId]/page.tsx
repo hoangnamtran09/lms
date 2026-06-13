@@ -62,6 +62,7 @@ export default function LessonViewerPage({
   const { activeQuiz, setActiveQuiz, lastQuizResult, clearLastQuizResult } = useActiveQuiz();
   const quizBlocked = activeQuiz !== null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [hasHistory, setHasHistory] = useState<boolean | null>(null); // null = loading, true = unlocked, false = locked
 
   // Load chat history on mount
@@ -241,8 +242,11 @@ export default function LessonViewerPage({
       .catch(() => {});
   }, [lessonId, sessionId, subjectId]);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+    }
   }, []);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -468,7 +472,7 @@ export default function LessonViewerPage({
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0">
               {messages.length === 0 && (
                 <div className="text-center py-10">
                   <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
