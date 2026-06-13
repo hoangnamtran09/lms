@@ -889,15 +889,15 @@ func seedMockLeaderboard(db *gorm.DB, cfg *config.Config, classID string, lesson
 	}
 
 	students := []mockStudent{
-		{name: "Trần Bảo Ngọc", username: "mock_lb_01", email: "mock_lb_01@lms.edu.vn", totalSeconds: 48200, totalDiamonds: 980},
-		{name: "Lê Hoàng Phúc", username: "mock_lb_02", email: "mock_lb_02@lms.edu.vn", totalSeconds: 42100, totalDiamonds: 850},
-		{name: "Phạm Thanh Tùng", username: "mock_lb_03", email: "mock_lb_03@lms.edu.vn", totalSeconds: 35600, totalDiamonds: 720},
-		{name: "Vũ Hải Yến", username: "mock_lb_04", email: "mock_lb_04@lms.edu.vn", totalSeconds: 33400, totalDiamonds: 680},
-		{name: "Đỗ Minh Quân", username: "mock_lb_05", email: "mock_lb_05@lms.edu.vn", totalSeconds: 29800, totalDiamonds: 610},
-		{name: "Ngô Thu Hà", username: "mock_lb_06", email: "mock_lb_06@lms.edu.vn", totalSeconds: 25300, totalDiamonds: 540},
-		{name: "Bùi Đức Anh", username: "mock_lb_07", email: "mock_lb_07@lms.edu.vn", totalSeconds: 22100, totalDiamonds: 480},
-		{name: "Trịnh Kim Liên", username: "mock_lb_08", email: "mock_lb_08@lms.edu.vn", totalSeconds: 18700, totalDiamonds: 420},
-		{name: "Mai Xuân Bách", username: "mock_lb_09", email: "mock_lb_09@lms.edu.vn", totalSeconds: 15200, totalDiamonds: 350},
+		{name: "Trần Bảo Ngọc", username: "mock_lb_01", email: "mock_lb_01@lms.edu.vn", totalSeconds: 48200, totalDiamonds: 285},
+		{name: "Lê Hoàng Phúc", username: "mock_lb_02", email: "mock_lb_02@lms.edu.vn", totalSeconds: 42100, totalDiamonds: 250},
+		{name: "Phạm Thanh Tùng", username: "mock_lb_03", email: "mock_lb_03@lms.edu.vn", totalSeconds: 35600, totalDiamonds: 220},
+		{name: "Vũ Hải Yến", username: "mock_lb_04", email: "mock_lb_04@lms.edu.vn", totalSeconds: 33400, totalDiamonds: 195},
+		{name: "Đỗ Minh Quân", username: "mock_lb_05", email: "mock_lb_05@lms.edu.vn", totalSeconds: 29800, totalDiamonds: 170},
+		{name: "Ngô Thu Hà", username: "mock_lb_06", email: "mock_lb_06@lms.edu.vn", totalSeconds: 25300, totalDiamonds: 145},
+		{name: "Bùi Đức Anh", username: "mock_lb_07", email: "mock_lb_07@lms.edu.vn", totalSeconds: 22100, totalDiamonds: 120},
+		{name: "Trịnh Kim Liên", username: "mock_lb_08", email: "mock_lb_08@lms.edu.vn", totalSeconds: 18700, totalDiamonds: 95},
+		{name: "Mai Xuân Bách", username: "mock_lb_09", email: "mock_lb_09@lms.edu.vn", totalSeconds: 15200, totalDiamonds: 70},
 	}
 
 	for _, ms := range students {
