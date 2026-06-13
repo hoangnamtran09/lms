@@ -48,10 +48,8 @@ export default function FlashcardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
   const [cardCount, setCardCount] = useState(10);
   const [createMode, setCreateMode] = useState<"ai" | "manual">("ai");
@@ -244,13 +242,11 @@ export default function FlashcardsPage() {
 
   async function handleSubjectChange(id: string) {
     setSelectedSubjectId(id);
-    setSelectedCourseId("");
     setSelectedLessonId("");
     setLessons([]);
     try {
       const res = await api<{ data: Course[] } | Course[]>(`/api/courses?subjectId=${id}`);
       const courseList = Array.isArray(res) ? res : res.data || [];
-      setCourses(courseList);
       // Auto-fetch lessons from all courses under this subject
       const allLessons: Lesson[] = [];
       for (const c of courseList) {
@@ -268,15 +264,6 @@ export default function FlashcardsPage() {
         return a.title.localeCompare(b.title, "vi");
       });
       setLessons(allLessons);
-    } catch { setCourses([]); setLessons([]); }
-  }
-
-  async function handleCourseChange(id: string) {
-    setSelectedCourseId(id);
-    setSelectedLessonId("");
-    try {
-      const l = await api<Lesson[]>(`/api/lessons?courseId=${id}`);
-      setLessons(Array.isArray(l) ? l : []);
     } catch { setLessons([]); }
   }
 
@@ -359,12 +346,10 @@ export default function FlashcardsPage() {
 
   function resetCreateForm() {
     setSelectedSubjectId("");
-    setSelectedCourseId("");
     setSelectedLessonId("");
     setCardCount(10);
     setCreateMode("ai");
     setManualText("");
-    setCourses([]);
     setLessons([]);
   }
 

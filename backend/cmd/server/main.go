@@ -50,6 +50,11 @@ func main() {
 				slog.Warn("Demo seed warning", "error", err)
 			}
 		}
+
+		// Mock leaderboard data (always runs, idempotent)
+		if err := seedMockLeaderboard(db, cfg, "", nil); err != nil {
+			slog.Warn("Mock leaderboard warning", "error", err)
+		}
 	} else {
 		slog.Info("SKIP_DB_MIGRATE set — skipping migrate and seed")
 	}

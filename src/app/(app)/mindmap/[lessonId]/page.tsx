@@ -147,7 +147,7 @@ function buildChildrenMap(edges: GraphEdge[]): Record<string, string[]> {
 
 // ---------- Custom Node with Hover Tooltip (Portal) ----------
 
-function MindMapNode({ id, data }: NodeProps) {
+function MindMapNode({ data }: NodeProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -354,14 +354,43 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
     [childrenMap]
   );
 
-  // Fetch data
-  const fetchMindMap = useCallback(async (refresh = false) => {
+  // Initial data fetch — no synchronous setState in effect body.
+  // loading starts as true, so we skip the redundant setLoading(true) here.
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const data = await api<GraphResult>("/api/ai/mindmap", {
+          method: "POST",
+          body: JSON.stringify({ lessonId, refresh: false }),
+          timeout: 120000,
+        });
+        if (!cancelled) {
+          setResult(data);
+          setExpandedIds(new Set(["central"]));
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Không thể tạo sơ đồ tư duy");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [lessonId]);
+
+  // Refresh handler for the "Làm mới" button — called from a click event, not an effect.
+  const refreshMindMap = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await api<GraphResult>("/api/ai/mindmap", {
         method: "POST",
-        body: JSON.stringify({ lessonId, refresh }),
+        body: JSON.stringify({ lessonId, refresh: true }),
         timeout: 120000,
       });
       setResult(data);
@@ -372,10 +401,6 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
       setLoading(false);
     }
   }, [lessonId]);
-
-  useEffect(() => {
-    fetchMindMap();
-  }, [fetchMindMap]);
 
   // Build React Flow nodes/edges
   useEffect(() => {
@@ -549,7 +574,7 @@ export default function MindMapDetailPage({ params }: { params: Promise<{ lesson
           {/* Expand/Collapse */}
           <div className="flex items-center gap-1">
             <button
-              onClick={() => fetchMindMap(true)}
+              onClick={refreshMindMap}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
               disabled={loading}
             >
