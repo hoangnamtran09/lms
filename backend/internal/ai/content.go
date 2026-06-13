@@ -80,7 +80,7 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lesson, err := h.lessonService.FindByID(r.Context(), req.LessonID)
-	if err == nil && lesson.Summary != "" {
+	if err == nil && lesson.Summary != "" && !isBalanceError(lesson.Summary) {
 		var objectives []string
 		if lesson.Objectives != "" {
 			json.Unmarshal([]byte(lesson.Objectives), &objectives)
@@ -113,7 +113,7 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.Unmarshal([]byte(extractJSON(response)), &result); err != nil {
 
-		if lesson != nil {
+		if lesson != nil && !isBalanceError(response) {
 			objectivesJSON, _ := json.Marshal([]string{})
 			h.lessonService.Update(r.Context(), lesson.ID, map[string]interface{}{
 				"summary":    response,
@@ -131,7 +131,7 @@ func (h *Handler) LessonSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if lesson != nil {
+	if lesson != nil && !isBalanceError(result.Summary) {
 		objectivesJSON, _ := json.Marshal(result.Objectives)
 		h.lessonService.Update(r.Context(), lesson.ID, map[string]interface{}{
 			"summary":    result.Summary,
