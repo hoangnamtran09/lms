@@ -838,7 +838,135 @@ func seedDemo(db *gorm.DB, cfg *config.Config) error {
 	}
 	fmt.Println("  Created flashcard deck with 6 cards")
 
+	// ── Step 16: Mock Leaderboard Students ──────────────────────────────
+	if err := seedMockLeaderboard(db, cfg, demoClassID, lessonIDs); err != nil {
+		return fmt.Errorf("mock leaderboard: %w", err)
+	}
+
 	fmt.Println("Demo seed: complete!")
+	return nil
+}
+
+// seedMockLeaderboard creates additional students with study data for leaderboard.
+func seedMockLeaderboard(db *gorm.DB, cfg *config.Config, classID string, lessonIDs []string) error {
+	// Check if already seeded
+	var count int64
+	db.Table("users").Where("username LIKE ?", "mock_lb_%").Count(&count)
+	if count > 0 {
+		fmt.Println("  Mock leaderboard students already exist, skipping")
+		return nil
+	}
+
+	type mockStudent struct {
+		name     string
+		username string
+		email    string
+		// Total study seconds (determines leaderboard rank)
+		totalSeconds int
+		// Total diamonds
+		totalDiamonds int
+	}
+
+	students := []mockStudent{
+		{name: "Trần Bảo Ngọc", username: "mock_lb_01", email: "mock_lb_01@lms.edu.vn", totalSeconds: 48200, totalDiamonds: 980},
+		{name: "Lê Hoàng Phúc", username: "mock_lb_02", email: "mock_lb_02@lms.edu.vn", totalSeconds: 42100, totalDiamonds: 850},
+		{name: "Phạm Thanh Tùng", username: "mock_lb_03", email: "mock_lb_03@lms.edu.vn", totalSeconds: 35600, totalDiamonds: 720},
+		{name: "Vũ Hải Yến", username: "mock_lb_04", email: "mock_lb_04@lms.edu.vn", totalSeconds: 33400, totalDiamonds: 680},
+		{name: "Đỗ Minh Quân", username: "mock_lb_05", email: "mock_lb_05@lms.edu.vn", totalSeconds: 29800, totalDiamonds: 610},
+		{name: "Ngô Thu Hà", username: "mock_lb_06", email: "mock_lb_06@lms.edu.vn", totalSeconds: 25300, totalDiamonds: 540},
+		{name: "Bùi Đức Anh", username: "mock_lb_07", email: "mock_lb_07@lms.edu.vn", totalSeconds: 22100, totalDiamonds: 480},
+		{name: "Trịnh Kim Liên", username: "mock_lb_08", email: "mock_lb_08@lms.edu.vn", totalSeconds: 18700, totalDiamonds: 420},
+		{name: "Mai Xuân Bách", username: "mock_lb_09", email: "mock_lb_09@lms.edu.vn", totalSeconds: 15200, totalDiamonds: 350},
+	}
+
+	for _, ms := range students {
+		// Create Supabase auth user
+		authID, err := getOrCreateSupabaseUser(cfg.SupabaseURL, cfg.SupabaseServiceRole,
+			ms.email, "Demo@123", ms.name, ms.username, "STUDENT")
+		if err != nil {
+			return fmt.Errorf("create supabase user %s: %w", ms.username, err)
+		}
+
+		// Create local user record
+		user := &users.User{
+			ID:         uuid.New().String(),
+			SupabaseID: authID,
+			Username:   ms.username,
+			FullName:   ms.name,
+			Email:      ms.email,
+			Role:       "STUDENT",
+			ClassID:    classID,
+		}
+		if err := db.Create(user).Error; err != nil {
+			return fmt.Errorf("create user %s: %w", ms.username, err)
+		}
+
+		// Generate study sessions spanning the last 4 weeks
+		now := time.Now()
+		numSessions := 15 + (ms.totalSeconds/1000)%10 // 15-24 sessions
+		sessionSeconds := ms.totalSeconds / numSessions
+		for s := 0; s < numSessions; s++ {
+			daysAgo := (s * 2) % 28
+			// Vary duration by ±20%
+			dur := sessionSeconds + (s%5-2)*sessionSeconds/10
+			lessonIdx := (s * 7) % len(lessonIDs)
+			startTime := now.AddDate(0, 0, -daysAgo).Add(time.Duration(8+s%6)*time.Hour + time.Duration(s%60)*time.Minute)
+			endTime := startTime.Add(time.Duration(dur) * time.Second)
+
+			session := &progress.StudySession{
+				ID:              uuid.New().String(),
+				UserID:          user.ID,
+				LessonID:        lessonIDs[lessonIdx],
+				DurationSeconds: dur,
+				StartedAt:       startTime,
+				EndedAt:         &endTime,
+				LastHeartbeatAt: &endTime,
+			}
+			if err := db.Create(session).Error; err != nil {
+				return fmt.Errorf("create session: %w", err)
+			}
+		}
+
+		// Generate diamond transactions
+		diamondDefs := []struct {
+			amount int
+			reason string
+		}{
+			{ms.totalDiamonds / 12, "study_complete"},
+			{ms.totalDiamonds / 12, "study_complete"},
+			{ms.totalDiamonds / 12, "study_complete"},
+			{ms.totalDiamonds / 10, "quiz_pass"},
+			{ms.totalDiamonds / 10, "quiz_pass"},
+			{ms.totalDiamonds / 15, "assignment_submit"},
+			{ms.totalDiamonds / 15, "assignment_submit"},
+			{ms.totalDiamonds / 8, "assignment_grade"},
+			{ms.totalDiamonds / 6, "streak_milestone"},
+			{ms.totalDiamonds / 20, "daily_login"},
+			{ms.totalDiamonds / 20, "daily_login"},
+			{ms.totalDiamonds / 20, "daily_login"},
+			{ms.totalDiamonds / 20, "daily_login"},
+			{ms.totalDiamonds / 20, "daily_login"},
+			{ms.totalDiamonds / 12, "study_complete"},
+			{ms.totalDiamonds / 10, "quiz_pass"},
+			{ms.totalDiamonds / 8, "achievement"},
+			{ms.totalDiamonds / 8, "achievement"},
+			{ms.totalDiamonds / 15, "assignment_submit"},
+			{ms.totalDiamonds / 12, "study_complete"},
+		}
+		for i, dd := range diamondDefs {
+			dt := &gamification.DiamondTransaction{
+				UserID:    user.ID,
+				Amount:    dd.amount,
+				Reason:    dd.reason,
+				CreatedAt: now.AddDate(0, 0, -(i*3)%28),
+			}
+			if err := db.Create(dt).Error; err != nil {
+				return fmt.Errorf("create diamond: %w", err)
+			}
+		}
+	}
+
+	fmt.Printf("  Created %d mock leaderboard students with study data\n", len(students))
 	return nil
 }
 
