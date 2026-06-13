@@ -40,12 +40,15 @@ function parseQuizBlocks(
     if (match.index > lastIdx) {
       parts.push({ type: "text", content: cleaned.slice(lastIdx, match.index) });
     }
+    // Always sanitize LaTeX first — JSON escapes like \f, \r, \t, \n, \b
+    // silently corrupt LaTeX commands like \frac, \rightarrow, \times, \neq, \beta
+    const sanitized = sanitizeLaTeXInJSON(match[1]);
     let rawQuiz: { question: string; options: QuizOption[]; explanation: string } | undefined;
     try {
-      rawQuiz = JSON.parse(match[1]);
+      rawQuiz = JSON.parse(sanitized);
     } catch {
       try {
-        rawQuiz = JSON.parse(sanitizeLaTeXInJSON(match[1]));
+        rawQuiz = JSON.parse(match[1]);
       } catch {}
     }
     if (rawQuiz) {

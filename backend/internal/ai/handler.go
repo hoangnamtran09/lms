@@ -106,7 +106,13 @@ func sanitizeJSONString(s string) string {
 		if escaped {
 			escaped = false
 			switch r {
-			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u':
+			case 'b', 'f', 'n', 'r', 't':
+				// LaTeX commands like \beta, \frac, \neq, \rightarrow, \times
+				// collide with JSON escapes. Double-escape so json.Unmarshal
+				// preserves them as literal \b, \f, \n, \r, \t.
+				b.WriteString("\\\\")
+				b.WriteRune(r)
+			case '"', '\\', '/', 'u':
 				b.WriteRune(r)
 			default:
 				b.WriteString("\\\\")
