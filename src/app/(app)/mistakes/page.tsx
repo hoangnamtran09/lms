@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 import { MathText } from "@/components/ai/math-text";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { WeaknessSummary } from "@/components/ai/weakness-summary";
-import { WeaknessQuizPanel } from "@/components/ai/weakness-quiz-panel";
 
 interface WeaknessProfile {
   id: string;
@@ -44,7 +44,6 @@ export default function StudentMistakesPage() {
   const [loading, setLoading] = useState(true);
   const [lessonContext, setLessonContext] = useState<Record<string, LessonContext>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [quizOpen, setQuizOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api<WeaknessProfile[]>("/api/weaknesses")
@@ -181,35 +180,15 @@ export default function StudentMistakesPage() {
                               </span>
                             </div>
                             {activeItems.length > 0 && (
-                              quizOpen[lessonId] ? (
-                                <button
-                                  className="flex items-center gap-1.5 px-4 py-1.5 text-gray-400 hover:text-gray-600 rounded-full text-xs font-bold transition-colors"
-                                  onClick={() => setQuizOpen((p) => ({ ...p, [lessonId]: false }))}
-                                >
-                                  <MaterialIcon name="visibility_off" className="text-sm" />
-                                  Ẩn bài tập
-                                </button>
-                              ) : (
-                                <button
-                                  className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold hover:shadow-md transition-all active:scale-95"
-                                  onClick={() => setQuizOpen((p) => ({ ...p, [lessonId]: true }))}
-                                >
-                                  <MaterialIcon name="assignment_add" className="text-sm" />
-                                  Luyện tập
-                                </button>
-                              )
+                              <Link
+                                href={`/mistakes/practice?lessonId=${encodeURIComponent(lessonId)}&subjectName=${encodeURIComponent(subjectName)}&lessonTitle=${encodeURIComponent(lessonTitle)}`}
+                                className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold hover:shadow-md transition-all active:scale-95"
+                              >
+                                <MaterialIcon name="assignment_add" className="text-sm" />
+                                Luyện tập
+                              </Link>
                             )}
                           </div>
-
-                          {/* Quiz panel */}
-                          {quizOpen[lessonId] && activeItems.length > 0 && (
-                            <WeaknessQuizPanel
-                              items={activeItems}
-                              subjectName={subjectName}
-                              lessonTitle={lessonTitle}
-                              onClose={() => setQuizOpen((p) => ({ ...p, [lessonId]: false }))}
-                            />
-                          )}
 
                           {/* Weakness items */}
                           <div className="divide-y divide-gray-200">

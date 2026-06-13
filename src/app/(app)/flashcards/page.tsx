@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Layers, Plus, ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { Layers, Plus, ChevronRight, Loader2, Trash2, Upload, FileText, X } from "lucide-react";
 
 interface Deck {
   id: string;
@@ -45,6 +45,167 @@ export default function FlashcardsPage() {
   const [selectedLessonId, setSelectedLessonId] = useState("");
   const [cardCount, setCardCount] = useState(10);
   const [creating, setCreating] = useState(false);
+
+  // Import modal state
+  const [showImport, setShowImport] = useState(false);
+  const [importTitle, setImportTitle] = useState("");
+  const [importLessonId, setImportLessonId] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<"text" | "file">("text");
+  const [importPreview, setImportPreview] = useState<{ question: string; answer: string }[]>([]);
+  const [importing, setImporting] = useState(false);
+  // Lesson cascade for import modal
+  const [importSubjects, setImportSubjects] = useState<Subject[]>([]);
+  const [importCourses, setImportCourses] = useState<Course[]>([]);
+  const [importLessons, setImportLessons] = useState<Lesson[]>([]);
+  const [importSubjectId, setImportSubjectId] = useState("");
+  const [importCourseId, setImportCourseId] = useState("");
+
+  // Parse text input: auto-detect separator (tab, pipe, or \x1f from Anki)
+  function parseImportText(text: string) {
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length === 0) { setImportPreview([]); return; }
+    // Auto-detect separator: count occurrences in first line
+    const first = lines[0];
+    const seps = ["\x1f", "\t", "|"];
+    let bestSep = "|";
+    let bestCount = 0;
+    for (const sep of seps) {
+      const count = first.split(sep).length - 1;
+      if (count > bestCount) { bestCount = count; bestSep = sep; }
+    }
+    // If no separator found with any, fall back to pipe
+    if (bestCount === 0) bestSep = "|";
+
+    const cards = lines.map((line) => {
+      const sepIdx = line.indexOf(bestSep);
+      if (sepIdx === -1) return { question: line.trim(), answer: "" };
+      return {
+        question: line.slice(0, sepIdx).trim(),
+        answer: line.slice(sepIdx + bestSep.length).trim(),
+      };
+    }).filter((c) => c.question);
+    setImportPreview(cards);
+  }
+
+  // Parse CSV file
+  function parseCSV(content: string) {
+    const lines = content.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) { setImportPreview([]); return; }
+    const cards = lines.slice(1).map((line) => {
+      // Simple CSV: split by comma, handle quoted fields
+      const parts = line.split(",");
+      if (parts.length < 2) return null;
+      return { question: parts[0].trim().replace(/^"|"$/g, ""), answer: parts[1].trim().replace(/^"|"$/g, "") };
+    }).filter((c): c is { question: string; answer: string } => c !== null && c.question !== "");
+    setImportPreview(cards);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+
+    // .apkg files need backend parsing
+    if (file.name.endsWith(".apkg")) {
+      setImportPreview([]);
+      const formData = new FormData();
+      formData.append("file", file);
+      api<{ cards: { question: string; answer: string }[]; deckTitle?: string }>("/api/flashcards/import-apkg", {
+        method: "POST",
+        body: formData,
+        headers: {}, // let browser set Content-Type for multipart
+      })
+        .then((data) => {
+          setImportPreview(data.cards || []);
+          if (data.deckTitle && !importTitle) setImportTitle(data.deckTitle);
+        })
+        .catch(() => setImportPreview([]));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      if (file.name.endsWith(".json")) {
+        try {
+          const json = JSON.parse(content);
+          const arr = Array.isArray(json) ? json : json.cards || [];
+          const cards = arr.map((c: Record<string, unknown>) => ({
+            question: String(c.question || c.Question || ""),
+            answer: String(c.answer || c.Answer || ""),
+          })).filter((c: { question: string }) => c.question);
+          setImportPreview(cards);
+        } catch { setImportPreview([]); }
+      } else {
+        parseCSV(content);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function loadImportLessonData() {
+    try {
+      const subj = await api<Subject[]>("/api/subjects");
+      setImportSubjects(subj);
+    } catch {}
+  }
+
+  async function handleImportSubjectChange(id: string) {
+    setImportSubjectId(id);
+    setImportCourseId("");
+    setImportLessonId("");
+    try {
+      const c = await api<Course[]>(`/api/courses?subjectId=${id}`);
+      setImportCourses(c);
+    } catch { setImportCourses([]); }
+  }
+
+  async function handleImportCourseChange(id: string) {
+    setImportCourseId(id);
+    setImportLessonId("");
+    try {
+      const l = await api<Lesson[]>(`/api/lessons?courseId=${id}`);
+      setImportLessons(l);
+    } catch { setImportLessons([]); }
+  }
+
+  async function handleImport() {
+    if (!importTitle.trim() || importPreview.length === 0) return;
+    setImporting(true);
+    try {
+      await api<Deck>("/api/flashcards/decks", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId: importLessonId,
+          title: importTitle.trim(),
+          cards: importPreview.map((c) => ({ question: c.question, answer: c.answer })),
+        }),
+      });
+      setShowImport(false);
+      resetImportForm();
+      fetchDecks();
+    } catch (err: unknown) {
+      alert("Lỗi tạo bộ thẻ: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function resetImportForm() {
+    setImportTitle("");
+    setImportLessonId("");
+    setImportText("");
+    setImportFile(null);
+    setImportMode("text");
+    setImportPreview([]);
+    setImportSubjectId("");
+    setImportCourseId("");
+    setImportSubjects([]);
+    setImportCourses([]);
+    setImportLessons([]);
+  }
 
   useEffect(() => {
     fetchDecks();
@@ -159,13 +320,22 @@ export default function FlashcardsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Flashcards</h1>
           <p className="text-sm text-gray-500 mt-1">Ôn tập hiệu quả với thẻ học tập và lặp lại ngắt quãng</p>
         </div>
-        <button
-          onClick={loadCreateData}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="size-4" />
-          Tạo bộ thẻ mới
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setShowImport(true); loadImportLessonData(); }}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            <Upload className="size-4" />
+            Nhập thẻ
+          </button>
+          <button
+            onClick={loadCreateData}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="size-4" />
+            Tạo bộ thẻ mới
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -310,6 +480,151 @@ export default function FlashcardsPage() {
               >
                 {creating ? <Loader2 className="size-4 animate-spin" /> : null}
                 {creating ? "Đang tạo..." : "Tạo bằng AI"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowImport(false); resetImportForm(); }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Nhập thẻ từ bên ngoài</h2>
+              <button onClick={() => { setShowImport(false); resetImportForm(); }} className="text-gray-400 hover:text-gray-600">
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Deck title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên bộ thẻ <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={importTitle}
+                  onChange={(e) => setImportTitle(e.target.value)}
+                  placeholder="VD: Từ vựng tiếng Anh chủ đề thời tiết"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Optional lesson */}
+              <div>
+                <button
+                  onClick={() => {
+                    if (importSubjects.length === 0) loadImportLessonData();
+                    if (importSubjectId) { setImportSubjectId(""); setImportLessonId(""); return; }
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  {importSubjectId ? "Bỏ chọn bài học" : "+ Gắn vào bài học (tuỳ chọn)"}
+                </button>
+                {importSubjectId !== "" && (
+                  <div className="mt-2 space-y-2">
+                    <select value={importSubjectId} onChange={(e) => handleImportSubjectChange(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white">
+                      <option value="">Chọn môn học</option>
+                      {importSubjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    {importCourses.length > 0 && (
+                      <select value={importCourseId} onChange={(e) => handleImportCourseChange(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white">
+                        <option value="">Chọn khoá học</option>
+                        {importCourses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                      </select>
+                    )}
+                    {importLessons.length > 0 && (
+                      <select value={importLessonId} onChange={(e) => setImportLessonId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white">
+                        <option value="">Chọn bài học</option>
+                        {importLessons.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Input mode tabs */}
+              <div>
+                <div className="flex border-b border-gray-200 mb-3">
+                  <button
+                    onClick={() => { setImportMode("text"); setImportFile(null); }}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${importMode === "text" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <FileText className="size-4 inline mr-1" />
+                    Nhập văn bản
+                  </button>
+                  <button
+                    onClick={() => { setImportMode("file"); setImportText(""); }}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${importMode === "file" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <Upload className="size-4 inline mr-1" />
+                    Tải file
+                  </button>
+                </div>
+
+                {importMode === "text" ? (
+                  <div>
+                    <textarea
+                      value={importText}
+                      onChange={(e) => { setImportText(e.target.value); parseImportText(e.target.value); }}
+                      placeholder={"Mỗi dòng một thẻ, phân cách câu hỏi và câu trả lời bằng dấu | hoặc tab\nHỗ trợ import từ Anki (text export)\n\nVD:\nThủ đô của Việt Nam là gì?|Hà Nội\n2 + 2 = ?\t4"}
+                      rows={8}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-y"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors">
+                      <Upload className="size-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">
+                        {importFile ? importFile.name : "Chọn file CSV hoặc JSON"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">CSV: cột 1 câu hỏi, cột 2 câu trả lời</p>
+                      <input
+                        type="file"
+                        accept=".csv,.json,.apkg"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Preview */}
+              {importPreview.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Xem trước: <span className="text-blue-600">{importPreview.length} thẻ</span>
+                  </p>
+                  <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2 bg-gray-50">
+                    {importPreview.slice(0, 10).map((c, i) => (
+                      <div key={i} className="text-xs text-gray-600 bg-white rounded px-2 py-1 border border-gray-100">
+                        <span className="font-semibold">Q:</span> {c.question} <span className="text-gray-300 mx-1">|</span> <span className="font-semibold">A:</span> {c.answer || <span className="text-gray-400 italic">(trống)</span>}
+                      </div>
+                    ))}
+                    {importPreview.length > 10 && (
+                      <p className="text-xs text-gray-400 text-center py-1">... và {importPreview.length - 10} thẻ nữa</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowImport(false); resetImportForm(); }}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={!importTitle.trim() || importPreview.length === 0 || importing}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                {importing ? "Đang tạo..." : `Tạo bộ thẻ (${importPreview.length} thẻ)`}
               </button>
             </div>
           </div>

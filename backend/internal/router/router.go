@@ -339,6 +339,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			r.Get("/api/flashcards/decks/{id}", h.Flashcards.GetDeck)
 			r.Post("/api/flashcards/review", h.Flashcards.ReviewCard)
 			r.Delete("/api/flashcards/decks/{id}", h.Flashcards.DeleteDeck)
+			r.Post("/api/flashcards/import-apkg", h.Flashcards.ImportApkg)
 					// Reports
 				r.With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
 					Post("/api/reports/generate", h.Reports.Generate)
