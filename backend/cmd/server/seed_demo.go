@@ -40,7 +40,15 @@ func seedDemo(db *gorm.DB, cfg *config.Config) error {
 		var sessionCount int64
 		db.Table("study_sessions").Where("user_id = ?", demoStudentID).Count(&sessionCount)
 		if sessionCount > 0 {
-			fmt.Println("Demo seed: data already exists, skipping")
+			fmt.Println("Demo seed: main data already exists, checking mock leaderboard...")
+			// Still seed mock leaderboard if not done yet
+			var allLessonIDs []string
+			db.Table("lessons").Select("id").Pluck("id", &allLessonIDs)
+			if len(allLessonIDs) > 0 {
+				if err := seedMockLeaderboard(db, cfg, "", allLessonIDs); err != nil {
+					return fmt.Errorf("mock leaderboard: %w", err)
+				}
+			}
 			return nil
 		}
 	}
@@ -854,6 +862,19 @@ func seedMockLeaderboard(db *gorm.DB, cfg *config.Config, classID string, lesson
 	db.Table("users").Where("username LIKE ?", "mock_lb_%").Count(&count)
 	if count > 0 {
 		fmt.Println("  Mock leaderboard students already exist, skipping")
+		return nil
+	}
+
+	// Look up class ID if not provided
+	if classID == "" {
+		db.Table("classes").Select("id").Limit(1).Scan(&classID)
+	}
+	// Look up lesson IDs if not provided
+	if len(lessonIDs) == 0 {
+		db.Table("lessons").Select("id").Limit(20).Pluck("id", &lessonIDs)
+	}
+	if classID == "" || len(lessonIDs) == 0 {
+		fmt.Println("  Mock leaderboard: no class or lessons found, skipping")
 		return nil
 	}
 
