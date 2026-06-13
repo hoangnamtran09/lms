@@ -72,9 +72,9 @@ export default function StudentMistakesPage() {
 
   const handleImprove = async (id: string) => {
     try {
-      await api(`/api/weaknesses/${id}/improve`, { method: "POST" });
+      await api(`/api/weaknesses/${id}/resolve`, { method: "POST" });
       setProfiles((prev) =>
-        prev.map((w) => (w.id === id ? { ...w, improvementScore: w.improvementScore + 1 } : w))
+        prev.map((w) => (w.id === id ? { ...w, resolved: true, resolvedAt: new Date().toISOString() } : w))
       );
     } catch { /* ignore */ }
   };

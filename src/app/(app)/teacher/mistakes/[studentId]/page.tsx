@@ -418,9 +418,9 @@ export default function TeacherStudentMistakesPage({
                                     className="flex items-center gap-1.5 text-tertiary font-bold text-sm hover:underline shrink-0"
                                     onClick={async () => {
                                       try {
-                                        await api(`/api/weaknesses/${p.id}/improve`, { method: "POST" });
+                                        await api(`/api/weaknesses/${p.id}/resolve`, { method: "POST" });
                                         setProfiles((prev) =>
-                                          prev.map((w) => (w.id === p.id ? { ...w, improvementScore: w.improvementScore + 1 } : w))
+                                          prev.map((w) => (w.id === p.id ? { ...w, resolved: true, resolvedAt: new Date().toISOString() } : w))
                                         );
                                       } catch { /* ignore */ }
                                     }}
