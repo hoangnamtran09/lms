@@ -191,6 +191,12 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check due date
+	if !assignment.DueDate.IsZero() && time.Now().After(assignment.DueDate) {
+		jsonErr(w, "Đã quá hạn nộp bài", http.StatusForbidden)
+		return
+	}
+
 	// Parse answers from submission content
 	type answerItem struct {
 		QuestionID string `json:"questionId"`
