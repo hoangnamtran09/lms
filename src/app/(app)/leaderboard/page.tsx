@@ -198,11 +198,11 @@ export default function LeaderboardPage() {
             <div key={entry.userId || `entry-${idx}`} className={`flex flex-col items-center gap-2 animate-slide-up [animation-delay:${idx * 150}ms]`}>
               {/* Avatar */}
               <div className={`rounded-full ${isFirst ? "p-1 bg-gradient-to-b from-yellow-300 to-amber-400 size-20" : isSecond ? "p-1 bg-gradient-to-b from-gray-200 to-gray-400 size-16" : "p-1 bg-gradient-to-b from-amber-400 to-amber-600 size-16"}`}>
-                <Avatar size={isFirst ? "lg" : "default"} className="size-full">
-                  <AvatarFallback className={`text-lg font-bold bg-white ${isFirst ? "text-yellow-700" : isSecond ? "text-gray-500" : "text-amber-800"}`}>
+                <div className={`flex items-center justify-center rounded-full bg-white size-full ${isFirst ? "text-yellow-700" : isSecond ? "text-gray-500" : "text-amber-800"}`}>
+                  <span className={`font-bold ${isFirst ? "text-xl" : "text-base"}`}>
                     {initials(entry.userName)}
-                  </AvatarFallback>
-                </Avatar>
+                  </span>
+                </div>
               </div>
               {isMe && <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Bạn</Badge>}
               {/* Name */}
