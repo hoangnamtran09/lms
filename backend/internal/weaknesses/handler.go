@@ -137,11 +137,13 @@ func (h *Handler) Resolve(w http.ResponseWriter, r *http.Request) {
 	if len(parts) >= 2 {
 		id = parts[len(parts)-2]
 	}
-	if err := h.service.Delete(r.Context(), id); err != nil {
+	if err := h.service.MarkResolved(r.Context(), id); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonOk(w, map[string]string{"status": "deleted"})
+	// Reload to get current state
+	p, _ := h.service.FindByID(r.Context(), id)
+	jsonOk(w, p)
 }
 
 func (h *Handler) UpdateCoachNotes(w http.ResponseWriter, r *http.Request) {

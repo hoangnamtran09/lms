@@ -186,6 +186,14 @@ func (s *Service) MarkImproved(ctx context.Context, id string) error {
 		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
 }
 
+// MarkResolved marks a weakness as resolved (understood) immediately.
+func (s *Service) MarkResolved(ctx context.Context, id string) error {
+	now := time.Now()
+	return s.db.WithContext(ctx).Model(&WeaknessProfile{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{"resolved": true, "resolved_at": &now}).Error
+}
+
 func (s *Service) Delete(ctx context.Context, id string) error {
 	return s.db.WithContext(ctx).Where("id = ?", id).Delete(&WeaknessProfile{}).Error
 }

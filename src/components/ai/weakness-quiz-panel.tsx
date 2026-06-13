@@ -72,7 +72,7 @@ export function WeaknessQuizPanel({
     setAnswering((p) => ({ ...p, [key]: true }));
     const correct = selectedIdx === correctIdx;
     try {
-      if (correct && weaknessId) await api(`/api/weaknesses/${weaknessId}/improve`, { method: "POST" });
+      if (correct && weaknessId) await api(`/api/weaknesses/${weaknessId}/resolve`, { method: "POST" });
     } catch { /* ignore */ }
     setState((prev) => {
       const updated = prev.questions.map((q: WeaknessQuestion, i: number) =>
@@ -171,7 +171,7 @@ export function WeaknessQuizPanel({
                     </p>
                   )}
                   {q.answered && q.correct && (
-                    <p className="mt-1 text-xs text-teal-600 font-semibold">✅ Điểm yếu này đã được cải thiện!</p>
+                    <p className="mt-1 text-xs text-teal-600 font-semibold">✅ Đã đánh dấu đã hiểu!</p>
                   )}
                 </div>
               </div>
