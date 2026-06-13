@@ -287,6 +287,7 @@ func generateSimpleMindMap(lessonTitle, subjectName, description string) GraphRe
 
 type mindmapInput struct {
 	LessonID string `json:"lessonId"`
+		Refresh  bool   `json:"refresh"`
 }
 
 func (h *Handler) MindMap(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +302,9 @@ func (h *Handler) MindMap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheKey := mindmapCacheKey(req.LessonID)
+	if req.Refresh {
+		h.cacheService.Delete(r.Context(), cacheKey)
+	}
 	if cached, ok := h.cacheService.Get(r.Context(), cacheKey); ok {
 		var result GraphResult
 		if err := json.Unmarshal([]byte(cached), &result); err == nil {

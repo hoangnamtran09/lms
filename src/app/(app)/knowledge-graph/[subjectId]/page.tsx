@@ -123,8 +123,11 @@ function computeGraphLayout(result: GraphResult) {
         fontSize: isConcept ? "13px" : "11px",
         fontWeight: isConcept ? 700 : 500,
         color: colors.text,
-        maxWidth: 180,
+        maxWidth: 200,
         textAlign: "center" as const,
+        wordBreak: "break-word" as const,
+        overflowWrap: "break-word" as const,
+        whiteSpace: "normal" as const,
       },
     };
   });

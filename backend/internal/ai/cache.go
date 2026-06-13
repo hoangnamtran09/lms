@@ -37,6 +37,10 @@ func (s *CacheService) Set(ctx context.Context, key, value string) {
 	s.db.WithContext(ctx).Save(&c)
 }
 
+func (s *CacheService) Delete(ctx context.Context, key string) {
+	s.db.WithContext(ctx).Where("key = ?", key).Delete(&AICache{})
+}
+
 func mindmapCacheKey(lessonID string) string   { return "mindmap:" + lessonID }
 func kgCacheKey(subjectID string) string       { return "kg:" + subjectID }
 func flashcardsCacheKey(lessonID string, count int) string {
