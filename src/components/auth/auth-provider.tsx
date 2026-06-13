@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { API_BASE } from "@/lib/api-client";
 
@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loggingInRef = useRef(false);
   const supabase = createClient();
 
   // Fetch local user profile from backend after Supabase session is established
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (loggingInRef.current) return; // login() tự gọi fetchLocalUser rồi, tránh trùng lặp
       if (session) {
         fetchLocalUser(session.user as SupabaseSessionUser, session.access_token);
       } else {
@@ -113,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<User> => {
     setError(null);
+    loggingInRef.current = true;
     try {
       const { data, error: signInError } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
@@ -136,6 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
       setError(message);
       throw err;
+    } finally {
+      loggingInRef.current = false;
     }
   };
 

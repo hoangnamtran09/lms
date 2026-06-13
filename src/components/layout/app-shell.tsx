@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StreakBadge } from "@/components/gamification/streak-badge";
 import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 import { bridge } from "@/lib/study-session-bridge";
@@ -197,10 +198,58 @@ function LessonInfoSidebar({ lessonId }: { lessonId: string }) {
   );
 }
 
+function AuthLoadingSkeleton() {
+  return (
+    <div className="flex min-h-screen">
+      {/* Sidebar skeleton */}
+      <aside className="hidden lg:flex lg:w-[260px] lg:shrink-0 lg:flex-col lg:border-r lg:border-border lg:bg-white sticky top-0 h-screen p-4 gap-3">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-5 w-48" delay={100} />
+        <Skeleton className="h-5 w-40" delay={150} />
+        <Skeleton className="h-5 w-44" delay={200} />
+        <Skeleton className="h-5 w-36" delay={250} />
+        <div className="mt-4 space-y-2">
+          <Skeleton className="h-8 w-full rounded-lg" delay={300} />
+          <Skeleton className="h-8 w-full rounded-lg" delay={350} />
+          <Skeleton className="h-8 w-full rounded-lg" delay={400} />
+        </div>
+      </aside>
+      {/* Main area skeleton */}
+      <div className="flex flex-1 flex-col min-w-0">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-white px-6">
+          <Skeleton className="h-5 w-24" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-6 w-px" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+        </header>
+        <main className="flex-1 px-4 py-6 lg:px-6">
+          <div className="max-w-6xl space-y-6">
+            <Skeleton className="h-10 w-56" />
+            <Skeleton className="h-5 w-80" delay={80} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} delay={120 + i * 100} className="h-36 rounded-2xl" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const lessonId = parseLessonPath(pathname);
   const isLessonViewer = lessonId !== null;
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <AuthLoadingSkeleton />;
+  }
 
   return (
     <ActiveQuizProvider>
