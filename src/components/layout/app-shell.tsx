@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BookLoader } from "@/components/ui/book-loader";
 import { StreakBadge } from "@/components/gamification/streak-badge";
 import { LessonInfoPanel } from "@/components/lessons/lesson-info-panel";
 import { bridge } from "@/lib/study-session-bridge";
@@ -225,15 +226,10 @@ function AuthLoadingSkeleton() {
             <Skeleton className="h-8 w-8 rounded-full" />
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 lg:px-6">
-          <div className="max-w-6xl space-y-6">
-            <Skeleton className="h-10 w-56" />
-            <Skeleton className="h-5 w-80" delay={80} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} delay={120 + i * 100} className="h-36 rounded-2xl" />
-              ))}
-            </div>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-6">
+            <BookLoader />
+            <p className="text-sm text-muted-foreground animate-pulse">Đang tải dữ liệu...</p>
           </div>
         </main>
       </div>
