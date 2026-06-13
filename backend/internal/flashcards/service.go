@@ -74,14 +74,18 @@ func (s *Service) ListDecks(ctx context.Context, userID string) ([]FlashcardDeck
 	return decks, err
 }
 
-func (s *Service) GetDeck(ctx context.Context, deckID, userID string) (*FlashcardDeck, []Flashcard, error) {
+func (s *Service) GetDeck(ctx context.Context, deckID, userID string, allCards bool) (*FlashcardDeck, []Flashcard, error) {
 	var deck FlashcardDeck
 	if err := s.db.WithContext(ctx).Where("id = ? AND user_id = ?", deckID, userID).First(&deck).Error; err != nil {
 		return nil, nil, err
 	}
 	now := time.Now()
 	var cards []Flashcard
-	if err := s.db.WithContext(ctx).Where("deck_id = ? AND next_review_date <= ?", deckID, now).Order("next_review_date ASC").Find(&cards).Error; err != nil {
+	q := s.db.WithContext(ctx).Where("deck_id = ?", deckID)
+	if !allCards {
+		q = q.Where("next_review_date <= ?", now)
+	}
+	if err := q.Order("created_at ASC").Find(&cards).Error; err != nil {
 		return nil, nil, err
 	}
 	if cards == nil {

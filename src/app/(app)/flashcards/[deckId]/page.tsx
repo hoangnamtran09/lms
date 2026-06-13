@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MathText } from "@/components/ai/math-text";
-import { ArrowLeft, CheckCircle2, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, AlertCircle, Sparkles, Eye } from "lucide-react";
 
 interface Deck {
   id: string;
@@ -28,8 +28,11 @@ interface DeckData {
   totalCards: number;
 }
 
+type Mode = "review" | "browse";
+
 export default function FlashcardReviewPage({ params }: { params: Promise<{ deckId: string }> }) {
   const { deckId } = use(params);
+  const [mode, setMode] = useState<Mode>("review");
   const [data, setData] = useState<DeckData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,19 +42,24 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
   const [submitting, setSubmitting] = useState(false);
   const [stats, setStats] = useState({ easy: 0, medium: 0, hard: 0 });
 
-  useEffect(() => {
-    async function fetchDeck() {
-      try {
-        const result = await api<DeckData>(`/api/flashcards/decks/${deckId}`);
-        setData(result);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Không thể tải bộ thẻ");
-      } finally {
-        setLoading(false);
-      }
+  const fetchDeck = async (allCards = false) => {
+    setLoading(true);
+    try {
+      const url = allCards
+        ? `/api/flashcards/decks/${deckId}?all=true`
+        : `/api/flashcards/decks/${deckId}`;
+      const result = await api<DeckData>(url);
+      setData(result);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể tải bộ thẻ");
+    } finally {
+      setLoading(false);
     }
-    fetchDeck();
-  }, [deckId]);
+  };
+
+  useEffect(() => {
+    fetchDeck(mode === "browse");
+  }, [deckId, mode]);
 
   async function handleReview(difficulty: "easy" | "medium" | "hard") {
     const card = data?.cards[currentIndex];
@@ -73,6 +81,13 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
       setFlipped(false);
     }
     setSubmitting(false);
+  }
+
+  function startBrowse() {
+    setMode("browse");
+    setCurrentIndex(0);
+    setFlipped(false);
+    setCompleted(false);
   }
 
   if (loading) {
@@ -99,7 +114,8 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
     );
   }
 
-  if (completed) {
+  // ---- Completed Review ----
+  if (mode === "review" && completed) {
     return (
       <div className="flex flex-col items-center py-16 animate-fade-in">
         <div className="size-20 rounded-full bg-green-50 flex items-center justify-center mb-6">
@@ -123,22 +139,54 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
           </div>
         </div>
 
-        <Link
-          href="/flashcards"
-          className="mt-8 px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          Quay lại trang Flashcards
-        </Link>
+        <div className="flex gap-3 mt-8">
+          <button
+            onClick={startBrowse}
+            className="px-6 py-2.5 rounded-lg border border-blue-300 text-blue-700 text-sm font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+          >
+            <Eye className="size-4" />
+            Xem lại tất cả thẻ
+          </button>
+          <Link
+            href="/flashcards"
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Quay lại trang Flashcards
+          </Link>
+        </div>
       </div>
     );
   }
 
-  if (!data || data.cards.length === 0) {
+  // ---- No due cards (review mode) ----
+  if (mode === "review" && (!data || data.cards.length === 0)) {
     return (
       <div className="text-center py-20">
         <Sparkles className="size-16 text-gray-200 mx-auto mb-5" />
         <p className="text-lg font-semibold text-gray-500">Bạn đã học hết các thẻ cho hôm nay!</p>
         <p className="text-sm text-gray-400 mt-1">Quay lại vào ngày mai để ôn tập tiếp</p>
+        <div className="flex gap-3 justify-center mt-6">
+          <button
+            onClick={startBrowse}
+            className="px-4 py-2 rounded-lg border border-blue-300 text-blue-700 text-sm font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+          >
+            <Eye className="size-4" />
+            Xem lại tất cả thẻ ({data?.totalCards || 0})
+          </button>
+          <Link href="/flashcards" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            Quay lại
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Browse mode: no cards at all ----
+  if (mode === "browse" && (!data || data.cards.length === 0)) {
+    return (
+      <div className="text-center py-20">
+        <AlertCircle className="size-16 text-gray-200 mx-auto mb-5" />
+        <p className="text-lg font-semibold text-gray-500">Bộ thẻ này chưa có thẻ nào</p>
         <Link href="/flashcards" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
           Quay lại
         </Link>
@@ -146,19 +194,26 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
     );
   }
 
-  const card = data.cards[currentIndex];
-  const progress = ((currentIndex) / data.cards.length) * 100;
+  const card = data!.cards[currentIndex];
+  const total = data!.cards.length;
+  const progress = total > 0 ? (currentIndex / total) * 100 : 0;
 
   return (
     <div className="max-w-lg mx-auto space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <Link href="/flashcards" className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600">
           <ArrowLeft className="size-3" />
           Thoát
         </Link>
-        <span className="text-sm text-gray-400">
-          {currentIndex + 1} / {data.cards.length}
-        </span>
+        <div className="flex items-center gap-2">
+          {mode === "browse" && (
+            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Xem lại</span>
+          )}
+          <span className="text-sm text-gray-400">
+            {currentIndex + 1} / {total}
+          </span>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -169,11 +224,42 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
         />
       </div>
 
+      {/* Deck title (browse mode) */}
+      {mode === "browse" && data?.deck && (
+        <p className="text-sm font-semibold text-gray-700 text-center">{data.deck.title}</p>
+      )}
+
+      {/* Nav buttons (browse mode) */}
+      {mode === "browse" && (
+        <div className="flex justify-between">
+          <button
+            onClick={() => { if (currentIndex > 0) { setCurrentIndex(i => i - 1); setFlipped(false); } }}
+            disabled={currentIndex === 0}
+            className="text-sm text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
+          >
+            ← Thẻ trước
+          </button>
+          <button
+            onClick={() => { setFlipped(!flipped); }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            {flipped ? "Ẩn đáp án" : "Xem đáp án"}
+          </button>
+          <button
+            onClick={() => { if (currentIndex < total - 1) { setCurrentIndex(i => i + 1); setFlipped(false); } }}
+            disabled={currentIndex === total - 1}
+            className="text-sm text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
+          >
+            Thẻ sau →
+          </button>
+        </div>
+      )}
+
       {/* Flip Card */}
       <div
-        className="flip-card cursor-pointer select-none"
+        className={`flip-card ${mode === "browse" ? "cursor-pointer" : "cursor-pointer"} select-none`}
         style={{ perspective: "1000px" }}
-        onClick={() => !submitting && setFlipped(!flipped)}
+        onClick={() => mode === "browse" && setFlipped(!flipped)}
       >
         <div
           className="flip-card-inner relative w-full transition-transform duration-500"
@@ -192,7 +278,9 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
             <div className="text-lg font-semibold text-gray-900 text-center leading-relaxed">
               <MathText text={card.question} />
             </div>
-            <p className="absolute bottom-4 text-xs text-gray-400">Nhấn để lật thẻ</p>
+            <p className="absolute bottom-4 text-xs text-gray-400">
+              {mode === "browse" ? "Nhấn để lật thẻ" : "Nhấn để lật thẻ"}
+            </p>
           </div>
 
           {/* Back — Answer */}
@@ -211,8 +299,8 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
         </div>
       </div>
 
-      {/* Difficulty buttons */}
-      {flipped && (
+      {/* Difficulty buttons — review mode only */}
+      {mode === "review" && flipped && (
         <div className="flex gap-3 justify-center animate-fade-in">
           <button
             onClick={() => handleReview("hard")}
@@ -235,6 +323,19 @@ export default function FlashcardReviewPage({ params }: { params: Promise<{ deck
           >
             {submitting ? <Loader2 className="size-4 animate-spin mx-auto" /> : "Dễ"}
           </button>
+        </div>
+      )}
+
+      {/* Browse mode: card navigation at bottom too */}
+      {mode === "browse" && total > 1 && (
+        <div className="flex justify-center gap-1">
+          {Array.from({ length: total }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => { setCurrentIndex(i); setFlipped(false); }}
+              className={`size-2 rounded-full transition-all ${i === currentIndex ? "bg-blue-600 scale-125" : "bg-gray-300 hover:bg-gray-400"}`}
+            />
+          ))}
         </div>
       )}
     </div>

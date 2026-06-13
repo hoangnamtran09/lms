@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Layers, Plus, ChevronRight, Loader2, Trash2, Upload, FileText, X } from "lucide-react";
+import { Layers, Plus, ChevronRight, Loader2, Trash2, Upload, FileText, X, Sparkles } from "lucide-react";
 
 interface Deck {
   id: string;
@@ -32,6 +32,16 @@ interface Course {
   title: string;
 }
 
+function extractLessonNumber(title: string): number {
+  // Extract "Bài 1", "Bài 2", etc. from title
+  const match = title.match(/[Bb]ài\s*(\d+)/);
+  if (match) return parseInt(match[1], 10);
+  // Fallback: any leading number
+  const numMatch = title.match(/^(\d+)/);
+  if (numMatch) return parseInt(numMatch[1], 10);
+  return Infinity; // items without numbers go last
+}
+
 export default function FlashcardsPage() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +54,8 @@ export default function FlashcardsPage() {
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
   const [cardCount, setCardCount] = useState(10);
+  const [createMode, setCreateMode] = useState<"ai" | "manual">("ai");
+  const [manualText, setManualText] = useState("");
   const [creating, setCreating] = useState(false);
 
   // Import modal state
@@ -147,8 +159,8 @@ export default function FlashcardsPage() {
 
   async function loadImportLessonData() {
     try {
-      const subj = await api<Subject[]>("/api/subjects");
-      setImportSubjects(subj);
+      const s = await api<Subject[]>("/api/subjects");
+      setImportSubjects(Array.isArray(s) ? s : []);
     } catch {}
   }
 
@@ -157,8 +169,8 @@ export default function FlashcardsPage() {
     setImportCourseId("");
     setImportLessonId("");
     try {
-      const c = await api<Course[]>(`/api/courses?subjectId=${id}`);
-      setImportCourses(c);
+      const res = await api<{ data: Course[] } | Course[]>(`/api/courses?subjectId=${id}`);
+      setImportCourses(Array.isArray(res) ? res : res.data || []);
     } catch { setImportCourses([]); }
   }
 
@@ -167,7 +179,7 @@ export default function FlashcardsPage() {
     setImportLessonId("");
     try {
       const l = await api<Lesson[]>(`/api/lessons?courseId=${id}`);
-      setImportLessons(l);
+      setImportLessons(Array.isArray(l) ? l : []);
     } catch { setImportLessons([]); }
   }
 
@@ -225,8 +237,8 @@ export default function FlashcardsPage() {
   async function loadCreateData() {
     setShowCreate(true);
     try {
-      const subj = await api<Subject[]>("/api/subjects");
-      setSubjects(subj);
+      const s = await api<Subject[]>("/api/subjects");
+      setSubjects(Array.isArray(s) ? s : []);
     } catch {}
   }
 
@@ -234,10 +246,29 @@ export default function FlashcardsPage() {
     setSelectedSubjectId(id);
     setSelectedCourseId("");
     setSelectedLessonId("");
+    setLessons([]);
     try {
-      const c = await api<Course[]>(`/api/courses?subjectId=${id}`);
-      setCourses(c);
-    } catch { setCourses([]); }
+      const res = await api<{ data: Course[] } | Course[]>(`/api/courses?subjectId=${id}`);
+      const courseList = Array.isArray(res) ? res : res.data || [];
+      setCourses(courseList);
+      // Auto-fetch lessons from all courses under this subject
+      const allLessons: Lesson[] = [];
+      for (const c of courseList) {
+        try {
+          const l = await api<Lesson[]>(`/api/lessons?courseId=${c.id}`);
+          const arr = Array.isArray(l) ? l : [];
+          allLessons.push(...arr);
+        } catch { /* skip */ }
+      }
+      // Sort by sortOrder then by title (Bài 1, Bài 2, ...)
+      allLessons.sort((a, b) => {
+        const aNum = extractLessonNumber(a.title);
+        const bNum = extractLessonNumber(b.title);
+        if (aNum !== bNum) return aNum - bNum;
+        return a.title.localeCompare(b.title, "vi");
+      });
+      setLessons(allLessons);
+    } catch { setCourses([]); setLessons([]); }
   }
 
   async function handleCourseChange(id: string) {
@@ -245,7 +276,7 @@ export default function FlashcardsPage() {
     setSelectedLessonId("");
     try {
       const l = await api<Lesson[]>(`/api/lessons?courseId=${id}`);
-      setLessons(l);
+      setLessons(Array.isArray(l) ? l : []);
     } catch { setLessons([]); }
   }
 
@@ -255,7 +286,7 @@ export default function FlashcardsPage() {
     try {
       const gen = await api<{ cards: { id: string; question: string; answer: string }[]; lessonTitle: string; subjectName: string }>(
         "/api/ai/flashcards/generate",
-        { method: "POST", body: JSON.stringify({ lessonId: selectedLessonId, count: cardCount }) }
+        { method: "POST", body: JSON.stringify({ lessonId: selectedLessonId, count: cardCount }), timeout: 120000 }
       );
 
       await api<Deck>("/api/flashcards/decks", {
@@ -268,12 +299,73 @@ export default function FlashcardsPage() {
       });
 
       setShowCreate(false);
+      resetCreateForm();
       fetchDecks();
     } catch (err: unknown) {
       alert("Lỗi tạo bộ thẻ: " + (err instanceof Error ? err.message : "Unknown"));
     } finally {
       setCreating(false);
     }
+  }
+
+  // Manual cards parsed from text input (reuse same parser)
+  const manualCards = (() => {
+    const lines = manualText.split("\n").filter((l) => l.trim());
+    if (lines.length === 0) return [];
+    const first = lines[0];
+    const seps = ["\x1f", "\t", "|"];
+    let bestSep = "|";
+    let bestCount = 0;
+    for (const sep of seps) {
+      const count = first.split(sep).length - 1;
+      if (count > bestCount) { bestCount = count; bestSep = sep; }
+    }
+    if (bestCount === 0) bestSep = "|";
+    return lines.map((line) => {
+      const sepIdx = line.indexOf(bestSep);
+      if (sepIdx === -1) return { question: line.trim(), answer: "" };
+      return {
+        question: line.slice(0, sepIdx).trim(),
+        answer: line.slice(sepIdx + bestSep.length).trim(),
+      };
+    }).filter((c) => c.question);
+  })();
+
+  async function handleCreateManual() {
+    if (!selectedLessonId || manualCards.length === 0) return;
+    setCreating(true);
+    try {
+      // Find lesson title from the lessons list
+      const lessonTitle = lessons.find((l) => l.id === selectedLessonId)?.title || "Bài học";
+
+      await api<Deck>("/api/flashcards/decks", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId: selectedLessonId,
+          title: `Thẻ học: ${lessonTitle}`,
+          cards: manualCards.map((c) => ({ question: c.question, answer: c.answer })),
+        }),
+      });
+
+      setShowCreate(false);
+      resetCreateForm();
+      fetchDecks();
+    } catch (err: unknown) {
+      alert("Lỗi tạo bộ thẻ: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function resetCreateForm() {
+    setSelectedSubjectId("");
+    setSelectedCourseId("");
+    setSelectedLessonId("");
+    setCardCount(10);
+    setCreateMode("ai");
+    setManualText("");
+    setCourses([]);
+    setLessons([]);
   }
 
   async function handleDelete(deckId: string) {
@@ -405,9 +497,32 @@ export default function FlashcardsPage() {
 
       {/* Create Deck Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Tạo bộ thẻ mới</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowCreate(false); resetCreateForm(); }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Tạo bộ thẻ mới</h2>
+              <button onClick={() => { setShowCreate(false); resetCreateForm(); }} className="text-gray-400 hover:text-gray-600">
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Mode tabs */}
+            <div className="flex border-b border-gray-200 mb-4">
+              <button
+                onClick={() => setCreateMode("ai")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${createMode === "ai" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <Sparkles className="size-4 inline mr-1" />
+                Tạo bằng AI
+              </button>
+              <button
+                onClick={() => setCreateMode("manual")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${createMode === "manual" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <FileText className="size-4 inline mr-1" />
+                Tự nhập thẻ
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div>
@@ -422,65 +537,83 @@ export default function FlashcardsPage() {
                 </select>
               </div>
 
-              {courses.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Khoá học</label>
-                  <select
-                    value={selectedCourseId}
-                    onChange={(e) => handleCourseChange(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
-                  >
-                    <option value="">Chọn khoá học</option>
-                    {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {lessons.length > 0 && (
+              {selectedSubjectId && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bài học</label>
                   <select
                     value={selectedLessonId}
                     onChange={(e) => setSelectedLessonId(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
+                    disabled={lessons.length === 0}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    <option value="">Chọn bài học</option>
+                    <option value="">{lessons.length === 0 ? "Đang tải..." : "Chọn bài học"}</option>
                     {lessons.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
                   </select>
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng thẻ: {cardCount}</label>
-                <input
-                  type="range"
-                  min={5}
-                  max={20}
-                  value={cardCount}
-                  onChange={(e) => setCardCount(Number(e.target.value))}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-400">
-                  <span>5</span><span>20</span>
+              {createMode === "ai" ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng thẻ: {cardCount}</label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={20}
+                    value={cardCount}
+                    onChange={(e) => setCardCount(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>5</span><span>20</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nhập thẻ <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={manualText}
+                    onChange={(e) => setManualText(e.target.value)}
+                    placeholder={"Mỗi dòng một thẻ, phân cách câu hỏi và câu trả lời bằng dấu | hoặc tab\n\nVD:\nThủ đô của Việt Nam là gì?|Hà Nội\nCông thức tính diện tích hình tròn?|S = πr²"}
+                    rows={6}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-y"
+                  />
+                  {manualCards.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Đã nhập {manualCards.length} thẻ
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={() => { setShowCreate(false); resetCreateForm(); }}
                 className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Huỷ
               </button>
-              <button
-                onClick={handleCreate}
-                disabled={!selectedLessonId || creating}
-                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {creating ? <Loader2 className="size-4 animate-spin" /> : null}
-                {creating ? "Đang tạo..." : "Tạo bằng AI"}
-              </button>
+              {createMode === "ai" ? (
+                <button
+                  onClick={handleCreate}
+                  disabled={!selectedLessonId || creating}
+                  className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {creating ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {creating ? "Đang tạo..." : "Tạo bằng AI"}
+                </button>
+              ) : (
+                <button
+                  onClick={handleCreateManual}
+                  disabled={!selectedLessonId || manualCards.length === 0 || creating}
+                  className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {creating ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {creating ? "Đang tạo..." : `Tạo bộ thẻ (${manualCards.length})`}
+                </button>
+              )}
             </div>
           </div>
         </div>

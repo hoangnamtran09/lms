@@ -89,7 +89,9 @@ func (h *Handler) GetDeck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deckID := chi.URLParam(r, "id")
-	deck, cards, err := h.service.GetDeck(r.Context(), deckID, claims.UserID)
+	allCards := r.URL.Query().Get("all") == "true"
+
+	deck, cards, err := h.service.GetDeck(r.Context(), deckID, claims.UserID, allCards)
 	if err != nil {
 		jsonErr(w, "Không tìm thấy bộ thẻ", http.StatusNotFound)
 		return

@@ -97,7 +97,8 @@ func extractJSON(raw string) string {
 // sanitizeJSONString replaces raw control characters that are invalid inside JSON strings.
 func sanitizeJSONString(s string) string {
 	// Replace raw tabs, carriage returns, and other control chars (except \n)
-	// within JSON string values. We keep \n as it may appear escaped.
+	// within JSON string values. Also handles LaTeX backslash sequences
+	// like \alpha, \Delta, \beta that are not valid JSON escapes.
 	var b strings.Builder
 	b.Grow(len(s))
 	inString := false
@@ -105,24 +106,16 @@ func sanitizeJSONString(s string) string {
 	for _, r := range s {
 		if escaped {
 			escaped = false
-			switch r {
-			case 'b', 'f', 'n', 'r', 't':
-				// LaTeX commands like \beta, \frac, \neq, \rightarrow, \times
-				// collide with JSON escapes. Double-escape so json.Unmarshal
-				// preserves them as literal \b, \f, \n, \r, \t.
-				b.WriteString("\\\\")
-				b.WriteRune(r)
-			case '"', '\\', '/', 'u':
-				b.WriteRune(r)
-			default:
-				b.WriteString("\\\\")
-				b.WriteRune(r)
-			}
+			// Previous char was \ inside a string.
+			// Double-escape so json.Unmarshal preserves literal backslash.
+			// \a  →  \\a  (JSON for literal "\a")
+			b.WriteString("\\\\")
+			b.WriteRune(r)
 			continue
 		}
 		if r == '\\' && inString {
 			escaped = true
-			b.WriteRune(r)
+			// Don't write the backslash yet — let the escaped handler decide
 			continue
 		}
 		if r == '"' {

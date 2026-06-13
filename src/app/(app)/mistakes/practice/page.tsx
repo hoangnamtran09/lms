@@ -78,6 +78,7 @@ function PracticeContent() {
           subjectName,
           lessonTitle,
         }),
+        timeout: 120000,
       });
       setQuestions(data.questions || []);
     } catch (e) {
