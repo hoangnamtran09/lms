@@ -696,40 +696,8 @@ export default function AssignmentDetailPage({
                 </section>
               )}
 
-              {/* ── Phản hồi từ giáo viên ── */}
-              {gradingDetails.length === 0 ? (
-                mySubmission.feedback ? (
-                  <section className="bg-white rounded-2xl border-l-8 border-emerald-500 shadow-sm p-8 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 opacity-5 -mr-4 -mt-4 text-[100px]">💬</div>
-                    <div className="flex items-center gap-3 mb-6 relative">
-                      <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><MessageCircle className="size-5" /></div>
-                      <h3 className="text-2xl font-semibold text-gray-900">Phản hồi từ giáo viên</h3>
-                    </div>
-                    <div className="flex gap-4 relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-primary shrink-0"><User className="size-5" /></div>
-                      <div>
-                        <p className="font-bold text-gray-900">{assignment.creatorName || "Giáo viên"}</p>
-                        <p className="text-gray-600 leading-relaxed italic bg-gray-50 p-4 rounded-xl mt-2 text-sm">"{mySubmission.feedback}"</p>
-                      </div>
-                    </div>
-                  </section>
-                ) : (
-                  <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-gray-100 rounded-lg text-gray-400"><MessageCircle className="size-5" /></div>
-                      <h3 className="text-2xl font-semibold text-gray-900">Phản hồi từ giáo viên</h3>
-                    </div>
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <MessageCircle className="size-10 text-gray-300" />
-                      </div>
-                      <p className="text-lg font-semibold text-gray-700 mb-1">Chưa có nhận xét</p>
-                      <p className="text-sm text-gray-400 max-w-xs mx-auto">Vui lòng quay lại sau khi giáo viên đã hoàn thành việc chấm bài.</p>
-                    </div>
-                  </section>
-                )
-              ) : (
-                /* ── Đánh giá chi tiết (per-question, with teacher feedback inline) ── */
+              {/* ── Đánh giá chi tiết ── */}
+              {gradingDetails.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <CheckCircle2 className="size-5 text-emerald-500" /> Đánh giá chi tiết
@@ -783,40 +751,43 @@ export default function AssignmentDetailPage({
             {/* ── Grade Card (when scored) ── */}
             {mySubmission && mySubmission.score != null && (
               <>
-                <div className="bg-primary p-6 rounded-2xl text-white shadow-xl relative overflow-hidden text-center">
+                <div className="bg-primary rounded-2xl text-white shadow-xl relative overflow-hidden text-center p-2">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary to-blue-700 opacity-50" />
-                  <div className="relative z-10">
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-200 mb-6">Kết quả cuối cùng</p>
-                    <div className="relative inline-flex items-center justify-center mb-6">
-                      <svg className="w-36 h-36 -rotate-90">
-                        <circle className="text-white/10" cx="72" cy="72" r="64" fill="transparent" stroke="currentColor" strokeWidth="8" />
-                        <circle className="text-emerald-400 transition-all duration-1000" cx="72" cy="72" r="64" fill="transparent" stroke="currentColor"
-                          strokeWidth="8" strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 64}`}
-                          strokeDashoffset={`${2 * Math.PI * 64 * (1 - Math.min(mySubmission.score / assignment.maxScore, 1))}`}
+                  <div className="relative z-10 py-4 px-6">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-200 mb-4">Kết quả cuối cùng</p>
+                    <div className="relative inline-flex items-center justify-center mb-4">
+                      <svg className="w-32 h-32 -rotate-90">
+                        <circle className="text-white/10" cx="64" cy="64" r="56" fill="transparent" stroke="currentColor" strokeWidth="6" />
+                        <circle className="text-emerald-400 transition-all duration-1000" cx="64" cy="64" r="56" fill="transparent" stroke="currentColor"
+                          strokeWidth="6" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 56}`}
+                          strokeDashoffset={`${2 * Math.PI * 56 * (1 - Math.min(mySubmission.score / assignment.maxScore, 1))}`}
                         />
                       </svg>
                       <div className="absolute flex flex-col items-center">
                         <span className="text-4xl font-extrabold">{mySubmission.score}</span>
-                        <span className="text-sm opacity-70">trên {assignment.maxScore}</span>
+                        <span className="text-xs font-medium opacity-80">trên {assignment.maxScore}</span>
                       </div>
                     </div>
-                    <h4 className="text-xl font-bold mb-1">
+                    <h4 className="text-lg font-bold mb-1">
                       {mySubmission.score >= assignment.maxScore * 0.9 ? "Xuất sắc!" : mySubmission.score >= assignment.maxScore * 0.8 ? "Giỏi!" : mySubmission.score >= assignment.maxScore * 0.5 ? "Khá!" : "Cần cải thiện"}
                     </h4>
-                    <p className="text-sm text-blue-200 mb-6">
-                      {mySubmission.score >= assignment.maxScore * 0.8 ? "Bạn làm rất tốt!" : "Hãy cố gắng hơn nhé!"}
+                    <p className="text-xs text-blue-200 mb-4">
+                      {mySubmission.score >= assignment.maxScore * 0.8 ? "Bạn nằm trong top đầu của lớp" : "Hãy cố gắng hơn ở lần sau nhé!"}
                     </p>
+                    <button className="w-full py-2 bg-white text-primary font-bold rounded-lg shadow-md hover:bg-blue-50 transition-all text-sm">
+                      Xem bảng xếp hạng
+                    </button>
                   </div>
                 </div>
 
                 {/* Stats Card */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <h4 className="font-bold text-gray-900 mb-4">Chi tiết</h4>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                  <h4 className="font-bold text-gray-900 mb-4">Chi tiết điểm số</h4>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Trạng thái</span>
-                      <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium"><CheckCircle2 className="size-4" /> {hasDueDate && !overdue ? "Đúng hạn" : "Đã nộp"}</span>
+                      <span className="text-gray-500 text-sm">Đúng hạn</span>
+                      <span className="text-emerald-600">{hasDueDate && !overdue ? "✓" : "—"}</span>
                     </div>
                     {gradingDetails.length > 0 && (
                       <div className="flex justify-between items-center">
@@ -912,6 +883,42 @@ export default function AssignmentDetailPage({
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* ── Phản hồi từ giáo viên (right sidebar) ── */}
+            {mySubmission && gradingDetails.length === 0 && (
+              mySubmission.feedback ? (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600"><MessageCircle className="size-4" /></div>
+                    <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
+                  </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-primary shrink-0"><User className="size-4" /></div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-900">{assignment.creatorName || "Giáo viên"}</p>
+                      <p className="text-xs text-gray-400">{mySubmission.gradedAt ? formatDate(mySubmission.gradedAt) : ""}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed italic bg-gray-50 p-3 rounded-xl border-l-4 border-emerald-500">
+                    "{mySubmission.feedback}"
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-gray-100 rounded-lg text-gray-400"><MessageCircle className="size-4" /></div>
+                    <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
+                  </div>
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <MessageCircle className="size-8 text-gray-300" />
+                    </div>
+                    <p className="font-semibold text-gray-700 text-sm mb-1">Chưa có nhận xét</p>
+                    <p className="text-xs text-gray-400 max-w-xs mx-auto">Vui lòng quay lại sau khi giáo viên đã hoàn thành việc chấm bài.</p>
+                  </div>
+                </div>
+              )
             )}
 
             {/* ── Question Navigation Grid ── */}
