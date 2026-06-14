@@ -7,7 +7,6 @@ import {
   Send,
   FileText,
   Check,
-  CheckCircle2,
   X,
   Upload,
   Loader2,
@@ -85,6 +84,13 @@ function fileNameFromUrl(url: string): string {
   } catch {
     return "Tài liệu";
   }
+}
+
+function extractTeacherFeedback(feedback: string): string {
+  const bracketIdx = feedback.indexOf("[");
+  if (bracketIdx === 0) return "";
+  const text = bracketIdx > 0 ? feedback.substring(0, bracketIdx).trim() : feedback.trim();
+  return text.replace(/^Tổng điểm:.*?\n/, "").trim();
 }
 
 // ---- Component ------------------------------------------------------------
@@ -696,51 +702,6 @@ export default function AssignmentDetailPage({
                 </section>
               )}
 
-              {/* ── Đánh giá chi tiết ── */}
-              {gradingDetails.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <CheckCircle2 className="size-5 text-emerald-500" /> Đánh giá chi tiết
-                  </h3>
-                  {gradingDetails.map((detail, i) => {
-                    const isCorrect = detail.feedback === "Đúng";
-                    const q = questions.find((q) => q.id === detail.questionId);
-                    const mcq = q ? isMcqQuestion(q) : false;
-                    const options = q ? (q.options && q.options.length > 0 ? q.options : parseInlineMcqOptions(q.question)) : [];
-                    const studentAnswerIdx = (() => {
-                      if (!mySubmission?.content) return -1;
-                      try { const p = JSON.parse(mySubmission.content); const a = p.answers?.find((a: {questionId:string; answer:string}) => a.questionId === detail.questionId); if (a?.answer && a.answer.length === 1) return a.answer.toUpperCase().charCodeAt(0)-65; } catch {} return -1;
-                    })();
-                    return (
-                      <div key={detail.questionId} className={`bg-white rounded-2xl p-5 border shadow-sm ${isCorrect ? "border-green-200" : "border-red-200"}`}>
-                        <div className="flex items-start gap-3 mb-3">
-                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${isCorrect ? "bg-green-500" : "bg-red-500"}`}>{i+1}</span>
-                          <div>
-                            <p className="font-medium text-gray-900">{detail.question}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant={isCorrect ? "default" : "destructive"} className="text-xs">{isCorrect ? "Đúng" : "Sai"}</Badge>
-                              <span className="text-xs text-gray-400">{detail.score}/{detail.maxScore} điểm</span>
-                            </div>
-                          </div>
-                        </div>
-                        {mcq && (
-                          <div className="ml-11 grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {options.map((opt, oi) => (
-                              <span key={oi} className={`text-xs px-3 py-2 rounded-lg border ${studentAnswerIdx===oi ? (isCorrect ? "bg-green-50 border-green-300 text-green-700" : "bg-red-50 border-red-300 text-red-700") : "bg-gray-50 border-gray-200 text-gray-400"}`}>{String.fromCharCode(65+oi)}. {opt.text} {studentAnswerIdx===oi ? (isCorrect ? "✓" : "✗") : ""}</span>
-                            ))}
-                          </div>
-                        )}
-                        {!isCorrect && detail.correctAnswer && (
-                          <p className="ml-11 mt-2 text-xs text-gray-600">Đáp án đúng: <span className="font-medium">{detail.correctAnswer}</span></p>
-                        )}
-                        {detail.feedback && detail.feedback !== "Đúng" && detail.feedback !== "Sai" && (
-                          <p className="ml-11 mt-2 text-xs text-gray-700 bg-blue-50 p-3 rounded-xl border border-blue-100"><span className="font-medium">Nhận xét: </span>{detail.feedback}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -886,39 +847,56 @@ export default function AssignmentDetailPage({
             )}
 
             {/* ── Phản hồi từ giáo viên (right sidebar) ── */}
-            {mySubmission && gradingDetails.length === 0 && (
-              mySubmission.feedback ? (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600"><MessageCircle className="size-4" /></div>
-                    <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
+            {mySubmission && (
+              (() => {
+                const feedbackText = mySubmission.feedback ? extractTeacherFeedback(mySubmission.feedback) : "";
+                return feedbackText ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600"><MessageCircle className="size-4" /></div>
+                      <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
+                    </div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-primary shrink-0"><User className="size-4" /></div>
+                      <div>
+                        <p className="font-bold text-sm text-gray-900">{assignment.creatorName || "Giáo viên"}</p>
+                        <p className="text-xs text-gray-400">{mySubmission.gradedAt ? formatDate(mySubmission.gradedAt) : ""}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed italic bg-gray-50 p-3 rounded-xl border-l-4 border-emerald-500">
+                      "{feedbackText}"
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-primary shrink-0"><User className="size-4" /></div>
-                    <div>
-                      <p className="font-bold text-sm text-gray-900">{assignment.creatorName || "Giáo viên"}</p>
-                      <p className="text-xs text-gray-400">{mySubmission.gradedAt ? formatDate(mySubmission.gradedAt) : ""}</p>
+                ) : mySubmission.score != null ? (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-gray-100 rounded-lg text-gray-400"><MessageCircle className="size-4" /></div>
+                      <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
+                    </div>
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <MessageCircle className="size-8 text-gray-300" />
+                      </div>
+                      <p className="font-semibold text-gray-700 text-sm mb-1">Chưa có nhận xét</p>
+                      <p className="text-xs text-gray-400 max-w-xs mx-auto">Vui lòng quay lại sau khi giáo viên đã hoàn thành việc chấm bài.</p>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed italic bg-gray-50 p-3 rounded-xl border-l-4 border-emerald-500">
-                    "{mySubmission.feedback}"
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-gray-100 rounded-lg text-gray-400"><MessageCircle className="size-4" /></div>
-                    <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
-                  </div>
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                      <MessageCircle className="size-8 text-gray-300" />
+                ) : (
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-1.5 bg-gray-100 rounded-lg text-gray-400"><MessageCircle className="size-4" /></div>
+                      <h4 className="font-bold text-gray-900 text-sm">Phản hồi từ giáo viên</h4>
                     </div>
-                    <p className="font-semibold text-gray-700 text-sm mb-1">Chưa có nhận xét</p>
-                    <p className="text-xs text-gray-400 max-w-xs mx-auto">Vui lòng quay lại sau khi giáo viên đã hoàn thành việc chấm bài.</p>
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <MessageCircle className="size-8 text-gray-300" />
+                      </div>
+                      <p className="font-semibold text-gray-700 text-sm mb-1">Chưa có nhận xét</p>
+                      <p className="text-xs text-gray-400 max-w-xs mx-auto">Vui lòng quay lại sau khi giáo viên đã hoàn thành việc chấm bài.</p>
+                    </div>
                   </div>
-                </div>
-              )
+                );
+              })()
             )}
 
             {/* ── Question Navigation Grid ── */}
