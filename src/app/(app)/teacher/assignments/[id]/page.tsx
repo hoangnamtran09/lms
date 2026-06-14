@@ -660,144 +660,121 @@ export default function TeacherAssignmentDetailPage({
 
       {/* Publish Dialog */}
       <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <DialogContent className="max-w-lg rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
-              {assignment.status === "DRAFT" ? "Giao bài" : "Sửa người nhận"}: {assignment.title}
+        <DialogContent className="max-w-2xl rounded-3xl p-0 overflow-hidden">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+            <DialogTitle className="text-2xl font-bold text-gray-900">
+              Chọn học sinh nhận bài
             </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5 mt-4">
+            <button onClick={() => setPublishDialogOpen(false)} className="size-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400">
+              <X className="size-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
             {/* Class selection */}
-            <div>
-              <Label className="text-sm font-bold uppercase tracking-wider text-gray-500">
-                Chọn lớp
-              </Label>
-              <Select
-                value={publishClassId}
-                onValueChange={(v) => handlePublishClassChange(v ?? "")}
-              >
-                <SelectTrigger className="rounded-xl mt-1.5 w-full">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Chọn lớp học</Label>
+              <Select value={publishClassId} onValueChange={(v) => handlePublishClassChange(v ?? "")}>
+                <SelectTrigger className="rounded-xl w-full h-12">
                   <SelectValue placeholder="Chọn lớp học..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Tất cả các lớp</SelectItem>
                   {availableClasses.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Student selection */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <Label className="text-sm font-bold uppercase tracking-wider text-gray-500">
-                  Chọn học sinh (
-                  {publishStudentIds.length > 0
-                    ? publishStudentIds.length
-                    : "cả lớp"}
-                  )
-                </Label>
-                {publishStudentIds.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPublishStudentIds([])}
-                    className="text-xs h-6 text-gray-500"
-                  >
-                    Bỏ chọn tất cả
-                  </Button>
-                )}
+            {/* Student list */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-2">
+                <h3 className="text-lg font-bold text-gray-900">Danh sách học sinh</h3>
+                <button
+                  onClick={() => {
+                    if (publishStudentIds.length === availableStudents.length) {
+                      setPublishStudentIds([]);
+                    } else {
+                      setPublishStudentIds(availableStudents.map(s => s.supabaseId));
+                    }
+                  }}
+                  className="text-primary text-sm font-semibold hover:underline"
+                >
+                  {publishStudentIds.length === availableStudents.length && availableStudents.length > 0 ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                </button>
               </div>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-2 space-y-0.5">
+              <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
                 {availableStudents.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-4">
-                    {publishClassId
-                      ? "Không có học sinh nào trong lớp này"
-                      : "Chọn lớp để xem danh sách học sinh"}
+                  <p className="text-sm text-gray-400 text-center py-8">
+                    {publishClassId ? "Không có học sinh nào trong lớp này" : "Chọn lớp để xem danh sách học sinh"}
                   </p>
                 ) : (
-                  availableStudents.map((s) => (
-                    <label
-                      key={s.id}
-                      className="flex items-center gap-2.5 px-2.5 py-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={publishStudentIds.includes(s.supabaseId)}
-                        onChange={() =>
-                          setPublishStudentIds((prev) =>
-                            prev.includes(s.supabaseId)
-                              ? prev.filter((id) => id !== s.supabaseId)
-                              : [...prev, s.supabaseId]
-                          )
-                        }
-                        className="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-sm">{s.fullName}</span>
-                    </label>
-                  ))
+                  availableStudents.map((s) => {
+                    const initials = s.fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                    const isSelected = publishStudentIds.includes(s.supabaseId);
+                    return (
+                      <label key={s.id}
+                        className={`flex items-center gap-4 p-3 rounded-2xl border cursor-pointer transition-all ${
+                          isSelected ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() =>
+                            setPublishStudentIds((prev) =>
+                              prev.includes(s.supabaseId)
+                                ? prev.filter((id) => id !== s.supabaseId)
+                                : [...prev, s.supabaseId]
+                            )
+                          }
+                          className="size-5 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm">{s.fullName}</p>
+                          <p className="text-xs text-gray-400">{s.username || s.id?.slice(0, 8)}</p>
+                        </div>
+                      </label>
+                    );
+                  })
                 )}
               </div>
-              {publishStudentIds.length > 0 &&
-                availableStudents.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Đã chọn {publishStudentIds.length}/
-                    {availableStudents.length} học sinh
-                  </p>
-                )}
-              {publishStudentIds.length === 0 &&
-                availableStudents.length > 0 && (
-                  <p className="text-xs text-amber-500 mt-1.5">
-                    Để trống = giao cho tất cả học sinh trong lớp
-                  </p>
-                )}
             </div>
+          </div>
 
-            {/* Summary */}
-            <div className="p-4 bg-gray-50 rounded-2xl text-sm text-gray-600 space-y-1">
-              <p>
-                <span className="font-semibold">Lớp:</span>{" "}
-                {publishClassId
-                  ? (availableClasses.find((c) => c.id === publishClassId)
-                      ?.name || publishClassId)
-                  : "Tất cả"}
-              </p>
-              <p>
-                <span className="font-semibold">Số học sinh:</span>{" "}
-                {publishStudentIds.length > 0
-                  ? publishStudentIds.length
-                  : "Cả lớp"}
-              </p>
-              <p>
-                <span className="font-semibold">Số câu hỏi:</span>{" "}
-                {questions.length}
-              </p>
-              <p>
-                <span className="font-semibold">Tổng điểm:</span>{" "}
-                {assignment.maxScore}
-              </p>
+          {/* Footer */}
+          <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-4">
+            <div className="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200">
+              <div className="flex gap-6">
+                <div>
+                  <p className="text-[11px] uppercase font-bold text-gray-400">Lớp</p>
+                  <p className="font-semibold text-sm text-gray-900">
+                    {publishClassId ? (availableClasses.find(c => c.id === publishClassId)?.name || publishClassId) : "Tất cả"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase font-bold text-gray-400">Đã chọn</p>
+                  <p className="font-semibold text-sm text-primary">
+                    {publishStudentIds.length > 0 ? `${publishStudentIds.length}/${availableStudents.length}` : `Cả lớp (${availableStudents.length})`}
+                  </p>
+                </div>
+              </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-2.5 pt-2">
-              <Button
-                onClick={handleConfirmPublish}
-                disabled={publishing}
-                className="gap-1.5 flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setPublishDialogOpen(false)} disabled={publishing} className="rounded-xl px-6">
+                Huỷ
+              </Button>
+              <Button onClick={handleConfirmPublish} disabled={publishing}
+                className="gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 px-8"
               >
                 <Send className="size-4" />
                 {publishing ? "Đang giao..." : "Xác nhận giao bài"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setPublishDialogOpen(false)}
-                disabled={publishing}
-                className="flex-1 rounded-xl"
-              >
-                Huỷ
               </Button>
             </div>
           </div>

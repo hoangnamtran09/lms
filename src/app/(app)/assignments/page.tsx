@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock4,
-  Sparkles,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -42,61 +41,6 @@ interface SubjectInfo {
   color: string;
   icon?: string;
 }
-
-const statusLabel: Record<string, string> = {
-  ASSIGNED: "To Do",
-  SUBMITTED: "Đang chờ",
-  GRADED: "Đã chấm",
-  RETURNED: "Cần sửa",
-  ACCEPTED: "Đã duyệt",
-};
-
-// Map status to card theme
-const statusTheme: Record<
-  string,
-  { card: string; icon: string; iconBg: string; button: string; text: string; badge: string }
-> = {
-  ASSIGNED: {
-    card: "border-gray-200",
-    icon: "text-primary",
-    iconBg: "bg-blue-50",
-    button: "bg-primary text-primary-foreground hover:bg-primary/90",
-    text: "text-primary",
-    badge: "bg-red-50 text-red-700",
-  },
-  SUBMITTED: {
-    card: "border-gray-200",
-    icon: "text-secondary",
-    iconBg: "bg-pink-50",
-    button: "border-2 border-gray-300 text-gray-600 hover:bg-gray-50",
-    text: "text-secondary",
-    badge: "bg-gray-100 text-gray-600",
-  },
-  GRADED: {
-    card: "border-gray-200",
-    icon: "text-emerald-600",
-    iconBg: "bg-emerald-50",
-    button: "bg-emerald-600 text-white hover:bg-emerald-700",
-    text: "text-emerald-600",
-    badge: "bg-emerald-50 text-emerald-700",
-  },
-  RETURNED: {
-    card: "border-red-300 border-dashed",
-    icon: "text-destructive",
-    iconBg: "bg-red-50",
-    button: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-    text: "text-destructive",
-    badge: "bg-red-50 text-red-700",
-  },
-  ACCEPTED: {
-    card: "border-gray-200",
-    icon: "text-emerald-600",
-    iconBg: "bg-emerald-50",
-    button: "bg-emerald-600 text-white hover:bg-emerald-700",
-    text: "text-emerald-600",
-    badge: "bg-emerald-50 text-emerald-700",
-  },
-};
 
 const subjectIcons: Record<string, string> = {
   "Toán học": "∑",
@@ -169,7 +113,7 @@ export default function AssignmentsPage() {
           const results = await Promise.allSettled(
             list.map((a) =>
               api<Submission[]>(`/api/assignments/${a.id}/submissions`).then(
-                (subs) => [a.id, subs.find((s) => s.studentId === user?.id)] as const
+                (subs) => [a.id, subs.find((s) => s.studentId === user?.id || s.studentId === user?.supabaseId)] as const
               )
             )
           );
@@ -246,61 +190,64 @@ export default function AssignmentsPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-1">
-            Danh sách bài tập
+          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-primary mb-1">
+            Quản lý bài tập
           </h1>
-          <p className="text-base text-gray-500">
-            Quản lý và theo dõi tiến độ học tập của bạn.
+          <p className="text-base text-gray-500 max-w-lg">
+            Theo dõi tiến độ học tập và hoàn thành các bài đánh giá để đạt được mục tiêu học tập của bạn.
           </p>
         </div>
 
-        {/* Filters & Search */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Search */}
-          <div className="flex items-center bg-white rounded-full px-4 py-2.5 border border-gray-200 w-72 shadow-sm">
-            <Search className="size-4 text-gray-400 mr-2 shrink-0" />
-            <input
-              className="bg-transparent border-none outline-none text-sm w-full"
-              placeholder="Tìm kiếm bài tập..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Stat pills */}
+        <div className="grid grid-cols-3 gap-4 shrink-0">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 text-center min-w-[100px]">
+            <p className="text-gray-400 text-[10px] uppercase font-bold tracking-widest mb-1">Tổng số</p>
+            <p className="text-2xl font-bold text-primary">{assignments.length}</p>
           </div>
-          {/* Subject filter */}
-          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-sm">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
-              Môn học:
-            </span>
-            <select
-              className="bg-transparent border-none outline-none text-sm font-medium"
-              value={subjectFilter}
-              onChange={(e) => setSubjectFilter(e.target.value)}
-            >
-              <option value="all">Tất cả</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+          <div className="bg-blue-50 p-4 rounded-2xl shadow-sm border border-blue-100 text-center min-w-[100px]">
+            <p className="text-primary text-[10px] uppercase font-bold tracking-widest mb-1">Đã nộp</p>
+            <p className="text-2xl font-bold text-primary">{Object.values(myStatuses).filter(s => s === "SUBMITTED" || s === "GRADED" || s === "ACCEPTED").length}</p>
           </div>
-          {/* Status filter */}
-          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-sm">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
-              Trạng thái:
-            </span>
-            <select
-              className="bg-transparent border-none outline-none text-sm font-medium"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">Tất cả</option>
-              <option value="ASSIGNED">Chưa làm</option>
-              <option value="SUBMITTED">Đang chờ</option>
-              <option value="GRADED">Đã chấm</option>
-              <option value="RETURNED">Cần sửa</option>
-              <option value="ACCEPTED">Đã duyệt</option>
-            </select>
+          <div className="bg-red-50 p-4 rounded-2xl shadow-sm border border-red-100 text-center min-w-[100px]">
+            <p className="text-red-500 text-[10px] uppercase font-bold tracking-widest mb-1">Quá hạn</p>
+            <p className="text-2xl font-bold text-red-500">{assignments.filter(a => (myStatuses[a.id] || a.status) === "ASSIGNED" && isOverdue(a.dueDate)).length}</p>
           </div>
         </div>
+      </div>
+
+      {/* Filters & Search */}
+      <div className="flex flex-wrap gap-4 items-center mb-8">
+        <div className="flex-1 relative min-w-[280px]">
+          <Search className="size-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          <input
+            className="w-full bg-white border border-gray-200 rounded-2xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-sm"
+            placeholder="Tìm kiếm theo tên bài tập..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <select
+          className="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-600 focus:ring-primary focus:border-primary"
+          value={subjectFilter}
+          onChange={(e) => setSubjectFilter(e.target.value)}
+        >
+          <option value="all">Tất cả môn học</option>
+          {subjects.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <select
+          className="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-600 focus:ring-primary focus:border-primary"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">Trạng thái: Tất cả</option>
+          <option value="ASSIGNED">Chưa làm</option>
+          <option value="SUBMITTED">Đang chờ</option>
+          <option value="GRADED">Đã chấm</option>
+          <option value="RETURNED">Cần sửa</option>
+          <option value="ACCEPTED">Đã duyệt</option>
+        </select>
       </div>
 
       {/* Content */}
@@ -318,150 +265,91 @@ export default function AssignmentsPage() {
         </div>
       ) : (
         <>
-          {/* Bento Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Assignment Cards */}
+          <div className="space-y-4">
             {filtered.map((a) => {
               const sub = subjectMap[a.subjectId];
               const subjectName = sub?.name || "Môn học";
               const effectiveStatus = myStatuses[a.id] || a.status;
-              const theme = statusTheme[effectiveStatus] || statusTheme.ASSIGNED;
               const overdue = effectiveStatus === "ASSIGNED" && isOverdue(a.dueDate);
-              const displayTheme = overdue ? statusTheme.RETURNED : theme;
               const score = myScores[a.id];
-              const hasScore = (effectiveStatus === "GRADED" || effectiveStatus === "ACCEPTED") && score != null;
+              const isGraded = (effectiveStatus === "GRADED" || effectiveStatus === "ACCEPTED") && score != null;
+              const isSubmitted = effectiveStatus === "SUBMITTED";
+
+              const statusBadge = overdue
+                ? "bg-red-100 text-red-700"
+                : isGraded
+                ? "bg-emerald-100 text-emerald-700"
+                : isSubmitted
+                ? "bg-amber-100 text-amber-700"
+                : "bg-blue-100 text-blue-700";
+
+              const progressPct = isGraded ? 100 : isSubmitted ? 80 : 0;
+              const progressColor = isGraded ? "bg-emerald-500" : isSubmitted ? "bg-amber-400" : "bg-gray-200";
 
               return (
-                <div
-                  key={a.id}
-                  className={`bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group flex flex-col relative overflow-hidden ${displayTheme.card}`}
-                >
-                  {/* Score badge for graded assignments */}
-                  {hasScore && (
-                    <div className="absolute top-0 right-0 px-4 py-2 bg-emerald-600 text-white rounded-bl-2xl font-bold text-lg">
-                      {score}
-                    </div>
-                  )}
-
-                  {/* Icon + Subject badge */}
+                <div key={a.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-all group">
                   <div className="flex justify-between items-start mb-4">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition-transform ${displayTheme.iconBg} ${displayTheme.icon}`}
-                    >
-                      {getSubjectIcon(subjectName)}
+                    <div className="flex gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 ${
+                        isGraded ? "bg-emerald-100 text-emerald-600" :
+                        isSubmitted ? "bg-amber-100 text-amber-600" :
+                        overdue ? "bg-red-100 text-red-600" :
+                        "bg-blue-100 text-blue-600"
+                      }`}>
+                        {getSubjectIcon(subjectName)}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary transition-colors">{a.title}</h3>
+                        <p className="text-gray-500 text-sm">{subjectName} • {a.creatorName || "Giáo viên"}</p>
+                      </div>
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 border border-gray-200 ${hasScore ? "mr-12" : ""}`}
-                    >
-                      {subjectName}
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider shrink-0 ${statusBadge}`}>
+                      {overdue ? "Quá hạn" : isGraded ? "Đã chấm" : isSubmitted ? "Đang chờ" : "Chưa làm"}
                     </span>
                   </div>
 
-                  {/* Title */}
-                  <h3 className={`text-lg font-semibold mb-2 line-clamp-1 ${displayTheme.text}`}>
-                    {a.title}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="text-sm text-gray-500 mb-6 line-clamp-2">
-                    {a.description || "Không có mô tả"}
-                  </p>
-
-                  {/* Footer: date + status + action */}
-                  <div className="mt-auto space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-gray-500">
-                        {overdue ? (
-                          <>
-                            <AlertTriangle className="size-3.5 text-destructive" />
-                            <span className="text-destructive font-semibold">
-                              Quá hạn: {formatDate(a.dueDate)}
-                            </span>
-                          </>
-                        ) : effectiveStatus === "SUBMITTED" ? (
-                          <>
-                            <Clock4 className="size-3.5" />
-                            <span>Đã nộp</span>
-                          </>
-                        ) : effectiveStatus === "GRADED" || effectiveStatus === "ACCEPTED" ? (
-                          <>
-                            <CheckCircle2 className="size-3.5" />
-                            <span>Đã chấm</span>
-                          </>
-                        ) : (
-                          <>
-                            <Calendar className="size-3.5" />
-                            <span>
-                              {a.dueDate
-                                ? `Hạn nộp: ${formatDate(a.dueDate)}`
-                                : "Không hạn nộp"}
-                            </span>
-                          </>
-                        )}
+                  <div className="flex items-center gap-6 mb-6 text-sm">
+                    {a.dueDate && new Date(a.dueDate).getFullYear() > 1 && (
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Calendar className="size-4" />
+                        <span>{overdue ? "Quá hạn: " : "Hạn chót: "}{formatDate(a.dueDate)}</span>
                       </div>
-                      <span
-                        className={`px-3 py-1 rounded-full font-semibold text-xs ${displayTheme.badge}`}
-                      >
-                        {overdue ? "Quá hạn" : statusLabel[effectiveStatus] || effectiveStatus}
-                      </span>
-                    </div>
-
-                    {/* Action button */}
-                    {effectiveStatus === "ASSIGNED" ? (
-                      <Link
-                        href={`/assignments/${a.id}`}
-                        className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-colors ${displayTheme.button}`}
-                      >
-                        {overdue ? "Nộp bài muộn" : "Bắt đầu làm bài"}
-                      </Link>
-                    ) : effectiveStatus === "SUBMITTED" ? (
-                      <Link
-                        href={`/assignments/${a.id}`}
-                        className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-colors ${displayTheme.button}`}
-                      >
-                        Xem lại bài nộp
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/assignments/${a.id}`}
-                        className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-colors ${displayTheme.button}`}
-                      >
-                        Xem phản hồi
-                      </Link>
                     )}
+                    {isSubmitted && (
+                      <div className="flex items-center gap-2 text-amber-600 font-medium">
+                        <Clock4 className="size-4" />
+                        <span>Chờ chấm điểm</span>
+                      </div>
+                    )}
+                    {isGraded && (
+                      <div className="flex items-center gap-2 text-emerald-600 font-medium">
+                        <CheckCircle2 className="size-4" />
+                        <span>Điểm: {score}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${progressColor}`} style={{ width: `${progressPct}%` }} />
+                    </div>
+                    <span className="text-sm font-bold text-gray-600">{progressPct}%</span>
+                    <Link
+                      href={`/assignments/${a.id}`}
+                      className={`ml-auto px-6 py-2 rounded-xl font-bold text-sm transition-colors active:scale-95 ${
+                        overdue ? "bg-red-600 text-white hover:bg-red-700" :
+                        isGraded ? "bg-emerald-600 text-white hover:bg-emerald-700" :
+                        isSubmitted ? "border border-gray-300 text-gray-600 hover:bg-gray-50" :
+                        "bg-primary text-white hover:bg-primary/90"
+                      }`}
+                    >
+                      {overdue ? "Nộp bài muộn" : isGraded ? "Xem phản hồi" : isSubmitted ? "Xem bài nộp" : "Tiếp tục"}
+                    </Link>
                   </div>
                 </div>
               );
             })}
-
-            {/* Promo Banner Card (spans 2 cols on lg screens) */}
-            <div className="lg:col-span-2 bg-gradient-to-br from-primary to-blue-600 rounded-3xl p-6 flex items-center gap-6 text-white shadow-xl relative overflow-hidden group">
-              <div className="relative z-10 flex-1">
-                <h4 className="text-2xl font-bold mb-4">Cần trợ giúp với bài tập?</h4>
-                <p className="text-base mb-6 opacity-90 max-w-md">
-                  Sử dụng hệ thống thư viện tài liệu trực tuyến của EduPortal để tìm kiếm tài liệu tham khảo nhanh chóng.
-                </p>
-                <div className="flex gap-4">
-                  <Link
-                    href="/courses"
-                    className="px-6 py-2.5 bg-white text-primary rounded-full font-bold text-sm hover:scale-105 transition-transform inline-block"
-                  >
-                    Khám phá ngay
-                  </Link>
-                  <Link
-                    href="/messages"
-                    className="px-6 py-2.5 bg-white/20 text-white rounded-full font-bold text-sm hover:bg-white/30 transition-all inline-block"
-                  >
-                    Hỏi Giáo viên
-                  </Link>
-                </div>
-              </div>
-              {/* Decorative */}
-              <div className="hidden md:block relative z-10 w-36 h-36 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20 flex items-center justify-center transform rotate-6 group-hover:rotate-3 transition-transform">
-                <Sparkles className="size-16 text-white/80" />
-              </div>
-              <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-              <div className="absolute -top-20 -left-20 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
-            </div>
           </div>
 
           {/* Footer */}
