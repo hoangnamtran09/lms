@@ -124,7 +124,7 @@ export default function AssignmentDetailPage({
   const [, setFileUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const mySubmission = submissions.find((s) => s.studentId === user?.id);
+  const mySubmission = submissions.find((s) => (s.studentId === user?.id || s.studentId === user?.supabaseId));
 
   // Weakness auto-resolve tracking
   const [weaknessId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("weaknessId"));
@@ -682,23 +682,28 @@ export default function AssignmentDetailPage({
                       );
                     })()}
                   </div>
-                  {mySubmission.fileUrl && (
-                    <div className="mt-8 border-t border-gray-200 pt-6">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Tài liệu đính kèm</h4>
-                      <a href={mySubmission.fileUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group border border-transparent hover:border-blue-200"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-pink-100 rounded flex items-center justify-center text-pink-600"><FileText className="size-5" /></div>
-                          <div>
-                            <p className="font-medium text-sm text-gray-900">{fileNameFromUrl(mySubmission.fileUrl)}</p>
-                            <p className="text-xs text-gray-400">Nhấn để tải xuống</p>
-                          </div>
-                        </div>
-                        <Download className="size-4 text-gray-300 group-hover:text-blue-500" />
-                      </a>
+                </section>
+              )}
+
+              {/* ── Tài liệu đã nộp (luôn hiện nếu có file) ── */}
+              {mySubmission.fileUrl && (
+                <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-pink-100 rounded-lg text-pink-600"><Paperclip className="size-5" /></div>
+                    <h3 className="text-2xl font-semibold text-gray-900">Tài liệu đã nộp</h3>
+                  </div>
+                  <a href={mySubmission.fileUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group border border-transparent hover:border-blue-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-pink-100 rounded flex items-center justify-center text-pink-600 shrink-0"><FileText className="size-5" /></div>
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">{fileNameFromUrl(mySubmission.fileUrl)}</p>
+                        <p className="text-xs text-gray-400">Đã tải lên lúc {formatDateTime(mySubmission.submittedAt)}</p>
+                      </div>
                     </div>
-                  )}
+                    <Download className="size-4 text-gray-300 group-hover:text-blue-500 shrink-0" />
+                  </a>
                 </section>
               )}
 
