@@ -195,7 +195,7 @@ func (s *Service) FindSubmission(ctx context.Context, id string) (*Submission, e
 	return &sub, err
 }
 
-func (s *Service) GradeSubmission(ctx context.Context, submissionID string, score int, feedback, gradedBy string) error {
+func (s *Service) GradeSubmission(ctx context.Context, submissionID string, score float64, feedback, gradedBy string) error {
 	now := time.Now()
 	return s.db.WithContext(ctx).Model(&Submission{}).Where("id = ?", submissionID).Updates(map[string]interface{}{
 		"score":    score,

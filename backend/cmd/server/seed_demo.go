@@ -313,7 +313,7 @@ func seedDemo(db *gorm.DB, cfg *config.Config) error {
 	fmt.Println("  Created 5 assignments")
 
 	// ── Step 9: Submissions ────────────────────────────────────────────
-	intPtr := func(v int) *int { return &v }
+	floatPtr := func(v float64) *float64 { return &v }
 
 	gradedAt1 := makeDate(10)
 	gradedAt2 := makeDate(6)
@@ -321,17 +321,17 @@ func seedDemo(db *gorm.DB, cfg *config.Config) error {
 
 	submissionDefs := []struct {
 		assignment *assignments.Assignment
-		score      *int
+		score      *float64
 		feedback   string
 		status     string
 		daysAgo    int
 		gradedAt   *time.Time
 		content    string
 	}{
-		{assignmentRecords[0], intPtr(85), "Bài làm tốt, trình bày rõ ràng. Cần cẩn thận hơn ở bước kết luận nghiệm.", assignments.StatusGraded, 12, &gradedAt1, "x² - 5x + 6 = 0\nΔ = 25 - 24 = 1 > 0\nx₁ = (5 + 1)/2 = 3, x₂ = (5 - 1)/2 = 2\nVậy S = {2, 3}"},
-		{assignmentRecords[1], intPtr(72), "Hiểu bài nhưng còn sai sót ở phần xét đồng biến.", assignments.StatusGraded, 8, &gradedAt2, "y = 2x - 3: đồ thị là đường thẳng qua A(0,-3) và B(1,-1)"},
+		{assignmentRecords[0], floatPtr(85), "Bài làm tốt, trình bày rõ ràng. Cần cẩn thận hơn ở bước kết luận nghiệm.", assignments.StatusGraded, 12, &gradedAt1, "x² - 5x + 6 = 0\nΔ = 25 - 24 = 1 > 0\nx₁ = (5 + 1)/2 = 3, x₂ = (5 - 1)/2 = 2\nVậy S = {2, 3}"},
+		{assignmentRecords[1], floatPtr(72), "Hiểu bài nhưng còn sai sót ở phần xét đồng biến.", assignments.StatusGraded, 8, &gradedAt2, "y = 2x - 3: đồ thị là đường thẳng qua A(0,-3) và B(1,-1)"},
 		{assignmentRecords[2], nil, "", assignments.StatusSubmitted, 3, nil, "Chí Phèo là nhân vật điển hình cho người nông dân bị tha hóa..."},
-		{assignmentRecords[3], intPtr(90), "Excellent! Good understanding of conditionals.", assignments.StatusGraded, 18, &gradedAt3, "If I were you, I would study harder."},
+		{assignmentRecords[3], floatPtr(90), "Excellent! Good understanding of conditionals.", assignments.StatusGraded, 18, &gradedAt3, "If I were you, I would study harder."},
 	}
 	for _, sd := range submissionDefs {
 		submittedAt := makeDate(sd.daysAgo)

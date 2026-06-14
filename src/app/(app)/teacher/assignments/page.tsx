@@ -160,9 +160,10 @@ export default function TeacherAssignmentsPage() {
         maxScore: parseInt(editForm.maxScore || "100"),
         allowResubmit: editForm.allowResubmit === "true",
       };
-      body.dueDate = editForm.dueDate
-        ? new Date(editForm.dueDate).toISOString()
-        : new Date().toISOString();
+      if (editForm.dueDate) {
+        const normalized = editForm.dueDate.length <= 16 ? editForm.dueDate + ":00" : editForm.dueDate;
+        body.dueDate = new Date(normalized).toISOString();
+      }
       await api(`/api/assignments/${editingAssignment.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),

@@ -121,6 +121,7 @@ export default function SubmissionDetailPage({
   >({});
 
   useEffect(() => {
+    setFeedbackSaved(false);
     Promise.all([
       api<Assignment>(`/api/assignments/${id}`),
       api<Submission[]>(`/api/assignments/${id}/submissions`),
@@ -214,6 +215,7 @@ export default function SubmissionDetailPage({
 
   // Saving state
   const [savingFeedback, setSavingFeedback] = useState(false);
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
 
   const handleSaveFeedback = async () => {
     if (!submission) return;
@@ -271,6 +273,7 @@ export default function SubmissionDetailPage({
       setAllSubmissions(subs);
       const updated = subs.find((s) => s.id === submissionId) || null;
       setSubmission(updated);
+      setFeedbackSaved(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi lưu nhận xét");
     } finally {
@@ -509,7 +512,7 @@ export default function SubmissionDetailPage({
                 className="gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-200"
               >
                 <Send className="size-4" />
-                {savingFeedback ? "Đang lưu..." : "Hoàn tất nhận xét"}
+                {savingFeedback ? "Đang lưu..." : feedbackSaved ? "Đã nhận xét" : "Hoàn tất nhận xét"}
               </Button>
             </>
           )}
@@ -946,7 +949,7 @@ export default function SubmissionDetailPage({
               disabled={savingFeedback}
               className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {savingFeedback ? "Đang lưu..." : "Gửi nhận xét"}
+              {savingFeedback ? "Đang lưu..." : feedbackSaved ? "Đã gửi nhận xét" : "Gửi nhận xét"}
             </button>
           </div>
 

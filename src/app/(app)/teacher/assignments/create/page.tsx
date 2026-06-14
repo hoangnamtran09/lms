@@ -268,7 +268,7 @@ export default function CreateAssignmentPage() {
       };
       if (generatedQuestions.length > 0) body.questions = JSON.stringify(generatedQuestions);
       if (testMatrix) body.matrixMetadata = JSON.stringify(testMatrix);
-      if (dueDate) body.dueDate = new Date(dueDate).toISOString();
+      if (dueDate) { const normalized = dueDate.length <= 16 ? dueDate + ":00" : dueDate; body.dueDate = new Date(normalized).toISOString(); }
       await api("/api/assignments", { method: "POST", body: JSON.stringify(body) });
       setSuccessMsg("Đã giao bài tập thành công!");
       resetForm(); setCreationMode(null);

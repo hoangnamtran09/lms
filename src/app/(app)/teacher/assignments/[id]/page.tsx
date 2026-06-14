@@ -18,6 +18,11 @@ import {
   GraduationCap,
   Calendar,
   Award,
+  Paperclip,
+  HelpCircle,
+  Trash2,
+  Download,
+  Eye,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -42,6 +47,23 @@ import { GradingSheet } from "@/components/assignment/grading-sheet";
 import { useQuestionEditor } from "./_hooks/use-question-editor";
 import type { Assignment, Question, Submission, ClassItem, StudentBrief } from "./_types";
 import { difficultyLabels, difficultyColors, statusLabel, statusStyle } from "./_types";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function isImageFile(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url);
+}
+
+function fileNameFromUrl(url: string): string {
+  try {
+    const parts = new URL(url).pathname.split("/");
+    return parts[parts.length - 1] || "Tài liệu";
+  } catch {
+    return "Tài liệu";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -105,6 +127,9 @@ export default function TeacherAssignmentDetailPage({
   const [availableClasses, setAvailableClasses] = useState<ClassItem[]>([]);
   const [availableStudents, setAvailableStudents] = useState<StudentBrief[]>([]);
 
+  // Delete
+  const [deleting, setDeleting] = useState(false);
+
   // ---- Data loading ----
   function loadData() {
     Promise.all([
@@ -161,16 +186,20 @@ export default function TeacherAssignmentDetailPage({
   const handleConfirmPublish = async () => {
     setPublishing(true);
     try {
+      const body: Record<string, unknown> = {
+        classId: publishClassId,
+        studentIds:
+          publishStudentIds.length > 0
+            ? JSON.stringify(publishStudentIds)
+            : "",
+      };
+      // Only set status to ASSIGNED if currently DRAFT
+      if (assignment?.status === "DRAFT") {
+        body.status = "ASSIGNED";
+      }
       await api(`/api/assignments/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          status: "ASSIGNED",
-          classId: publishClassId,
-          studentIds:
-            publishStudentIds.length > 0
-              ? JSON.stringify(publishStudentIds)
-              : "",
-        }),
+        body: JSON.stringify(body),
       });
       setPublishDialogOpen(false);
       loadData();
@@ -181,7 +210,24 @@ export default function TeacherAssignmentDetailPage({
     }
   };
 
+  // ---- Delete ----
+  const handleDelete = async () => {
+    if (!confirm("Bạn có chắc chắn muốn xoá bài tập này? Hành động này không thể hoàn tác.")) return;
+    setDeleting(true);
+    try {
+      await api(`/api/assignments/${id}`, { method: "DELETE" });
+      router.push(`${basePath}/assignments`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Lỗi xoá bài tập");
+      setDeleting(false);
+    }
+  };
+
   // ---- Derived data ----
+  const lateCount = submissions.filter((s) => {
+    if (!assignment?.dueDate || new Date(assignment.dueDate).getFullYear() < 2000) return false;
+    return new Date(s.submittedAt) > new Date(assignment.dueDate);
+  }).length;
   const gradedCount = submissions.filter((s) => s.score != null).length;
   const ungradedCount = submissions.filter(
     (s) => s.status === "SUBMITTED" && s.score == null
@@ -189,6 +235,8 @@ export default function TeacherAssignmentDetailPage({
   const submittedCount = submissions.filter(
     (s) => s.status !== "ASSIGNED"
   ).length;
+  const totalStudents = submissions.length;
+  const submissionPct = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
   const avgScore =
     gradedCount > 0
       ? (
@@ -231,633 +279,371 @@ export default function TeacherAssignmentDetailPage({
     );
   }
 
+  const hasDueDate = assignment.dueDate && new Date(assignment.dueDate).getFullYear() > 2000;
+
   return (
     <div className="animate-fade-in max-w-6xl pb-8">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-        <Link
-          href={basePath}
-          className="hover:text-blue-600 transition-colors"
-        >
-          Dashboard
-        </Link>
+      <nav className="flex items-center gap-2 mb-6 text-xs font-bold uppercase tracking-wider text-gray-500">
+        <Link href={basePath} className="hover:text-blue-600 transition-colors">Dashboard</Link>
         <ChevronRight className="size-3" />
-        <Link
-          href={`${basePath}/assignments`}
-          className="hover:text-blue-600 transition-colors"
-        >
-          Assignments
-        </Link>
+        <Link href={`${basePath}/assignments`} className="hover:text-blue-600 transition-colors">Bài tập</Link>
         <ChevronRight className="size-3" />
-        <span className="text-blue-600 font-bold">{assignment.title}</span>
+        <span className="text-blue-600 font-bold truncate max-w-[300px]">{assignment.title}</span>
       </nav>
 
-      {/* Assignment Header Card */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 mb-6 relative overflow-hidden">
-        {/* Left accent bar */}
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600" />
-
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-          <div className="flex-1">
-            {/* Status + source badges */}
-            <div className="flex items-center gap-2 mb-3">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  statusStyle[assignment.status] || statusStyle.DRAFT
-                }`}
-              >
-                {statusLabel[assignment.status] || assignment.status}
-              </span>
-              {assignment.source === "weakness" && (
-                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-700">
-                  Khắc phục
-                </span>
-              )}
-              {assignment.status === "DRAFT" && (
-                <Button
-                  size="sm"
-                  onClick={openPublishDialog}
-                  className="gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200"
-                >
-                  <Send className="size-3.5" />
-                  Giao bài
-                </Button>
-              )}
-            </div>
-
-            {/* Title */}
-            <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-3">
-              {assignment.title}
-            </h1>
-            <p className="text-base text-gray-500 mb-4">
-              {assignment.description || "Không có mô tả"}
-            </p>
-
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-              {assignment.creatorName && (
-                <div className="flex items-center gap-1.5">
-                  <GraduationCap className="size-4 text-gray-400" />
-                  <span>{assignment.creatorName}</span>
-                </div>
-              )}
-              {assignment.dueDate &&
-                new Date(assignment.dueDate).getFullYear() > 2000 && (
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="size-4 text-gray-400" />
-                    <span>
-                      Hạn:{" "}
-                      {new Date(assignment.dueDate).toLocaleDateString(
-                        "vi-VN"
-                      )}
-                    </span>
-                  </div>
-                )}
-              {questions.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <FileText className="size-4 text-gray-400" />
-                  <span>{questions.length} câu hỏi</span>
-                </div>
-              )}
-            </div>
-
-            {/* Difficulty breakdown */}
-            {questions.some((q) => q.difficulty) && (
-              <div className="flex items-center gap-2 mt-3">
-                {["nhan_biet", "thong_hieu", "van_dung"].map((d) => {
-                  const count = questions.filter(
-                    (q) => q.difficulty === d
-                  ).length;
-                  if (count === 0) return null;
-                  return (
-                    <span
-                      key={d}
-                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                        difficultyColors[d] || ""
-                      }`}
-                    >
-                      {difficultyLabels[d]}: {count}
-                    </span>
-                  );
-                })}
-              </div>
+      {/* ── Header Section ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusStyle[assignment.status] || statusStyle.DRAFT}`}>
+              {statusLabel[assignment.status] || assignment.status}
+            </span>
+            {assignment.source === "weakness" && (
+              <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-700">Khắc phục</span>
             )}
+            <span className="text-on-surface-variant text-sm text-gray-400">Mã: {assignment.id.slice(0, 8).toUpperCase()}</span>
           </div>
-
-          {/* Right meta box */}
-          <div className="lg:w-56 shrink-0 bg-gray-50 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Điểm tối đa</span>
-              <span className="text-xl font-bold text-blue-600">
-                {assignment.maxScore}
+          <h1 className="text-[32px] font-bold tracking-[-0.02em] text-gray-900 mb-2">{assignment.title}</h1>
+          <p className="text-gray-500 text-base flex flex-wrap items-center gap-x-4 gap-y-1">
+            {assignment.creatorName && (
+              <span className="inline-flex items-center gap-1.5">
+                <GraduationCap className="size-4 text-gray-400" />
+                {assignment.creatorName}
               </span>
+            )}
+            {hasDueDate && (
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="size-4 text-gray-400" />
+                Hạn nộp: {new Date(assignment.dueDate).toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </span>
+            )}
+            {questions.length > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <HelpCircle className="size-4 text-gray-400" />
+                {questions.length} câu hỏi
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5">
+              <Award className="size-4 text-gray-400" />
+              {assignment.maxScore} điểm
+            </span>
+          </p>
+
+          {/* Difficulty breakdown */}
+          {questions.some((q) => q.difficulty) && (
+            <div className="flex items-center gap-2 mt-3">
+              {["nhan_biet", "thong_hieu", "van_dung"].map((d) => {
+                const count = questions.filter((q) => q.difficulty === d).length;
+                if (count === 0) return null;
+                return (
+                  <span key={d} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${difficultyColors[d] || ""}`}>
+                    {difficultyLabels[d]}: {count}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 shrink-0">
+          <Button onClick={openPublishDialog} className="gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200">
+            <Send className="size-4" /> {assignment.status === "DRAFT" ? "Giao bài" : "Sửa người nhận"}
+          </Button>
+          <Button variant="outline" onClick={startEditingQuestions} className="gap-2 rounded-xl">
+            <Pencil className="size-4" /> Chỉnh sửa câu hỏi
+          </Button>
+          <Button variant="outline" onClick={handleDelete} disabled={deleting} className="gap-2 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200">
+            <Trash2 className="size-4" /> {deleting ? "Đang xoá..." : "Xoá"}
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Two-Column Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ===== LEFT COLUMN (8 cols) ===== */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* ── Instructions Section ── */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <FileText className="size-5" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Hướng dẫn chi tiết</h3>
+            </div>
+            <div className="text-gray-600 text-base space-y-4 leading-relaxed">
+              {assignment.description ? (
+                <p>{assignment.description}</p>
+              ) : (
+                <p className="text-gray-400 italic">Không có mô tả cho bài tập này</p>
+              )}
             </div>
             {assignment.rubric && (
-              <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
-                  Tiêu chí chấm
-                </p>
-                <p className="text-sm text-gray-600">{assignment.rubric}</p>
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Tiêu chí chấm điểm</h4>
+                <div className="text-sm text-gray-600 bg-amber-50/50 border border-amber-100 rounded-xl p-4 whitespace-pre-wrap">
+                  {assignment.rubric}
+                </div>
               </div>
             )}
-          </div>
-        </div>
-      </div>
+          </section>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {/* Tổng bài nộp */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="size-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <Users className="size-7" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Tổng bài nộp
-            </p>
-            <p className="text-[28px] font-bold tracking-[-0.02em] text-blue-600 leading-none">
-              {submissions.length}
-            </p>
-          </div>
-        </div>
-
-        {/* Đã nộp */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="size-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-            <CheckCircle2 className="size-7" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Đã nộp
-            </p>
-            <p className="text-[28px] font-bold tracking-[-0.02em] text-emerald-600 leading-none">
-              {submittedCount}
-            </p>
-          </div>
-        </div>
-
-        {/* Cần chấm */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow border-l-4 border-l-pink-500">
-          <div className="size-14 rounded-2xl bg-pink-100 flex items-center justify-center text-pink-600 shrink-0">
-            <Clock className="size-7" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Cần chấm
-            </p>
-            <p className="text-[28px] font-bold tracking-[-0.02em] text-pink-600 leading-none">
-              {ungradedCount}
-            </p>
-          </div>
-        </div>
-
-        {/* Điểm trung bình */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="size-14 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-            <Award className="size-7" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              Điểm TB
-            </p>
-            <p className="text-[28px] font-bold tracking-[-0.02em] text-purple-600 leading-none">
-              {avgScore ?? "--"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Questions Section */}
-      {questions.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-6 overflow-hidden">
-          <button
-            onClick={() => setQuestionsExpanded(!questionsExpanded)}
-            className="w-full px-8 py-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {questionsExpanded ? (
-                <ChevronDown className="size-5 text-gray-400" />
-              ) : (
-                <ChevronRight className="size-5 text-gray-400" />
-              )}
-              <h2 className="text-lg font-semibold text-gray-900">
-                Danh sách câu hỏi ({questions.length})
-              </h2>
-            </div>
-            {!editingQuestions && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startEditingQuestions();
-                }}
-                className="rounded-xl gap-1.5"
-              >
-                <Pencil className="size-3.5" />
-                Chỉnh sửa
-              </Button>
-            )}
-          </button>
-
-          {questionsExpanded && (
-            <div className="px-8 pb-8 border-t border-gray-100">
-              {editingQuestions && (
-                <div className="flex items-center gap-2 py-4 border-b border-gray-100 mb-6">
-                  <Button
-                    onClick={handleSaveQuestions}
-                    disabled={savingQuestions}
-                    className="gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Save className="size-4" />
-                    {savingQuestions ? "Đang lưu..." : "Lưu thay đổi"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={cancelEditingQuestions}
-                    disabled={savingQuestions}
-                    className="rounded-xl"
-                  >
-                    <X className="size-4 mr-1" /> Huỷ
-                  </Button>
+          {/* ── Attachments Section ── */}
+          {assignment.attachmentUrl && (
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="size-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                  <Paperclip className="size-5" />
                 </div>
-              )}
+                <h3 className="text-lg font-bold text-gray-900">Tài liệu đính kèm</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/30 transition-all group cursor-pointer"
+                  onClick={() => window.open(assignment.attachmentUrl, "_blank")}
+                >
+                  {isImageFile(assignment.attachmentUrl!) ? (
+                    <>
+                      <div className="size-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden">
+                        <Eye className="size-5" />
+                      </div>
+                      <div className="ml-3 flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{fileNameFromUrl(assignment.attachmentUrl!)}</p>
+                        <p className="text-xs text-gray-400">Nhấn để xem</p>
+                      </div>
+                      <ExternalLink className="size-4 text-gray-300 group-hover:text-blue-500 shrink-0 ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      <div className="size-12 rounded-lg bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                        <FileText className="size-5" />
+                      </div>
+                      <div className="ml-3 flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{fileNameFromUrl(assignment.attachmentUrl!)}</p>
+                        <p className="text-xs text-gray-400">Nhấn để tải xuống</p>
+                      </div>
+                      <Download className="size-4 text-gray-300 group-hover:text-blue-500 shrink-0 ml-2" />
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
 
-              <div className="space-y-4 mt-6">
-                {(editingQuestions ? editedQuestions : questions).map(
-                  (q, qi) => (
-                    <div
-                      key={q.id}
-                      className="p-5 bg-gray-50/70 rounded-2xl border border-gray-100"
+          {/* ── Questions Section ── */}
+          {questions.length > 0 && (
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setQuestionsExpanded(!questionsExpanded)}
+                className="w-full px-8 py-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                    <HelpCircle className="size-5" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Danh sách câu hỏi ({questions.length})</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!editingQuestions && (
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={(e) => { e.stopPropagation(); startEditingQuestions(); }}
+                      className="rounded-xl gap-1.5"
                     >
-                      <div className="flex items-start gap-3 mb-3">
-                        <span className="font-bold text-gray-900 mt-1 shrink-0">
-                          Câu {qi + 1}
-                        </span>
+                      <Pencil className="size-3.5" /> Chỉnh sửa
+                    </Button>
+                  )}
+                  {questionsExpanded ? <ChevronDown className="size-5 text-gray-400" /> : <ChevronRight className="size-5 text-gray-400" />}
+                </div>
+              </button>
 
-                        {editingQuestions ? (
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                Câu hỏi
-                              </Label>
-                              <Textarea
-                                value={q.question}
-                                onChange={(e) =>
-                                  updateEditedQuestion(
-                                    qi,
-                                    "question",
-                                    e.target.value
-                                  )
-                                }
-                                rows={2}
-                                className="rounded-xl mt-1"
-                              />
-                            </div>
+              {questionsExpanded && (
+                <div className="px-8 pb-8 border-t border-gray-100">
+                  {editingQuestions && (
+                    <div className="flex items-center gap-2 py-4 border-b border-gray-100 mb-6">
+                      <Button onClick={handleSaveQuestions} disabled={savingQuestions} className="gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700">
+                        <Save className="size-4" />
+                        {savingQuestions ? "Đang lưu..." : "Lưu thay đổi"}
+                      </Button>
+                      <Button variant="outline" onClick={cancelEditingQuestions} disabled={savingQuestions} className="rounded-xl">
+                        <X className="size-4 mr-1" /> Huỷ
+                      </Button>
+                    </div>
+                  )}
 
-                            <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-4 mt-6">
+                    {(editingQuestions ? editedQuestions : questions).map((q, qi) => (
+                      <div key={q.id} className="p-5 bg-gray-50/70 rounded-2xl border border-gray-100">
+                        <div className="flex items-start gap-3 mb-3">
+                          <span className="font-bold text-gray-900 mt-1 shrink-0">Câu {qi + 1}</span>
+
+                          {editingQuestions ? (
+                            <div className="flex-1 space-y-3">
                               <div>
-                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                  Loại
-                                </Label>
-                                <Select
-                                  value={q.type || "mcq"}
-                                  onValueChange={(v) =>
-                                    updateEditedQuestion(qi, "type", v)
-                                  }
-                                >
-                                  <SelectTrigger className="rounded-xl mt-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="mcq">
-                                      Trắc nghiệm
-                                    </SelectItem>
-                                    <SelectItem value="short_answer">
-                                      Tự luận
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Câu hỏi</Label>
+                                <Textarea value={q.question} onChange={(e) => updateEditedQuestion(qi, "question", e.target.value)} rows={2} className="rounded-xl mt-1" />
                               </div>
-                              <div>
-                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                  Mức độ
-                                </Label>
-                                <Select
-                                  value={q.difficulty || "thong_hieu"}
-                                  onValueChange={(v) =>
-                                    updateEditedQuestion(qi, "difficulty", v)
-                                  }
-                                >
-                                  <SelectTrigger className="rounded-xl mt-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="nhan_biet">
-                                      Nhận biết
-                                    </SelectItem>
-                                    <SelectItem value="thong_hieu">
-                                      Thông hiểu
-                                    </SelectItem>
-                                    <SelectItem value="van_dung">
-                                      Vận dụng
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                  Điểm
-                                </Label>
-                                <Input
-                                  type="number"
-                                  value={q.score || 10}
-                                  onChange={(e) =>
-                                    updateEditedQuestion(
-                                      qi,
-                                      "score",
-                                      parseInt(e.target.value) || 0
-                                    )
-                                  }
-                                  min={1}
-                                  className="rounded-xl mt-1"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                Đáp án
-                              </Label>
-                              <Input
-                                value={q.expectedAnswer || ""}
-                                onChange={(e) =>
-                                  updateEditedQuestion(
-                                    qi,
-                                    "expectedAnswer",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Đáp án mong đợi"
-                                className="rounded-xl mt-1"
-                              />
-                            </div>
-
-                            {q.type === "mcq" && (
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                    Lựa chọn
-                                  </Label>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => addOption(qi)}
-                                    className="text-xs h-6 text-blue-600"
-                                  >
-                                    + Thêm lựa chọn
-                                  </Button>
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Loại</Label>
+                                  <Select value={q.type || "mcq"} onValueChange={(v) => updateEditedQuestion(qi, "type", v)}>
+                                    <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="mcq">Trắc nghiệm</SelectItem>
+                                      <SelectItem value="short_answer">Tự luận</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <div className="space-y-2">
-                                  {(q.options || []).map((opt, oi) => (
-                                    <div
-                                      key={oi}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <input
-                                        type="radio"
-                                        name={`correct-${q.id}`}
-                                        checked={opt.isCorrect}
-                                        onChange={() => setCorrectOption(qi, oi)}
-                                        className="size-4"
-                                      />
-                                      <Input
-                                        value={opt.text}
-                                        onChange={(e) =>
-                                          updateEditedOption(
-                                            qi,
-                                            oi,
-                                            "text",
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder={`Lựa chọn ${oi + 1}`}
-                                        className="rounded-xl flex-1 h-8 text-sm"
-                                      />
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          removeOption(qi, oi)
-                                        }
-                                        className="text-red-400 hover:text-red-600 h-8 w-8 p-0"
-                                      >
-                                        <X className="size-3.5" />
-                                      </Button>
-                                    </div>
-                                  ))}
+                                <div>
+                                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Mức độ</Label>
+                                  <Select value={q.difficulty || "thong_hieu"} onValueChange={(v) => updateEditedQuestion(qi, "difficulty", v)}>
+                                    <SelectTrigger className="rounded-xl mt-1"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="nhan_biet">Nhận biết</SelectItem>
+                                      <SelectItem value="thong_hieu">Thông hiểu</SelectItem>
+                                      <SelectItem value="van_dung">Vận dụng</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Điểm</Label>
+                                  <Input type="number" value={q.score || 10} onChange={(e) => updateEditedQuestion(qi, "score", parseInt(e.target.value) || 0)} min={1} className="rounded-xl mt-1" />
                                 </div>
                               </div>
-                            )}
-
-                            <div>
-                              <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                Giải thích
-                              </Label>
-                              <Textarea
-                                value={q.explanation || ""}
-                                onChange={(e) =>
-                                  updateEditedQuestion(
-                                    qi,
-                                    "explanation",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Giải thích đáp án"
-                                rows={2}
-                                className="rounded-xl mt-1 text-sm"
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          /* View mode */
-                          <div className="flex-1">
-                            <p className="text-gray-900 font-medium">
-                              {q.question}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                              <span className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
-                                {q.type === "mcq" ? "Trắc nghiệm" : "Tự luận"}
-                              </span>
-                              {q.difficulty && (
-                                <span
-                                  className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
-                                    difficultyColors[q.difficulty] ||
-                                    "bg-gray-50"
-                                  }`}
-                                >
-                                  {difficultyLabels[q.difficulty] ||
-                                    q.difficulty}
-                                </span>
+                              <div>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Đáp án</Label>
+                                <Input value={q.expectedAnswer || ""} onChange={(e) => updateEditedQuestion(qi, "expectedAnswer", e.target.value)} placeholder="Đáp án mong đợi" className="rounded-xl mt-1" />
+                              </div>
+                              {q.type === "mcq" && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Lựa chọn</Label>
+                                    <Button variant="ghost" size="sm" onClick={() => addOption(qi)} className="text-xs h-6 text-blue-600">+ Thêm lựa chọn</Button>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {(q.options || []).map((opt, oi) => (
+                                      <div key={oi} className="flex items-center gap-2">
+                                        <input type="radio" name={`correct-${q.id}`} checked={opt.isCorrect} onChange={() => setCorrectOption(qi, oi)} className="size-4" />
+                                        <Input value={opt.text} onChange={(e) => updateEditedOption(qi, oi, "text", e.target.value)} placeholder={`Lựa chọn ${oi + 1}`} className="rounded-xl flex-1 h-8 text-sm" />
+                                        <Button variant="ghost" size="sm" onClick={() => removeOption(qi, oi)} className="text-red-400 hover:text-red-600 h-8 w-8 p-0"><X className="size-3.5" /></Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
-                              <span className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
-                                {q.score || 10} điểm
-                              </span>
-                              {q.expectedAnswer && (
-                                <span className="text-xs text-gray-400">
-                                  Đáp án: {q.expectedAnswer}
-                                </span>
-                              )}
+                              <div>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Giải thích</Label>
+                                <Textarea value={q.explanation || ""} onChange={(e) => updateEditedQuestion(qi, "explanation", e.target.value)} placeholder="Giải thích đáp án" rows={2} className="rounded-xl mt-1 text-sm" />
+                              </div>
                             </div>
-                            {q.type === "mcq" &&
-                              q.options &&
-                              q.options.length > 0 && (
+                          ) : (
+                            /* View mode */
+                            <div className="flex-1">
+                              <p className="text-gray-900 font-medium">{q.question}</p>
+                              <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                                <span className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
+                                  {q.type === "mcq" ? "Trắc nghiệm" : "Tự luận"}
+                                </span>
+                                {q.difficulty && (
+                                  <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${difficultyColors[q.difficulty] || "bg-gray-50"}`}>
+                                    {difficultyLabels[q.difficulty] || q.difficulty}
+                                  </span>
+                                )}
+                                <span className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
+                                  {q.score || 10} điểm
+                                </span>
+                                {q.expectedAnswer && (
+                                  <span className="text-xs text-gray-400">Đáp án: {q.expectedAnswer}</span>
+                                )}
+                              </div>
+                              {q.type === "mcq" && q.options && q.options.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                                   {q.options.map((opt, oi) => (
-                                    <span
-                                      key={oi}
-                                      className={`text-xs px-2.5 py-1 rounded-full border ${
-                                        opt.isCorrect
-                                          ? "bg-emerald-50 border-emerald-300 text-emerald-700"
-                                          : "bg-gray-50 border-gray-200 text-gray-500"
-                                      }`}
-                                    >
-                                      {String.fromCharCode(65 + oi)}. {opt.text}{" "}
-                                      {opt.isCorrect ? "✓" : ""}
+                                    <span key={oi} className={`text-xs px-2.5 py-1 rounded-full border ${opt.isCorrect ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                                      {String.fromCharCode(65 + oi)}. {opt.text} {opt.isCorrect ? "✓" : ""}
                                     </span>
                                   ))}
                                 </div>
                               )}
-                            {q.explanation && (
-                              <p className="text-xs text-gray-400 mt-2.5 italic">
-                                💡 {q.explanation}
-                              </p>
-                            )}
-                          </div>
-                        )}
+                              {q.explanation && (
+                                <p className="text-xs text-gray-400 mt-2.5 italic">💡 {q.explanation}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                )}
-              </div>
+                    ))}
+                  </div>
 
-              {editingQuestions && (
-                <div className="flex items-center gap-2 pt-4 border-t border-gray-100 mt-6">
-                  <Button
-                    onClick={handleSaveQuestions}
-                    disabled={savingQuestions}
-                    className="gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Save className="size-4" />
-                    {savingQuestions ? "Đang lưu..." : "Lưu thay đổi"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={cancelEditingQuestions}
-                    disabled={savingQuestions}
-                    className="rounded-xl"
-                  >
-                    <X className="size-4 mr-1" /> Huỷ
-                  </Button>
+                  {editingQuestions && (
+                    <div className="flex items-center gap-2 pt-4 border-t border-gray-100 mt-6">
+                      <Button onClick={handleSaveQuestions} disabled={savingQuestions} className="gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700">
+                        <Save className="size-4" /> {savingQuestions ? "Đang lưu..." : "Lưu thay đổi"}
+                      </Button>
+                      <Button variant="outline" onClick={cancelEditingQuestions} disabled={savingQuestions} className="rounded-xl">
+                        <X className="size-4 mr-1" /> Huỷ
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </section>
           )}
         </div>
-      )}
 
-      {/* Submissions List */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Bài nộp của học sinh ({submissions.length})
-          </h2>
-          <Link
-            href={`${basePath}/assignments/${id}/submissions`}
-            className="text-sm text-blue-600 font-semibold hover:underline flex items-center gap-1"
-          >
-            Xem tất cả
-            <ExternalLink className="size-3" />
-          </Link>
+        {/* ===== RIGHT COLUMN (4 cols) ===== */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* ── Submission Status Card ── */}
+          <div className="sticky top-20 bg-blue-600 p-8 rounded-2xl shadow-lg text-white">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-lg font-bold opacity-95">Tình trạng nộp bài</h3>
+                <p className="text-xs opacity-70">Cập nhật: {submissions.length > 0 ? "Mới nhất" : "Chưa có"}</p>
+              </div>
+              <div className="size-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Users className="size-6" />
+              </div>
+            </div>
+
+            {/* Big number */}
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-4xl font-extrabold">{submittedCount}</span>
+              <span className="text-xl font-medium opacity-70">/ {totalStudents}</span>
+              <span className="ml-auto text-lg font-bold">{submissionPct}%</span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-3 bg-white/20 rounded-full mb-8 overflow-hidden">
+              <div className="h-full bg-white rounded-full transition-all duration-700 ease-out" style={{ width: `${submissionPct}%` }} />
+            </div>
+
+            {/* Mini stats */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
+                <p className="text-[11px] uppercase font-bold opacity-70">Đã chấm</p>
+                <p className="text-xl font-bold">{gradedCount}</p>
+              </div>
+              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
+                <p className="text-[11px] uppercase font-bold opacity-70">Trễ hạn</p>
+                <p className="text-xl font-bold">{lateCount}</p>
+              </div>
+              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
+                <p className="text-[11px] uppercase font-bold opacity-70">Cần chấm</p>
+                <p className="text-xl font-bold">{ungradedCount}</p>
+              </div>
+              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
+                <p className="text-[11px] uppercase font-bold opacity-70">Điểm TB</p>
+                <p className="text-xl font-bold">{avgScore ?? "--"}</p>
+              </div>
+            </div>
+
+            <Link href={`${basePath}/assignments/${id}/submissions`}>
+              <Button className="w-full py-3 bg-white text-blue-600 font-bold rounded-xl hover:bg-blue-50 transition-all shadow-md">
+                Xem danh sách nộp bài
+              </Button>
+            </Link>
+          </div>
+
         </div>
-
-        {submissions.length === 0 ? (
-          <div className="text-center py-16">
-            <Users className="size-12 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-400">Chưa có học sinh nào nộp bài</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {submissions.map((sub) => {
-              const isUngraded =
-                sub.status === "SUBMITTED" && sub.score == null;
-              const isReturned = sub.status === "RETURNED";
-              const isGraded = sub.score != null;
-
-              let rowAccent = "";
-              if (isReturned)
-                rowAccent = "border-l-2 border-l-amber-400 bg-amber-50/30";
-              else if (isUngraded)
-                rowAccent = "border-l-2 border-l-blue-400 bg-blue-50/30";
-              else if (isGraded)
-                rowAccent = "border-l-2 border-l-emerald-400";
-
-              return (
-                <div key={sub.id} className={rowAccent}>
-                  <button
-                    onClick={() =>
-                      router.push(
-                        `${basePath}/assignments/${id}/submissions/${sub.id}`
-                      )
-                    }
-                    className="w-full px-8 py-5 flex items-center justify-between hover:bg-gray-50/30 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Avatar */}
-                      <div className="size-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
-                        {sub.studentName?.charAt(0) || "?"}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {sub.studentName}
-                        </p>
-                        <p className="text-sm text-gray-400">
-                          {new Date(sub.submittedAt).toLocaleString("vi-VN")}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {sub.score != null && (
-                        <span className="inline-flex items-center justify-center size-10 rounded-full bg-emerald-50 text-emerald-600 font-bold text-sm">
-                          {sub.score}
-                        </span>
-                      )}
-                      {isUngraded && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-                          <span className="size-2 rounded-full bg-blue-500 animate-pulse" />
-                          Cần chấm
-                        </span>
-                      )}
-                      {isReturned && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
-                          Cần sửa lại
-                        </span>
-                      )}
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                          statusStyle[sub.status] || "bg-gray-50 text-gray-600"
-                        }`}
-                      >
-                        {statusLabel[sub.status] || sub.status}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Grading Sheet Dialog */}
@@ -877,7 +663,7 @@ export default function TeacherAssignmentDetailPage({
         <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
-              Giao bài: {assignment.title}
+              {assignment.status === "DRAFT" ? "Giao bài" : "Sửa người nhận"}: {assignment.title}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 mt-4">

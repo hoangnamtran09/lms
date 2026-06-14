@@ -14,6 +14,7 @@ export interface Assignment {
   questions: string;
   classId?: string;
   studentIds?: string;
+  attachmentUrl?: string;
   createdAt: string;
 }
 

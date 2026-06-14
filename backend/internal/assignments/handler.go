@@ -242,6 +242,7 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	var results []QuestionResult
 	totalScore := 0
 	totalMaxScore := 0
+	hasAnyMcq := false
 	for _, q := range questions {
 		qID, _ := q["id"].(string)
 		qText, _ := q["question"].(string)
@@ -321,11 +322,11 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store grading results in submission feedback
-	if len(results) > 0 {
+	if hasAnyMcq {
 		summary := fmt.Sprintf("Tổng điểm: %d/%d", totalScore, assignment.MaxScore)
 		detailJSON, _ := json.Marshal(results)
 		feedback := summary + "\n" + string(detailJSON)
-		totalScoreVal := totalScore
+		totalScoreVal := float64(totalScore)
 		h.service.GradeSubmission(r.Context(), sub.ID, totalScoreVal, feedback, "auto")
 		sub.Score = &totalScoreVal
 		sub.Feedback = feedback
@@ -417,8 +418,8 @@ func (h *Handler) GradeSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var gradeReq struct {
-		Score    int    `json:"score"`
-		Feedback string `json:"feedback"`
+		Score    float64 `json:"score"`
+		Feedback string  `json:"feedback"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&gradeReq); err != nil {
 		jsonErr(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
@@ -436,7 +437,7 @@ func (h *Handler) GradeSubmission(w http.ResponseWriter, r *http.Request) {
 		UserID:       claims.UserID,
 		UserName:     claims.UserName,
 		Action:       "GRADE",
-		Detail:       fmt.Sprintf("Chấm điểm: %d", gradeReq.Score),
+		Detail:       fmt.Sprintf("Chấm điểm: %.1f", gradeReq.Score),
 	})
 	jsonOk(w, map[string]string{"status": "graded"})
 }
@@ -571,7 +572,7 @@ func (h *Handler) AutoGrade(w http.ResponseWriter, r *http.Request) {
 		detailJSON, _ := json.Marshal(detailResults)
 		summaryFeedback := fmt.Sprintf("Tổng điểm: %d/%d (AI chấm từng câu)", totalScore, totalMaxScore)
 
-		if err := h.service.GradeSubmission(r.Context(), subID, totalScore, summaryFeedback+"\n"+string(detailJSON), "AI"); err != nil {
+		if err := h.service.GradeSubmission(r.Context(), subID, float64(totalScore), summaryFeedback+"\n"+string(detailJSON), "AI"); err != nil {
 			jsonErr(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -605,7 +606,7 @@ func (h *Handler) AutoGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.GradeSubmission(r.Context(), subID, result.Score, result.Feedback, "AI"); err != nil {
+	if err := h.service.GradeSubmission(r.Context(), subID, float64(result.Score), result.Feedback, "AI"); err != nil {
 		jsonErr(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

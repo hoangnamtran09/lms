@@ -141,6 +141,7 @@ export function GradingSheet({
   const [perQuestionScores, setPerQuestionScores] = useState<Record<string, number>>({});
   const [perQuestionFeedback, setPerQuestionFeedback] = useState<Record<string, string>>({});
   const [generalFeedback, setGeneralFeedback] = useState("");
+  const [manualScore, setManualScore] = useState<number>(0);
   const [grading, setGrading] = useState(false);
   const [autoGrading, setAutoGrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +159,7 @@ export function GradingSheet({
   useEffect(() => {
     if (!sub) return;
     setGeneralFeedback("");
+    setManualScore(sub.score ?? 0);
     setError(null);
 
     const existingFeedback = parseExistingFeedback(sub.feedback);
@@ -183,7 +185,7 @@ export function GradingSheet({
 
   const totalScore = questions.length > 0
     ? Object.values(perQuestionScores).reduce((s, v) => s + (v || 0), 0)
-    : 0;
+    : manualScore;
 
   const toggleExpectedAnswer = (questionId: string) => {
     setShowExpectedAnswers((prev) => ({
@@ -497,15 +499,14 @@ export function GradingSheet({
                         <div className="flex items-center gap-1.5 mt-1">
                           <Input
                             type="number"
-                            value={perQuestionScores[q.id] ?? 0}
-                            onChange={(e) =>
-                              setPerQuestionScores((prev) => ({
-                                ...prev,
-                                [q.id]: Math.min(parseInt(e.target.value) || 0, q.score || 10),
-                              }))
-                            }
+                            value={perQuestionScores[q.id] || ""}
+                            onChange={(e) => {
+                              const v = e.target.value === "" ? 0 : Math.min(parseFloat(e.target.value) || 0, q.score || 10);
+                              setPerQuestionScores((prev) => ({ ...prev, [q.id]: v }));
+                            }}
                             min={0}
                             max={q.score || 10}
+                            step="0.1"
                             className="h-9 text-sm w-16 text-center font-semibold"
                           />
                           <span className="text-xs text-gray-400 font-medium">/ {q.score || 10}</span>
@@ -537,6 +538,23 @@ export function GradingSheet({
                 <p className="text-sm text-gray-800 whitespace-pre-wrap mt-1.5 bg-gray-50 p-3 rounded-lg border leading-relaxed">
                   {sub?.content || <span className="text-gray-400 italic">(không có nội dung)</span>}
                 </p>
+              </div>
+              <div className="flex items-end gap-4">
+                <div>
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Điểm</Label>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Input
+                      type="number"
+                      value={manualScore || ""}
+                      onChange={(e) => setManualScore(e.target.value === "" ? 0 : Math.min(parseFloat(e.target.value) || 0, maxScore))}
+                      min={0}
+                      max={maxScore}
+                      step="0.1"
+                      className="h-9 text-sm w-20 text-center font-semibold"
+                    />
+                    <span className="text-xs text-gray-400 font-medium">/ {maxScore}</span>
+                  </div>
+                </div>
               </div>
               <div>
                 <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nhận xét</Label>
@@ -576,14 +594,12 @@ export function GradingSheet({
           </div>
 
           <div className="flex items-center gap-3">
-            {hasQuestions && (
-              <div className="flex items-center gap-2 mr-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-                <Hash className="size-3.5 text-gray-400" />
-                <span className="text-sm font-bold text-gray-700">
-                  {totalScore}<span className="text-gray-400 font-normal">/{maxScore}</span>
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 mr-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+              <Hash className="size-3.5 text-gray-400" />
+              <span className="text-sm font-bold text-gray-700">
+                {totalScore}<span className="text-gray-400 font-normal">/{maxScore}</span>
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"

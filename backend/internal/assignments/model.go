@@ -67,7 +67,7 @@ type Submission struct {
 	StudentName  string     `gorm:"size:200" json:"studentName"`
 	Content      string     `gorm:"type:text" json:"content"`
 	FileURL      string     `gorm:"size:1000" json:"fileUrl"`
-	Score        *int       `json:"score"`
+	Score        *float64  `json:"score"`
 	Feedback     string     `gorm:"type:text" json:"feedback"`
 	Status       string     `gorm:"size:20;default:SUBMITTED" json:"status"`
 	GradedBy     string     `gorm:"size:36" json:"gradedBy"`

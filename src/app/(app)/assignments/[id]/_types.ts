@@ -11,6 +11,7 @@ export interface Assignment {
   source: string;
   creatorName: string;
   questions: string;
+  attachmentUrl?: string;
   createdAt: string;
 }
 

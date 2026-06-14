@@ -248,7 +248,7 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
       if (generatedQuestions.length > 0) {
         body.questions = JSON.stringify(generatedQuestions);
       }
-      if (dueDate) body.dueDate = new Date(dueDate).toISOString();
+      if (dueDate) { const normalized = dueDate.length <= 16 ? dueDate + ":00" : dueDate; body.dueDate = new Date(normalized).toISOString(); }
       await api("/api/assignments", {
         method: "POST",
         body: JSON.stringify(body),
@@ -320,9 +320,10 @@ export default function AdminAssignmentsPage({ basePath = "/admin" }: { basePath
         subjectId: editForm.subjectId || "",
         classId: editForm.classId || "",
       };
-      body.dueDate = editForm.dueDate
-        ? new Date(editForm.dueDate).toISOString()
-        : new Date().toISOString();
+      if (editForm.dueDate) {
+        const normalized = editForm.dueDate.length <= 16 ? editForm.dueDate + ":00" : editForm.dueDate;
+        body.dueDate = new Date(normalized).toISOString();
+      }
       await api(`/api/assignments/${editingAssignment.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
