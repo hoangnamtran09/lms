@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, Flame, ChevronRight, Users } from "lucide-react";
+import { Heart, Flame, Users, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,7 +64,7 @@ export default function ParentDashboardPage() {
             <Link
               key={child.id}
               href={`/parent/child/${child.id}`}
-              className="block bg-white rounded-lg border p-5 hover:border-gray-300 hover:shadow-sm transition-shadow"
+              className="block bg-white rounded-lg border p-5 hover:border-blue-300 hover:shadow-sm transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">

@@ -16,15 +16,15 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: "dashboard", roles: ["PARENT", "STUDENT"] },
+  { label: "Dashboard", href: "/", icon: "dashboard", roles: ["STUDENT"] },
   { label: "Môn học", href: "/courses", icon: "menu_book", roles: ["STUDENT"] },
-  { label: "Bài tập", href: "/assignments", icon: "assignment", roles: ["PARENT", "STUDENT"] },
+  { label: "Bài tập", href: "/assignments", icon: "assignment", roles: ["STUDENT"] },
   { label: "Bảng xếp hạng", href: "/leaderboard", icon: "leaderboard", roles: ["STUDENT"] },
   { label: "Điểm sai", href: "/mistakes", icon: "error", roles: ["STUDENT"] },
   { label: "Sơ đồ tư duy", href: "/mindmap", icon: "psychology", roles: ["STUDENT"] },
   { label: "Flashcards", href: "/flashcards", icon: "style", roles: ["STUDENT"] },
   { label: "Thành tựu", href: "/achievements", icon: "bookmark", filled: true, roles: ["STUDENT"] },
-  { label: "Báo cáo tuần", href: "/reports", icon: "assessment", roles: ["STUDENT", "PARENT"] },
+  { label: "Báo cáo tuần", href: "/reports", icon: "assessment", roles: ["STUDENT"] },
   // Teacher
   { label: "Tổng quan", href: "/teacher", icon: "co_present", roles: ["TEACHER"] },
   { label: "Bài tập", href: "/teacher/assignments", icon: "assignment", roles: ["TEACHER"] },
@@ -37,7 +37,6 @@ const allNavItems: NavItem[] = [
   { label: "Điểm danh", href: "/teacher/attendance", icon: "how_to_reg", roles: ["TEACHER"] },
   // Parent
   { label: "Phụ huynh", href: "/parent", icon: "family_restroom", roles: ["PARENT"] },
-  { label: "Cài đặt", href: "/parent/settings", icon: "settings", roles: ["PARENT"] },
   // Admin
   { label: "Tổng quan", href: "/admin", icon: "admin_panel_settings", roles: ["SUPER_ADMIN", "ADMIN"] },
   { label: "Quản lí học sinh", href: "/admin/students", icon: "group", roles: ["SUPER_ADMIN", "ADMIN"] },

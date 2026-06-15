@@ -59,7 +59,7 @@ func (s *Service) GetChildren(ctx context.Context, parentID string) ([]map[strin
 		s.db.WithContext(ctx).Table("users").Where("id = ?", u.ID).Select("supabase_id").Scan(&childSupabaseID)
 		var pendingCount int64
 		s.db.WithContext(ctx).Table("assignments a").
-			Where("a.class_id = ? AND a.status = ? AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = ?)", u.ClassID, "ASSIGNED", childSupabaseID).
+			Where("a.class_id = ? AND a.status = ? AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND (s.student_id = ? OR s.student_id = ?))", u.ClassID, "ASSIGNED", childSupabaseID, u.ID).
 			Count(&pendingCount)
 
 		// Get streak
@@ -111,18 +111,76 @@ func (s *Service) GetChildDetail(ctx context.Context, parentID, childID string) 
 
 	// Recent submissions
 	type SubRow struct {
-		ID         string     `json:"id"`
-		AssignmentTitle string `json:"title"`
-		Score      *int       `json:"score"`
-		Status     string     `json:"status"`
-		SubmittedAt time.Time `json:"submittedAt"`
+		ID              string     `json:"id"`
+		AssignmentTitle string     `gorm:"column:title" json:"title"`
+		Score           *float64   `json:"score"`
+		Status          string     `json:"status"`
+		SubmittedAt     time.Time  `json:"submittedAt"`
 	}
 	var submissions []SubRow
+	// Get child's supabase ID
+	var childSupabaseID string
+	s.db.WithContext(ctx).Table("users").Where("id = ?", childID).Select("supabase_id").Scan(&childSupabaseID)
+
 	s.db.WithContext(ctx).Table("submissions s").
 		Select("s.id, a.title, s.score, s.status, s.submitted_at").
 		Joins("JOIN assignments a ON a.id = s.assignment_id").
-		Where("s.student_id = ?", childID).
+		Where("s.student_id = ? OR s.student_id = ?", childSupabaseID, childID).
 		Order("s.submitted_at DESC").Limit(10).Find(&submissions)
+
+	// Get assignments for child's class
+	type AssignmentRow struct {
+		ID         string     `json:"id"`
+		Title      string     `json:"title"`
+		MaxScore   int        `json:"maxScore"`
+		DueDate    time.Time  `json:"dueDate"`
+		Status     string     `json:"status"`
+		Score      *float64   `json:"score"`
+		SubmittedAt *time.Time `json:"submittedAt,omitempty"`
+	}
+	// First get all assignments for the class
+	type rawAssignment struct {
+		ID       string
+		Title    string
+		MaxScore int
+		DueDate  time.Time
+		Status   string
+	}
+	var rawAssignments []rawAssignment
+	// Get assignments: class-wide ones + individually assigned ones
+	query := s.db.WithContext(ctx).Table("assignments").
+		Where("class_id = ? OR student_ids LIKE ?", child.ClassID, "%\""+childSupabaseID+"\"%").
+		Order("due_date ASC, created_at DESC").Limit(20).
+		Select("id, title, max_score, due_date, status")
+	query.Find(&rawAssignments)
+
+	// Get submissions for this child
+	type rawSubmission struct {
+		AssignmentID string
+		Status       string
+		Score        *float64
+		SubmittedAt  time.Time
+	}
+	var childSubmissions []rawSubmission
+	s.db.WithContext(ctx).Table("submissions").
+		Where("student_id = ? OR student_id = ?", childSupabaseID, childID).
+		Select("assignment_id, status, score, submitted_at").Find(&childSubmissions)
+
+	subMap := make(map[string]rawSubmission)
+	for _, s := range childSubmissions {
+		subMap[s.AssignmentID] = s
+	}
+
+	var assignments []AssignmentRow
+	for _, a := range rawAssignments {
+		row := AssignmentRow{ID: a.ID, Title: a.Title, MaxScore: a.MaxScore, DueDate: a.DueDate, Status: a.Status}
+		if sub, ok := subMap[a.ID]; ok {
+			row.Status = sub.Status
+			row.Score = sub.Score
+			row.SubmittedAt = &sub.SubmittedAt
+		}
+		assignments = append(assignments, row)
+	}
 
 	return map[string]interface{}{
 		"id":           child.ID,
@@ -130,6 +188,7 @@ func (s *Service) GetChildDetail(ctx context.Context, parentID, childID string) 
 		"totalSeconds": totalSec,
 		"weaknesses":   weaknesses,
 		"submissions":  submissions,
+		"assignments":  assignments,
 	}, nil
 }
 

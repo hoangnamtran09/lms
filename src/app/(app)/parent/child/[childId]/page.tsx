@@ -14,6 +14,7 @@ interface ChildDetail {
   totalSeconds: number;
   weaknesses: { topic: string; errorCount: number }[];
   submissions: { id: string; title: string; score: number | null; status: string; submittedAt: string }[];
+  assignments: { id: string; title: string; maxScore: number; dueDate: string; status: string; score: number | null; submittedAt?: string }[];
 }
 
 function formatDuration(seconds: number): string {
@@ -79,6 +80,43 @@ export default function ChildDetailPage({ params }: { params: Promise<{ childId:
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Assignments */}
+        <Card className="rounded-xl ring-1 ring-foreground/10 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="size-4 text-blue-500" />
+              Danh sách bài tập
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(!detail.assignments || detail.assignments.length === 0) ? (
+              <p className="text-sm text-gray-400 text-center py-8">Chưa có bài tập nào</p>
+            ) : (
+              <div className="space-y-2">
+                {detail.assignments.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-sm py-2 px-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-900 font-medium truncate">{a.title}</p>
+                      <p className="text-xs text-gray-400">
+                        {a.dueDate && new Date(a.dueDate).getFullYear() > 2000
+                          ? `Hạn: ${new Date(a.dueDate).toLocaleDateString("vi-VN")}`
+                          : "Không hạn"}
+                        {" · "}{a.maxScore}đ
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {a.score != null && <span className="text-xs font-bold text-emerald-600">{a.score}đ</span>}
+                      <Badge variant={a.status === "GRADED" ? "default" : a.status === "SUBMITTED" ? "secondary" : "outline"} className="text-xs">
+                        {a.status === "ASSIGNED" ? "Chưa làm" : a.status === "SUBMITTED" ? "Chờ chấm" : a.status === "GRADED" ? "Đã chấm" : a.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Weaknesses */}
         <Card className="rounded-xl ring-1 ring-foreground/10">
           <CardHeader>
