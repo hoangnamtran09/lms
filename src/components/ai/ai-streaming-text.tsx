@@ -10,6 +10,7 @@ export function AiProgressBar({ isStreaming, showLabel = true }: { isStreaming: 
 
   useEffect(() => {
     if (!isStreaming) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(100);
       return;
     }
@@ -81,6 +82,7 @@ export function StreamingText({
 
   useEffect(() => {
     if (!isStreaming) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCursorVisible(false);
       return;
     }

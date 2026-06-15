@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, use, useRef } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   Send,
@@ -12,30 +11,27 @@ import {
   Loader2,
   Calendar,
   Clock3,
-  CloudUpload,
   Timer,
-  HelpCircle,
+  Eye,
   MessageCircle,
   Paperclip,
-  ChevronRight,
   User,
   AlertTriangle,
   Download,
-  Eye,
   ArrowLeft,
   GraduationCap,
 } from "lucide-react";
 import { api, uploadFile } from "@/lib/api-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RemediationExercise } from "@/components/ai/remediation-exercise";
 import type { RemediationQuestion, ExerciseAnswer } from "@/components/ai/remediation-exercise";
 import { MathText } from "@/components/ai/math-text";
 import type { Assignment, Question, Submission, QuestionResult, McqOption } from "./_types";
-import { difficultyLabels, difficultyColors, statusLabel, statusColor as statusBadgeStyle } from "./_types";
+import { difficultyLabels, difficultyColors } from "./_types";
 
 // ---- Helpers --------------------------------------------------------------
 
@@ -869,7 +865,7 @@ export default function AssignmentDetailPage({
                       </div>
                     </div>
                     <p className="text-sm text-gray-700 leading-relaxed italic bg-gray-50 p-3 rounded-xl border-l-4 border-emerald-500">
-                      "{feedbackText}"
+                      {"“"}{feedbackText}{"”"}
                     </p>
                   </div>
                 ) : mySubmission.score != null ? (

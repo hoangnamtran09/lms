@@ -13,8 +13,6 @@ import {
   ExternalLink,
   X,
   Users,
-  CheckCircle2,
-  Clock,
   GraduationCap,
   Calendar,
   Award,
@@ -40,7 +38,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GradingSheet } from "@/components/assignment/grading-sheet";
