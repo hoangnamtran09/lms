@@ -150,6 +150,16 @@ export default function TeacherAssignmentDetailPage({
   }, [id]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
+  // Load class & students for recipient list sidebar
+  useEffect(() => {
+    if (!assignment) return;
+    api<ClassItem[]>("/api/classes").then(d => setAvailableClasses(d || [])).catch(() => {});
+    const url = assignment.classId
+      ? `/api/users?role=STUDENT&classId=${assignment.classId}`
+      : "/api/users?role=STUDENT";
+    api<StudentBrief[]>(url).then(d => setAvailableStudents(d || [])).catch(() => {});
+  }, [assignment]);
+
   // ---- Publish ----
   const openPublishDialog = () => {
     let existingStudentIds: string[] = [];
@@ -235,7 +245,11 @@ export default function TeacherAssignmentDetailPage({
   const submittedCount = submissions.filter(
     (s) => s.status !== "ASSIGNED"
   ).length;
-  const totalStudents = submissions.length;
+  const assignedStudentCount = (() => {
+    if (!assignment?.studentIds) return 0;
+    try { const ids = JSON.parse(assignment.studentIds); return Array.isArray(ids) ? ids.length : 0; } catch { return 0; }
+  })();
+  const totalStudents = assignedStudentCount > 0 ? assignedStudentCount : submissions.length;
   const submissionPct = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
   const avgScore =
     gradedCount > 0
@@ -591,9 +605,10 @@ export default function TeacherAssignmentDetailPage({
         </div>
 
         {/* ===== RIGHT COLUMN (4 cols) ===== */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-4">
+          <div className="sticky top-20 space-y-6 max-h-[calc(100vh-6rem)] overflow-y-auto">
           {/* ── Submission Status Card ── */}
-          <div className="sticky top-20 bg-blue-600 p-8 rounded-2xl shadow-lg text-white">
+          <div className="bg-blue-600 p-8 rounded-2xl shadow-lg text-white">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-lg font-bold opacity-95">Tình trạng nộp bài</h3>
@@ -643,6 +658,73 @@ export default function TeacherAssignmentDetailPage({
             </Link>
           </div>
 
+          {/* ── Học sinh được gán ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <Users className="size-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-900">Học sinh được gán</h3>
+                <p className="text-xs text-gray-400 truncate">
+                  {(() => {
+                    const ids = (() => { try { return JSON.parse(assignment.studentIds || "[]"); } catch { return []; } })();
+                    if (ids.length > 0) return `${ids.length} học sinh được chọn`;
+                    const cls = availableClasses.find(c => c.id === assignment.classId);
+                    return cls ? `${cls.name} (${availableStudents.length} học sinh)` : "Cả lớp";
+                  })()}
+                </p>
+              </div>
+            </div>
+
+            <button onClick={openPublishDialog}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all text-sm font-semibold text-gray-700 mb-4"
+            >
+              <Pencil className="size-4" />
+              <span>Sửa người nhận</span>
+            </button>
+
+            {/* Student list */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {(() => {
+                const assignedIds: string[] = (() => { try { return JSON.parse(assignment.studentIds || "[]"); } catch { return []; } })();
+                const studentsToShow = assignedIds.length > 0
+                  ? availableStudents.filter(s => assignedIds.includes(s.supabaseId))
+                  : availableStudents.slice(0, 10); // class-wide: show first 10
+
+                if (studentsToShow.length === 0) {
+                  return <p className="text-sm text-gray-400 text-center py-4">Đang tải danh sách...</p>;
+                }
+
+                return studentsToShow.map(s => {
+                  const sub = submissions.find(sub => sub.studentId === s.supabaseId);
+                  const status = sub
+                    ? (sub.score != null ? "Đã chấm" : "Đã nộp")
+                    : "Chưa nộp";
+                  const statusColor = sub
+                    ? (sub.score != null ? "text-emerald-600" : "text-blue-600")
+                    : "text-gray-400";
+                  const initials = s.fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                  return (
+                    <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-100 bg-gray-50/50">
+                      <div className="size-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{s.fullName}</p>
+                        <p className={`text-xs font-medium ${statusColor}`}>{status}</p>
+                      </div>
+                      {sub?.score != null && (
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{sub.score}</span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
+        </div>
         </div>
       </div>
 
@@ -660,7 +742,7 @@ export default function TeacherAssignmentDetailPage({
 
       {/* Publish Dialog */}
       <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl p-0 overflow-hidden">
+        <DialogContent className="max-w-2xl sm:max-w-2xl rounded-3xl p-0 overflow-hidden [&>button]:hidden">
           {/* Header */}
           <div className="p-6 border-b border-gray-100 flex justify-between items-center">
             <DialogTitle className="text-2xl font-bold text-gray-900">
@@ -678,7 +760,9 @@ export default function TeacherAssignmentDetailPage({
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-400">Chọn lớp học</Label>
               <Select value={publishClassId} onValueChange={(v) => handlePublishClassChange(v ?? "")}>
                 <SelectTrigger className="rounded-xl w-full h-12">
-                  <SelectValue placeholder="Chọn lớp học..." />
+                  <SelectValue placeholder="Chọn lớp học...">
+                    {publishClassId === "" ? "Tất cả các lớp" : (availableClasses.find(c => c.id === publishClassId)?.name || publishClassId)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Tất cả các lớp</SelectItem>
@@ -738,7 +822,6 @@ export default function TeacherAssignmentDetailPage({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm">{s.fullName}</p>
-                          <p className="text-xs text-gray-400">{s.username || s.id?.slice(0, 8)}</p>
                         </div>
                       </label>
                     );

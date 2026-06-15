@@ -112,7 +112,7 @@ func New(
 	gamificationH := gamification.NewHandler(diamondSvc, streakSvc)
 	achievementsH := achievements.NewHandler(achievementsSvc, db)
 	weaknessH := weaknesses.NewHandler(weaknessSvc)
-	teacherH := teacher.NewHandler(db)
+	teacherH := teacher.NewHandler(db, cfg.SupabaseURL, cfg.SupabaseServiceRole)
 	analyticsH := analytics.NewHandler(db)
 	chatHistorySvc := ai.NewChatHistoryService(db)
 	chatHistoryH := ai.NewChatHistoryHandler(chatHistorySvc)
@@ -271,8 +271,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 			}
 			return r.RemoteAddr
 		}
-		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
-			With(middleware.Limit(0.5, 30, aiRateLimitKey)).
+		r.With(middleware.Limit(0.5, 30, aiRateLimitKey)).
 			Post("/api/ai/chat", h.AI.Chat)
 		r.With(middleware.RequirePermission(permissions.ResAI, permissions.ActRead)).
 			With(middleware.Limit(1.0/6.0, 10, aiRateLimitKey)).
@@ -445,6 +444,7 @@ func mountRoutes(r chi.Router, h *Handlers, jwtSecret, supabaseURL string, db *g
 		r.Post("/api/teacher/link-parent", h.Teacher.LinkParent)
 		r.Get("/api/teacher/parent-links", h.Teacher.ListLinks)
 		r.Delete("/api/teacher/parent-links/{id}", h.Teacher.DeleteLink)
+		r.Post("/api/teacher/parents/{id}/reset-password", h.Teacher.ResetParentPassword)
 
 		// Attendance
 		r.With(middleware.RequirePermission(permissions.ResAttendance, permissions.ActRead)).

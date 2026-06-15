@@ -498,10 +498,10 @@ export default function LessonViewerPage({
                       AI
                     </div>
                   )}
-                  <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground rounded-br-md"
-                      : `bg-gradient-to-br from-violet-50 to-purple-50 text-gray-800 rounded-bl-md border shadow-sm ${isStreamingThis ? "border-violet-300" : "border-violet-100"}`
+                      : `bg-white text-gray-800 rounded-bl-md border-l-4 shadow-sm ${isStreamingThis ? "border-l-violet-500 border-t border-r border-b border-violet-200 ring-2 ring-violet-100" : "border-l-violet-400 border border-violet-100"}`
                   }`}>
                     {msg.role === "assistant" ? (
                       <ChatMessage

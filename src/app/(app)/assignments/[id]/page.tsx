@@ -304,7 +304,7 @@ export default function AssignmentDetailPage({
             answers: questions.map((q) => ({
               questionId: q.id,
               answer: isMcqQuestion(q)
-                ? String.fromCharCode(65 + (mcqSelections[q.id] ?? 0))
+                ? (mcqSelections[q.id] != null ? String.fromCharCode(65 + mcqSelections[q.id]) : "")
                 : (perQuestionAnswers[q.id] || ""),
             })),
           })
@@ -380,7 +380,7 @@ export default function AssignmentDetailPage({
   const overdue = isOverdue(assignment.dueDate);
   const hasDueDate = assignment.dueDate && new Date(assignment.dueDate).getFullYear() > 1;
   const isGraded = !!mySubmission || !!submitResults;
-  const canSubmit = !mySubmission && !mySubmitted && assignment.source !== "weakness";
+  const canSubmit = !mySubmission && !mySubmitted;
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 md:px-8 py-8 animate-fade-in">
@@ -503,7 +503,7 @@ export default function AssignmentDetailPage({
 
           {/* ── Questions Section (pre-submission) ── */}
           {questions.length > 0 && weaknessExercises.length === 0 && (
-            <div className="space-y-6 max-h-[800px] overflow-y-auto pr-2" id="questions-container">
+            <div className="space-y-6" id="questions-container">
               <h3 className="text-lg font-bold text-gray-900 px-2">Câu hỏi trực tuyến</h3>
               {questions.map((q, i) => {
                 const mcq = isMcqQuestion(q);

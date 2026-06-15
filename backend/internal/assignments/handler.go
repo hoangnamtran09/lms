@@ -172,6 +172,10 @@ type QuestionResult struct {
 
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
+	if claims.Role != "STUDENT" {
+		jsonErr(w, "Chỉ học sinh mới được nộp bài", http.StatusForbidden)
+		return
+	}
 	var sub Submission
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		jsonErr(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
@@ -263,23 +267,67 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		}
 		totalMaxScore += maxScore
 
-		isMcq := qType == "mcq" || hasOptions
-		if !isMcq || !hasAnswers {
-			results = append(results, QuestionResult{
-				QuestionID: qID,
-				Question:   qText,
-				Score:      0,
-				MaxScore:   maxScore,
-				Feedback:   "",
-			})
-			continue
-		}
+			isMcq := qType == "mcq" || hasOptions
+			if isMcq { hasAnyMcq = true }
+			studentAns := strings.TrimSpace(answerMap[qID])
+			expectedAns := ""
+			if ea, ok := q["expectedAnswer"].(string); ok {
+				expectedAns = strings.TrimSpace(ea)
+			}
 
-		studentAns := strings.TrimSpace(answerMap[qID])
-		expectedAns := ""
-		if ea, ok := q["expectedAnswer"].(string); ok {
-			expectedAns = strings.TrimSpace(ea)
-		}
+			// Non-MCQ: use AI grading for short answer questions
+			if !isMcq {
+				if studentAns == "" {
+					results = append(results, QuestionResult{
+						QuestionID: qID, Question: qText,
+						Score: 0, MaxScore: maxScore,
+						Feedback: "Chưa trả lời",
+					})
+				} else if h.aiService != nil {
+					aiResult, aiErr := h.aiService.GradeSubmission(ai.GradingRequest{
+						Question:      qText,
+						StudentAnswer: studentAns,
+						Rubric:        fmt.Sprintf("Đáp án mong đợi: %s. %s", expectedAns, assignment.Rubric),
+						MaxScore:      maxScore,
+					})
+					if aiErr == nil {
+						totalScore += aiResult.Score
+						results = append(results, QuestionResult{
+							QuestionID:    qID, Question: qText,
+							Score:         aiResult.Score, MaxScore: maxScore,
+							Feedback:      aiResult.Feedback,
+							CorrectAnswer: expectedAns,
+						})
+						if !aiResult.Correct && qText != "" {
+							h.weaknessService.UpsertWeakness(r.Context(), claims.UserID, qText, "quiz")
+						}
+					} else {
+						results = append(results, QuestionResult{
+							QuestionID: qID, Question: qText,
+							Score: 0, MaxScore: maxScore,
+							Feedback: "Lỗi chấm AI: " + aiErr.Error(),
+						})
+					}
+				} else {
+					results = append(results, QuestionResult{
+						QuestionID:    qID, Question: qText,
+						Score:         0, MaxScore: maxScore,
+						Feedback:      "Đã ghi nhận (chờ giáo viên chấm)",
+						CorrectAnswer: expectedAns,
+					})
+				}
+				continue
+			}
+
+			// MCQ: continue with exact matching below
+			if !hasAnswers {
+				results = append(results, QuestionResult{
+					QuestionID: qID, Question: qText,
+					Score: 0, MaxScore: maxScore,
+					Feedback: "Chưa trả lời",
+				})
+				continue
+			}
 
 		// Only grade if both student and expected answer are non-empty
 		score := 0

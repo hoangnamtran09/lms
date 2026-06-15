@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Loader2, Sparkles, BookOpen, Brain, FileText, ChevronRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, Loader2, Sparkles, BookOpen, Brain, FileText, ChevronRight, CheckCircle2, Send } from "lucide-react";
 import { api, uploadFile, fetchList } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -247,11 +247,40 @@ export default function CreateAssignmentPage() {
       const result = await api<{ assignmentId: string; title: string; questions: GeneratedQuestion[]; assignedStudentCount: number }>(
         "/api/ai/generate-remediation-assignment", { method: "POST", body: JSON.stringify({ classId: selectedClassId, topic: selectedTopic.topic }) }
       );
-      sessionStorage.setItem("lastRemediationAssignmentId", result.assignmentId);
-      setSuccessMsg(`Đã tạo bài tập và gán cho ${result.assignedStudentCount} học sinh.`);
-      resetForm();
+      setGeneratedQuestions(result.questions || []);
+      setGeneratedTitle(result.title);
+      // Store remediation metadata for publish
+      setTitle(result.title);
+      setClassId(selectedClassId);
+      // Store assigned student count for the save section
+      setSelectedStudentIds([`_remediation_${result.assignedStudentCount}_students_`]);
+      setWizardStep("generate");
+      setSuccessMsg(`Đã tạo ${result.questions.length} câu hỏi cho ${result.assignedStudentCount} học sinh. Vui lòng xem trước và nhập hạn nộp trước khi xuất bản.`);
     } catch (e: unknown) { setGenerateError(e instanceof Error ? e.message : "Lỗi tạo bài tập khắc phục"); }
     finally { setGeneratingQuestions(false); }
+  };
+
+  const handlePublishRemediation = async () => {
+    if (!title.trim()) { setCreateError("Vui lòng nhập tiêu đề"); return; }
+    setSubmitting(true); setCreateError(null);
+    try {
+      const body: Record<string, unknown> = {
+        title: title.trim(),
+        rubric: rubric.trim(),
+        status: "ASSIGNED",
+        classId: classId.trim(),
+      };
+      if (generatedQuestions.length > 0) body.questions = JSON.stringify(generatedQuestions);
+      if (dueDate) { const normalized = dueDate.length <= 16 ? dueDate + ":00" : dueDate; body.dueDate = new Date(normalized).toISOString(); }
+      // Update the draft assignment created by the remediation API
+      const assignmentId = sessionStorage.getItem("lastRemediationAssignmentId");
+      if (assignmentId) {
+        await api(`/api/assignments/${assignmentId}`, { method: "PATCH", body: JSON.stringify(body) });
+      }
+      setSuccessMsg("Đã xuất bản bài tập khắc phục!");
+      resetForm(); setCreationMode(null);
+    } catch (e: unknown) { setCreateError(e instanceof Error ? e.message : "Lỗi xuất bản bài tập"); }
+    finally { setSubmitting(false); }
   };
 
   const handleCreate = async () => {
@@ -567,6 +596,46 @@ export default function CreateAssignmentPage() {
                       <Button onClick={handleGenerateRemediation} disabled={generatingQuestions} className="gap-2 rounded-xl">
                         {generatingQuestions ? <><Loader2 className="size-4 animate-spin" /> Đang tạo...</> : <><Sparkles className="size-4" /> Tạo bài tập khắc phục & Gán tự động</>}
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Preview section after generating questions */}
+                  {wizardStep === "generate" && generatedQuestions.length > 0 && (
+                    <div className="border-t pt-6 space-y-6">
+                      {/* Success banner */}
+                      {successMsg && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">{successMsg}</div>
+                      )}
+
+                      {/* Due date */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tiêu đề</Label>
+                          <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl mt-1" />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Hạn nộp</Label>
+                          <Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="rounded-xl mt-1" />
+                        </div>
+                      </div>
+
+                      {/* Questions preview */}
+                      <QuestionPreview
+                        questions={generatedQuestions}
+                        updateQuestion={updateQuestion}
+                        removeQuestion={removeQuestion}
+                        title={generatedTitle}
+                        onTitleChange={setGeneratedTitle}
+                      />
+
+                      {/* Publish actions */}
+                      <div className="flex gap-3 pt-2">
+                        <Button onClick={handlePublishRemediation} disabled={submitting} className="gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700">
+                          {submitting ? <><Loader2 className="size-4 animate-spin" /> Đang xuất bản...</> : <><Send className="size-4" /> Xuất bản & Giao cho học sinh</>}
+                        </Button>
+                        <Button variant="outline" onClick={() => { setWizardStep("config"); setGeneratedQuestions([]); }} className="rounded-xl">Huỷ</Button>
+                      </div>
+                      {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{createError}</div>}
                     </div>
                   )}
 

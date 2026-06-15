@@ -398,7 +398,11 @@ export default function TeacherAssignmentsPage() {
             const colors = subjectColor(subj);
             const timeInfo = getTimeInfo(a);
             const className = getClassName(a.classId);
-            const progressTotal = a.totalStudents || a.submissionCount || 30;
+            const assignedCount = (() => {
+              if (!a.studentIds) return 0;
+              try { const ids = JSON.parse(a.studentIds); return Array.isArray(ids) ? ids.length : 0; } catch { return 0; }
+            })();
+            const progressTotal = assignedCount > 0 ? assignedCount : (a.submissionCount || 0);
             const progressCurrent = a.submissionCount || 0;
             const progressPct =
               progressTotal > 0
@@ -487,14 +491,17 @@ export default function TeacherAssignmentsPage() {
 
                 {/* Progress */}
                 <div className="w-full lg:w-48">
-                  <div className="flex justify-between items-end mb-2">
+                  <div className="flex justify-between items-end mb-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
                       TIẾN ĐỘ NỘP BÀI
                     </span>
-                    <span className="font-bold text-gray-900">
+                    <span className="font-bold text-gray-900 text-sm">
                       {progressCurrent}/{progressTotal}
                     </span>
                   </div>
+                  <p className="text-[11px] text-gray-400 mb-2">
+                    {assignedCount > 0 ? `${assignedCount} học sinh được gán` : "Giao cả lớp"}
+                  </p>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${

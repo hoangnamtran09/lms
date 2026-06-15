@@ -6,6 +6,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { InteractiveQuiz } from "./interactive-quiz";
+import { AiProgressBar } from "./ai-streaming-text";
 
 interface QuizOption {
   text: string;
@@ -122,10 +123,16 @@ export function ChatMessage({
   if (!content) {
     if (isStreaming) {
       return (
-        <div className="flex items-center gap-1 py-1">
-          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
-          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
-          <span className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
+        <div className="space-y-2 min-w-[220px]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">AI đang suy nghĩ</span>
+            <span className="flex gap-1">
+              <span className="size-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
+              <span className="size-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
+              <span className="size-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
+            </span>
+          </div>
+          <AiProgressBar isStreaming={true} showLabel={false} />
         </div>
       );
     }
@@ -133,7 +140,7 @@ export function ChatMessage({
   }
 
   return (
-    <div className="prose max-w-none">
+    <div className="max-w-none [&_h2]:text-violet-700 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-indigo-600 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:text-gray-700 [&_p]:leading-relaxed [&_strong]:text-gray-900 [&_strong]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_li]:text-gray-700 [&_code]:bg-violet-50 [&_code]:text-violet-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:text-sm [&_pre]:bg-gray-900 [&_pre]:text-gray-100 [&_pre]:rounded-xl [&_pre]:shadow-lg [&_pre]:p-4 [&_pre]:overflow-x-auto [&_blockquote]:border-l-4 [&_blockquote]:border-l-violet-400 [&_blockquote]:bg-violet-50/50 [&_blockquote]:rounded-r-lg [&_blockquote]:py-2 [&_blockquote]:px-4 [&_blockquote]:text-gray-700 [&_blockquote]:not-italic [&_a]:text-violet-600 [&_a]:font-medium [&_table]:w-full [&_table]:border-collapse [&_th]:bg-gray-100 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_td]:border [&_td]:border-gray-200 [&_td]:px-3 [&_td]:py-2 [&_hr]:my-4 [&_hr]:border-gray-200">
       {parts.map((part, i) => {
         if (part.type === "quiz" && part.quiz) {
           if (hideQuizzes) {

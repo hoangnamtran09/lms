@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { apiStream } from "@/lib/api-client";
 import ReactMarkdown from "react-markdown";
+import { AiThinkingBubble, StreamingText } from "./ai-streaming-text";
 
 const weaknessRe = /:::weakness topic="[^"]*"/g;
 
@@ -118,7 +119,13 @@ export function AITutorPanel({ open, onOpenChange, lessonId, lessonTitle }: AITu
                 }`}
               >
                 {msg.role === "assistant" ? (
-                  <ReactMarkdown>{stripWeakness(msg.content) || (streaming && i === messages.length - 1 ? "..." : "")}</ReactMarkdown>
+                  msg.content ? (
+                    <div className="relative">
+                      <ReactMarkdown>{stripWeakness(msg.content)}</ReactMarkdown>
+                    </div>
+                  ) : streaming && i === messages.length - 1 ? (
+                    <AiThinkingBubble />
+                  ) : null
                 ) : (
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 )}

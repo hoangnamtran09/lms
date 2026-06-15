@@ -1,7 +1,10 @@
 package teacher
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -12,10 +15,14 @@ import (
 )
 
 type Handler struct {
-	db *gorm.DB
+	db                  *gorm.DB
+	supabaseURL         string
+	supabaseServiceRole string
 }
 
-func NewHandler(db *gorm.DB) *Handler { return &Handler{db: db} }
+func NewHandler(db *gorm.DB, supabaseURL, supabaseServiceRole string) *Handler {
+	return &Handler{db: db, supabaseURL: supabaseURL, supabaseServiceRole: supabaseServiceRole}
+}
 
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
@@ -168,11 +175,12 @@ func (h *Handler) LinkParent(w http.ResponseWriter, r *http.Request) {
 }
 
 type LinkRow struct {
-	ID         string `json:"id"`
-	ParentID   string `json:"parentId"`
-	ParentName string `json:"parentName"`
-	ChildID    string `json:"childId"`
-	ChildName  string `json:"childName"`
+	ID         string    `json:"id"`
+	ParentID   string    `json:"parentId"`
+	ParentName string    `json:"parentName"`
+	ChildID    string    `json:"childId"`
+	ChildName  string    `json:"childName"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // ListLinks lists all parent-student links for the teacher's class.
@@ -188,12 +196,13 @@ func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type rawLink struct {
-		ID       string
-		ParentID string
-		ChildID  string
+		ID        string
+		ParentID  string
+		ChildID   string
+		CreatedAt time.Time
 	}
 	var links []rawLink
-	h.db.Table("child_links").Where("child_id IN ?", studentIDs).Select("id, parent_id, child_id").Find(&links)
+	h.db.Table("child_links").Where("child_id IN ?", studentIDs).Select("id, parent_id, child_id, created_at").Find(&links)
 	if len(links) == 0 {
 		jsonOk(w, []LinkRow{})
 		return
@@ -229,6 +238,7 @@ func (h *Handler) ListLinks(w http.ResponseWriter, r *http.Request) {
 			ParentName: nameMap[l.ParentID],
 			ChildID:    l.ChildID,
 			ChildName:  nameMap[l.ChildID],
+			CreatedAt:  l.CreatedAt,
 		}
 	}
 	jsonOk(w, result)
@@ -255,6 +265,69 @@ func (h *Handler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 
 	h.db.Table("child_links").Where("id = ?", linkID).Delete(nil)
 	jsonOk(w, map[string]string{"status": "deleted"})
+}
+
+func (h *Handler) ResetParentPassword(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetClaims(r.Context())
+	parentID := extractID(r.URL.Path)
+
+	// Verify the user is a PARENT linked to a student in teacher's class
+	var count int64
+	h.db.Table("child_links cl").
+		Joins("JOIN users u ON u.id = cl.child_id AND u.role = 'STUDENT' AND u.class_id = ?", claims.ClassID).
+		Where("cl.parent_id = ?", parentID).
+		Count(&count)
+	if count == 0 {
+		jsonError(w, "Phụ huynh không liên kết với học sinh trong lớp của bạn", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		NewPassword string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 6 {
+		jsonError(w, "Mật khẩu mới phải có ít nhất 6 ký tự", http.StatusBadRequest)
+		return
+	}
+
+	// Get user supabase ID
+	var userRow struct {
+		SupabaseID string
+		Role       string
+	}
+	h.db.Table("users").Where("id = ?", parentID).Select("supabase_id, role").Scan(&userRow)
+	if userRow.Role != "PARENT" {
+		jsonError(w, "Người dùng không phải là phụ huynh", http.StatusBadRequest)
+		return
+	}
+	if userRow.SupabaseID == "" {
+		jsonError(w, "Tài khoản chưa được đồng bộ", http.StatusInternalServerError)
+		return
+	}
+
+	// Call Supabase to update password
+	supabaseBody, _ := json.Marshal(map[string]string{"password": req.NewPassword})
+	supabaseReq, _ := http.NewRequest("PUT",
+		fmt.Sprintf("%s/auth/v1/admin/users/%s", h.supabaseURL, userRow.SupabaseID),
+		bytes.NewReader(supabaseBody))
+	supabaseReq.Header.Set("Authorization", "Bearer "+h.supabaseServiceRole)
+	supabaseReq.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(supabaseReq)
+	if err != nil {
+		jsonError(w, "Không thể đổi mật khẩu: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		jsonError(w, fmt.Sprintf("Không thể đổi mật khẩu: %s", string(body)), http.StatusInternalServerError)
+		return
+	}
+	jsonOk(w, map[string]string{"status": "ok"})
 }
 
 func jsonError(w http.ResponseWriter, msg string, code int) {

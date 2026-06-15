@@ -54,10 +54,13 @@ func (s *Service) GetChildren(ctx context.Context, parentID string) ([]map[strin
 			Where("user_id = ? AND started_at >= ?", u.ID, time.Now().AddDate(0, 0, -7)).
 			Select("COALESCE(SUM(duration_seconds), 0)").Scan(&weekSec)
 
-		// Get pending assignments count
+		// Get pending assignments count — exclude those already submitted by this child
+		var childSupabaseID string
+		s.db.WithContext(ctx).Table("users").Where("id = ?", u.ID).Select("supabase_id").Scan(&childSupabaseID)
 		var pendingCount int64
-		s.db.WithContext(ctx).Table("assignments").
-			Where("class_id = ? AND status = ?", u.ClassID, "ASSIGNED").Count(&pendingCount)
+		s.db.WithContext(ctx).Table("assignments a").
+			Where("a.class_id = ? AND a.status = ? AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = ?)", u.ClassID, "ASSIGNED", childSupabaseID).
+			Count(&pendingCount)
 
 		// Get streak
 		var currentStreak int
