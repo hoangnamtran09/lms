@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduSelf — Hệ thống Quản lý Học tập Thông minh</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --blue: #3b82f6; --indigo: #6366f1; --purple: #8b5cf6;
+    --green: #10b981; --amber: #f59e0b; --rose: #f43f5e; --cyan: #06b6d4;
+    --bg: #060612;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+    background: var(--bg); color: #e2e8f0; overflow: hidden;
+    height: 100vh; width: 100vw; -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Lucide icon sizing ── */
+  .lucide { stroke-width: 1.8; }
+  .lucide.icon-sm { width: 20px; height: 20px; }
+  .lucide.icon-md { width: 26px; height: 26px; }
+  .lucide.icon-lg { width: 36px; height: 36px; }
+  .lucide.icon-xl { width: 48px; height: 48px; }
+  .lucide.icon-2xl { width: 64px; height: 64px; }
+  .lucide.icon-huge { width: 90px; height: 90px; }
+
+  /* ── Background ── */
+  .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bg-orb {
+    position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15;
+    animation: orb-float 20s ease-in-out infinite;
+  }
+  .bg-orb.o1 { width: 600px; height: 600px; background: #3b82f6; top: -200px; left: -100px; }
+  .bg-orb.o2 { width: 500px; height: 500px; background: #8b5cf6; bottom: -150px; right: -150px; animation-delay: -7s; }
+  .bg-orb.o3 { width: 400px; height: 400px; background: #10b981; top: 50%; left: 50%; transform: translate(-50%,-50%); animation-delay: -14s; }
+  .bg-orb.o4 { width: 350px; height: 350px; background: #f59e0b; top: -100px; right: 20%; animation-delay: -3s; }
+  .bg-orb.o5 { width: 300px; height: 300px; background: #06b6d4; bottom: 10%; left: 20%; animation-delay: -10s; }
+  @keyframes orb-float {
+    0%,100% { transform: translate(0,0) scale(1); }
+    25% { transform: translate(80px,-60px) scale(1.15); }
+    50% { transform: translate(-40px,40px) scale(0.9); }
+    75% { transform: translate(-80px,-30px) scale(1.1); }
+  }
+
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Slides ── */
+  .presentation { position: relative; z-index: 1; width: 100vw; height: 100vh; }
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 56px 90px;
+    opacity: 0; transform: scale(.97);
+    transition: opacity .55s cubic-bezier(.4,0,.2,1), transform .55s cubic-bezier(.4,0,.2,1);
+    pointer-events: none;
+  }
+  .slide.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+
+  /* ── Title slide ── */
+  .slide-title { text-align: center; }
+  .slide-title .logo-mark {
+    width: 110px; height: 110px; margin-bottom: 26px;
+    background: linear-gradient(135deg, rgba(59,130,246,.18), rgba(139,92,246,.18));
+    border: 2px solid rgba(255,255,255,.08); border-radius: 30px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 30px 80px rgba(59,130,246,.2);
+    animation: logo-pulse 3s ease-in-out infinite;
+  }
+  .slide-title .logo-mark .lucide { color: #60a5fa; }
+  @keyframes logo-pulse {
+    0%,100% { box-shadow: 0 30px 80px rgba(59,130,246,.2); }
+    50% { box-shadow: 0 30px 120px rgba(139,92,246,.35); }
+  }
+  .slide-title h1 {
+    font-size: clamp(44px,7vw,80px); font-weight: 900; line-height: 1.15;
+    background: linear-gradient(135deg,#60a5fa 0%,#a78bfa 30%,#34d399 60%,#fbbf24 100%);
+    background-size: 300% 300%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: gradient-shift 6s ease infinite;
+    margin-bottom: 18px; max-width: 900px;
+  }
+  @keyframes gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .slide-title .subtitle { font-size: 21px; color: #94a3b8; margin-bottom: 38px; line-height: 1.6; max-width: 700px; }
+  .tag-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .tag {
+    padding: 11px 24px; border-radius: 50px; font-size: 14px; font-weight: 600;
+    backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); transition: all .3s;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .tag:hover { transform: translateY(-2px); }
+  .tag.ai { border-color: rgba(139,92,246,.5); color: #c4b5fd; background: rgba(139,92,246,.1); }
+  .tag.pl { border-color: rgba(59,130,246,.5); color: #93c5fd; background: rgba(59,130,246,.1); }
+  .tag.ed { border-color: rgba(16,185,129,.5); color: #6ee7b7; background: rgba(16,185,129,.1); }
+  .tag .lucide { width: 17px; height: 17px; }
+
+  /* ── Section header ── */
+  .slide-section { text-align: center; }
+  .slide-section .sec-icon { margin-bottom: 12px; display: inline-flex; }
+  .slide-section .sec-icon .lucide { width: 52px; height: 52px; color: #60a5fa; }
+  .slide-section .sec-num {
+    font-size: 150px; font-weight: 900; line-height: 1;
+    background: linear-gradient(180deg, rgba(59,130,246,.12) 0%, transparent 80%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: -26px;
+  }
+  .slide-section h2 { font-size: clamp(32px,5vw,52px); font-weight: 800; margin-bottom: 16px; color: #f8fafc; }
+  .slide-section .sec-desc { font-size: 19px; color: #94a3b8; max-width: 700px; line-height: 1.7; }
+
+  /* ── Content slide ── */
+  .slide-content h2 {
+    font-size: clamp(28px,4vw,40px); font-weight: 800; margin-bottom: 36px;
+    text-align: center; color: #f8fafc;
+  }
+  .slide-content h2 em {
+    font-style: normal;
+    background: linear-gradient(135deg,#60a5fa,#a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  /* ── Glass card ── */
+  .gcard {
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 18px; backdrop-filter: blur(20px);
+    transition: all .35s cubic-bezier(.4,0,.2,1);
+    position: relative; overflow: hidden;
+  }
+  .gcard::before {
+    content: ''; position: absolute; inset: 0; border-radius: 18px;
+    background: radial-gradient(600px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.04), transparent 60%);
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  .gcard:hover::before { opacity: 1; }
+  .gcard:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.11); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+
+  /* ── Problem cards ── */
+  .problem-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; max-width: 1100px; width: 100%; }
+  .pcard { padding: 30px 24px 24px; text-align: left; border-top: 3px solid transparent; }
+  .pcard.r { border-top-color: rgba(239,68,68,.3); }
+  .pcard.r:hover { border-top-color: #ef4444; background: rgba(239,68,68,.04); }
+  .pcard.o { border-top-color: rgba(245,158,11,.3); }
+  .pcard.o:hover { border-top-color: #f59e0b; background: rgba(245,158,11,.04); }
+  .pcard.a { border-top-color: rgba(251,191,36,.3); }
+  .pcard.a:hover { border-top-color: #fbbf24; background: rgba(251,191,36,.04); }
+  .pcard .pi {
+    width: 46px; height: 46px; border-radius: 13px; display: flex;
+    align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  .pcard .pi .lucide { width: 24px; height: 24px; }
+  .pcard.r .pi { background: rgba(239,68,68,.12); } .pcard.r .pi .lucide { color: #f87171; }
+  .pcard.o .pi { background: rgba(245,158,11,.12); } .pcard.o .pi .lucide { color: #fbbf24; }
+  .pcard.a .pi { background: rgba(251,191,36,.12); } .pcard.a .pi .lucide { color: #fcd34d; }
+  .pcard h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #f8fafc; }
+  .pcard p { font-size: 13.5px; color: #94a3b8; line-height: 1.65; }
+
+  /* ── Solution cards ── */
+  .solution-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; max-width: 1020px; width: 100%; }
+  .scard { display: flex; gap: 15px; align-items: flex-start; padding: 21px 22px; border-left: 3px solid transparent; }
+  .scard:hover { border-left-color: #10b981; background: rgba(16,185,129,.03); }
+  .scard .si {
+    width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(16,185,129,.12);
+  }
+  .scard .si .lucide { width: 20px; height: 20px; color: #34d399; }
+  .scard h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: #f8fafc; }
+  .scard p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+
+  /* ── Feature cards ── */
+  .feature-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 15px; max-width: 1100px; width: 100%; }
+  .fcard { padding: 25px 18px 20px; text-align: center; }
+  .fcard .fi {
+    width: 48px; height: 48px; border-radius: 13px; margin: 0 auto 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fcard .fi .lucide { width: 24px; height: 24px; }
+  .fcard .fi.blu { background: rgba(59,130,246,.12); } .fcard .fi.blu .lucide { color: #60a5fa; }
+  .fcard .fi.pur { background: rgba(139,92,246,.12); } .fcard .fi.pur .lucide { color: #a78bfa; }
+  .fcard .fi.grn { background: rgba(16,185,129,.12); } .fcard .fi.grn .lucide { color: #34d399; }
+  .fcard .fi.amb { background: rgba(245,158,11,.12); } .fcard .fi.amb .lucide { color: #fbbf24; }
+  .fcard .fi.ros { background: rgba(244,63,94,.12); } .fcard .fi.ros .lucide { color: #fb7185; }
+  .fcard .fi.cya { background: rgba(6,182,212,.12); } .fcard .fi.cya .lucide { color: #22d3ee; }
+  .fcard .fi.ind { background: rgba(99,102,241,.12); } .fcard .fi.ind .lucide { color: #818cf8; }
+  .fcard .fi.tea { background: rgba(20,184,166,.12); } .fcard .fi.tea .lucide { color: #2dd4bf; }
+  .fcard h4 { font-size: 14.5px; font-weight: 700; margin-bottom: 5px; color: #f8fafc; }
+  .fcard p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+
+  /* ── Stats ── */
+  .stats-row { display: flex; gap: 44px; justify-content: center; flex-wrap: wrap; margin-bottom: 38px; }
+  .stat { text-align: center; }
+  .stat .sn {
+    font-size: 56px; font-weight: 900; line-height: 1.1;
+    background: linear-gradient(135deg,#60a5fa,#a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stat .sn.icon-stat { display: flex; justify-content: center; }
+  .stat .sn.icon-stat .lucide { width: 52px; height: 52px; color: #a78bfa; }
+  .stat .sl { font-size: 13.5px; color: #94a3b8; margin-top: 5px; font-weight: 500; }
+
+  /* ── Role cards ── */
+  .role-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; max-width: 1050px; width: 100%; }
+  .rcard { padding: 26px 12px 20px; text-align: center; }
+  .rcard .ra {
+    width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rcard .ra .lucide { width: 28px; height: 28px; }
+  .rcard .ra.sp { background: rgba(139,92,246,.16); } .rcard .ra.sp .lucide { color: #a78bfa; }
+  .rcard .ra.ad { background: rgba(59,130,246,.16); } .rcard .ra.ad .lucide { color: #60a5fa; }
+  .rcard .ra.te { background: rgba(16,185,129,.16); } .rcard .ra.te .lucide { color: #34d399; }
+  .rcard .ra.pa { background: rgba(245,158,11,.16); } .rcard .ra.pa .lucide { color: #fbbf24; }
+  .rcard .ra.st { background: rgba(6,182,212,.16); } .rcard .ra.st .lucide { color: #22d3ee; }
+  .rcard h4 { font-size: 14.5px; font-weight: 700; color: #f8fafc; margin-bottom: 5px; }
+  .rcard p { font-size: 11px; color: #94a3b8; line-height: 1.5; }
+
+  /* ── Before/After ── */
+  .ba-wrap { display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: start; max-width: 1020px; width: 100%; }
+  .ba-box { border-radius: 18px; padding: 28px; }
+  .ba-box.bad { background: rgba(239,68,68,.04); border: 1px solid rgba(239,68,68,.15); }
+  .ba-box.good { background: rgba(16,185,129,.04); border: 1px solid rgba(16,185,129,.15); }
+  .ba-box .ba-h { font-size: 17px; font-weight: 800; margin-bottom: 14px; display: flex; align-items: center; gap: 9px; }
+  .ba-box.bad .ba-h { color: #fca5a5; }
+  .ba-box.good .ba-h { color: #6ee7b7; }
+  .ba-box .ba-h .lucide { width: 22px; height: 22px; }
+  .ba-box ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .ba-box li { font-size: 13.5px; color: #cbd5e1; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
+  .ba-box.bad li::before { content: "✕"; color: #f87171; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .ba-box.good li::before { content: "✓"; color: #34d399; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .ba-arr { font-size: 34px; color: #60a5fa; align-self: center; font-weight: 900; }
+
+  /* ── Compare table ── */
+  .cmp-table { max-width: 1000px; width: 100%; border-collapse: collapse; border-radius: 16px; overflow: hidden; font-size: 13.5px; }
+  .cmp-table thead th { background: rgba(59,130,246,.1); padding: 15px 18px; text-align: left; font-weight: 700; color: #f8fafc; font-size: 15px; }
+  .cmp-table tbody td { padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,.04); line-height: 1.5; }
+  .cmp-table tbody tr { transition: background .2s; }
+  .cmp-table tbody tr:hover { background: rgba(255,255,255,.02); }
+  .cmp-table .old { color: #fca5a5; }
+  .cmp-table .new { color: #6ee7b7; }
+  .cmp-table .lbl { font-weight: 600; color: #e2e8f0; }
+
+  /* ── Flow ── */
+  .flow { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+  .flow .fs {
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 13px; padding: 15px 20px; text-align: center; min-width: 115px; transition: all .3s;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .flow .fs:hover { border-color: rgba(59,130,246,.4); background: rgba(59,130,246,.05); }
+  .flow .fs .lucide { width: 26px; height: 26px; color: #60a5fa; }
+  .flow .fs .fl { font-weight: 700; font-size: 13px; color: #f8fafc; }
+  .flow .fs .fsl { font-size: 10.5px; color: #64748b; }
+  .flow .arr { font-size: 20px; color: #60a5fa; font-weight: bold; }
+
+  /* ── Tech grid ── */
+  .tech-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 16px; max-width: 1000px; width: 100%; margin-bottom: 30px; }
+  .titem { text-align: center; padding: 21px 10px; }
+  .titem .ti {
+    width: 42px; height: 42px; border-radius: 11px; margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(59,130,246,.1); font-size: 17px; font-weight: 800; color: #60a5fa;
+  }
+  .titem .ti .lucide { width: 22px; height: 22px; color: #60a5fa; }
+  .titem .tn { font-weight: 700; font-size: 13px; color: #f8fafc; margin-bottom: 2px; }
+  .titem .tr { font-size: 10.5px; color: #64748b; }
+
+  /* ── Architecture ── */
+  .arch { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 900px; width: 100%; }
+  .arch-box {
+    border-radius: 13px; padding: 15px 32px; text-align: center; font-weight: 700;
+    font-size: 14px; color: #f8fafc; border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.03); transition: all .3s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .arch-box .lucide { width: 20px; height: 20px; flex-shrink: 0; }
+  .arch-box:hover { transform: scale(1.02); }
+  .arch-box .ab-sub { font-weight: 400; font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .arch-row { display: flex; gap: 16px; width: 100%; }
+  .arch-row .arch-box { flex: 1; padding: 14px 8px; flex-direction: column; }
+  .arch-arrow { font-size: 20px; color: #60a5fa; }
+  .arch-box.blue { border-color: rgba(59,130,246,.25); background: rgba(59,130,246,.06); } .arch-box.blue .lucide { color: #60a5fa; }
+  .arch-box.purple { border-color: rgba(139,92,246,.25); background: rgba(139,92,246,.06); } .arch-box.purple .lucide { color: #a78bfa; }
+  .arch-box.green { border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.06); } .arch-box.green .lucide { color: #34d399; }
+  .arch-box.amber { border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.06); } .arch-box.amber .lucide { color: #fbbf24; }
+  .arch-box.cyan { border-color: rgba(6,182,212,.25); background: rgba(6,182,212,.06); } .arch-box.cyan .lucide { color: #22d3ee; }
+  .arch-box.rose { border-color: rgba(244,63,94,.25); background: rgba(244,63,94,.06); } .arch-box.rose .lucide { color: #fb7185; }
+
+  /* ── Impact ── */
+  .impact-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; max-width: 1020px; width: 100%; }
+  .icard { padding: 28px 24px; text-align: center; }
+  .icard .ii { margin-bottom: 12px; display: flex; justify-content: center; }
+  .icard .ii .lucide { width: 40px; height: 40px; }
+  .icard.blue .ii .lucide { color: #60a5fa; }
+  .icard.green .ii .lucide { color: #34d399; }
+  .icard.purple .ii .lucide { color: #a78bfa; }
+  .icard h3 { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+  .icard.blue h3 { color: #60a5fa; } .icard.green h3 { color: #34d399; } .icard.purple h3 { color: #a78bfa; }
+  .icard ul { list-style: none; text-align: left; display: flex; flex-direction: column; gap: 7px; }
+  .icard li { font-size: 13px; color: #cbd5e1; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
+  .icard li::before { content: "▸"; color: #60a5fa; flex-shrink: 0; }
+
+  /* ── Split2 ── */
+  .split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; max-width: 1020px; width: 100%; }
+  .sp-card { padding: 26px; }
+  .sp-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 9px; }
+  .sp-card h3 .lucide { width: 22px; height: 22px; }
+  .sp-card.blue h3 .lucide { color: #60a5fa; } .sp-card.blue h3 { color: #60a5fa; }
+  .sp-card.purple h3 .lucide { color: #a78bfa; } .sp-card.purple h3 { color: #a78bfa; }
+  .sp-card ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .sp-card li { font-size: 13.5px; color: #cbd5e1; display: flex; align-items: center; gap: 8px; line-height: 1.5; }
+  .sp-card li .ck { color: #34d399; flex-shrink: 0; font-weight: 700; }
+
+  /* ── Thanks ── */
+  .slide-thanks { text-align: center; }
+  .slide-thanks .thanks-icon { margin-bottom: 18px; display: flex; justify-content: center; }
+  .slide-thanks .thanks-icon .lucide { width: 70px; height: 70px; color: #60a5fa; animation: logo-pulse 2.5s ease-in-out infinite; }
+  .slide-thanks h2 {
+    font-size: clamp(44px,7vw,72px); font-weight: 900; margin-bottom: 16px;
+    background: linear-gradient(135deg,#60a5fa,#a78bfa,#34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .slide-thanks .thanks-sub { font-size: 20px; color: #94a3b8; margin-bottom: 34px; line-height: 1.6; }
+
+  /* ── Nav bar ── */
+  .nav-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 12px 24px; background: rgba(10,10,26,.85); backdrop-filter: blur(30px);
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+  .nav-bar .pg { width: 380px; height: 3px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+  .nav-bar .pg-fill { height: 100%; background: linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981); border-radius: 3px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+  .nav-bar button {
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); color: #e2e8f0; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center; transition: all .2s; backdrop-filter: blur(10px);
+  }
+  .nav-bar button:hover { background: #3b82f6; border-color: #3b82f6; transform: scale(1.05); }
+  .nav-bar button:disabled { opacity: .25; cursor: default; }
+  .nav-bar button:disabled:hover { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); transform: none; }
+  .nav-bar .ctr { font-size: 12.5px; color: #94a3b8; min-width: 68px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .nav-bar .nav-icon { display: flex; align-items: center; }
+  .nav-bar .nav-icon .lucide { width: 18px; height: 18px; }
+
+  .kb-hint { position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #475569; z-index: 99; pointer-events: none; transition: opacity 2s; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1100px) {
+    .slide { padding: 36px 22px; }
+    .problem-grid { grid-template-columns: 1fr 1fr; }
+    .feature-grid { grid-template-columns: repeat(2,1fr); }
+    .tech-grid { grid-template-columns: repeat(3,1fr); }
+    .role-grid { grid-template-columns: repeat(3,1fr); }
+    .solution-grid, .split2, .impact-grid { grid-template-columns: 1fr; }
+    .ba-wrap { grid-template-columns: 1fr; }
+    .ba-arr { transform: rotate(90deg); }
+    .arch-row { flex-direction: column; }
+  }
+  @media (max-width: 640px) {
+    .problem-grid, .feature-grid, .tech-grid, .role-grid { grid-template-columns: 1fr; }
+    .stats-row { gap: 20px; }
+    .stat .sn { font-size: 38px; }
+  }
+  @media print {
+    body { overflow: visible; height: auto; background: white; color: black; }
+    .bg-layer, .bg-grid, .nav-bar, .kb-hint { display: none; }
+    .slide { position: relative; display: flex !important; opacity: 1 !important; transform: none !important; page-break-after: always; min-height: 100vh; color: #1e293b; }
+    .slide h1, .slide h2, .slide h3, .slide h4 { -webkit-text-fill-color: initial; color: #0f172a; }
+    .slide p, .slide li { color: #475569; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-layer">
+  <div class="bg-orb o1"></div><div class="bg-orb o2"></div><div class="bg-orb o3"></div>
+  <div class="bg-orb o4"></div><div class="bg-orb o5"></div>
+</div>
+<div class="bg-grid"></div>
+<div class="kb-hint" id="kbHint">Dùng ← → hoặc Space để chuyển slide</div>
+
+<div class="presentation" id="pres">
+
+  <!-- 0: TITLE -->
+  <div class="slide slide-title active" data-i="0">
+    <div class="logo-mark">
+      <i data-lucide="graduation-cap" class="icon-huge"></i>
+    </div>
+    <h1>Hệ thống Quản lý<br>Học tập Thông minh</h1>
+    <p class="subtitle">Nền tảng học tập cá nhân hoá ứng dụng Trí tuệ Nhân tạo dành cho học sinh Việt Nam — nơi AI đồng hành cùng từng bước tiến của bạn</p>
+    <div class="tag-row">
+      <span class="tag ai"><i data-lucide="bot"></i> Trợ lý AI thông minh</span>
+      <span class="tag pl"><i data-lucide="library"></i> Quản lý học tập toàn diện</span>
+      <span class="tag ed"><i data-lucide="trophy"></i> Học mà chơi & Thành tựu</span>
+    </div>
+  </div>
+
+  <!-- 1: SECTION — Giới thiệu -->
+  <div class="slide slide-section" data-i="1">
+    <div class="sec-icon"><i data-lucide="book-open"></i></div>
+    <div class="sec-num">01</div>
+    <h2>Giới thiệu về EduSelf</h2>
+    <p class="sec-desc">EduSelf là nền tảng học tập trực tuyến thông minh, kết hợp công nghệ AI hiện đại với phương pháp sư phạm gợi mở, giúp cá nhân hoá trải nghiệm học tập cho từng học sinh Việt Nam.</p>
+  </div>
+
+  <!-- 2: TỔNG QUAN NỀN TẢNG -->
+  <div class="slide slide-content" data-i="2">
+    <h2>EduSelf là <em>nền tảng toàn diện</em> cho giáo dục</h2>
+    <div class="stats-row">
+      <div class="stat"><div class="sn">5</div><div class="sl">Vai trò người dùng</div></div>
+      <div class="stat"><div class="sn">45+</div><div class="sl">Dịch vụ trực tuyến</div></div>
+      <div class="stat"><div class="sn">10</div><div class="sl">Nhóm tính năng chính</div></div>
+      <div class="stat"><div class="sn">24/7</div><div class="sl">AI Tutor sẵn sàng</div></div>
+    </div>
+    <div class="role-grid">
+      <div class="rcard gcard"><div class="ra sp"><i data-lucide="shield-check"></i></div><h4>Super Admin</h4><p>Quản trị hệ thống cao nhất, toàn quyền kiểm soát</p></div>
+      <div class="rcard gcard"><div class="ra ad"><i data-lucide="settings"></i></div><h4>Admin</h4><p>Quản lý người dùng, môn học, bài tập & xuất dữ liệu</p></div>
+      <div class="rcard gcard"><div class="ra te"><i data-lucide="presentation"></i></div><h4>Giáo viên</h4><p>Tạo bài tập, chấm điểm, theo dõi học sinh, điểm danh</p></div>
+      <div class="rcard gcard"><div class="ra pa"><i data-lucide="users"></i></div><h4>Phụ huynh</h4><p>Theo dõi tiến độ học tập của con, nhận báo cáo AI hàng tuần</p></div>
+      <div class="rcard gcard"><div class="ra st"><i data-lucide="graduation-cap"></i></div><h4>Học sinh</h4><p>Học bài, chat AI, làm quiz, nộp bài tập, tích luỹ thành tựu</p></div>
+    </div>
+  </div>
+
+  <!-- 3: SECTION — Lý do chọn đề tài -->
+  <div class="slide slide-section" data-i="3">
+    <div class="sec-icon"><i data-lucide="compass"></i></div>
+    <div class="sec-num">02</div>
+    <h2>Lý do chọn đề tài</h2>
+    <p class="sec-desc">Từ thực tiễn giáo dục Việt Nam đến khát vọng tạo ra sản phẩm công nghệ "Make in Vietnam" phục vụ học sinh, giáo viên và phụ huynh</p>
+  </div>
+
+  <!-- 4: LÝ DO CHỌN ĐỀ TÀI CHI TIẾT -->
+  <div class="slide slide-content" data-i="4">
+    <h2>Tại sao chúng tôi chọn <em>xây dựng EduSelf</em>?</h2>
+    <div class="problem-grid">
+      <div class="pcard gcard r">
+        <div class="pi"><i data-lucide="smartphone"></i></div>
+        <h3>Nhu cầu chuyển đổi số giáo dục</h3>
+        <p>Việt Nam đang đẩy mạnh chuyển đổi số trong giáo dục theo đề án của Chính phủ. Cần một nền tảng học tập số thực sự hiệu quả, không chỉ là "số hoá" tài liệu.</p>
+      </div>
+      <div class="pcard gcard o">
+        <div class="pi"><i data-lucide="map-pin"></i></div>
+        <h3>Khoảng cách giáo dục thành thị – nông thôn</h3>
+        <p>Học sinh vùng sâu, vùng xa thiếu giáo viên giỏi và tài liệu chất lượng. AI có thể thu hẹp khoảng cách này — mang tri thức đến mọi nơi, mọi lúc.</p>
+      </div>
+      <div class="pcard gcard a">
+        <div class="pi"><i data-lucide="bot"></i></div>
+        <h3>Tiềm năng đột phá của AI trong giáo dục</h3>
+        <p>Trí tuệ nhân tạo đã đủ trưởng thành để làm gia sư ảo. Phương pháp gợi mở + AI có thể tạo ra trải nghiệm học tập cá nhân hoá chưa từng có.</p>
+      </div>
+      <div class="pcard gcard r">
+        <div class="pi"><i data-lucide="file-text"></i></div>
+        <h3>Hạn chế của nền tảng LMS hiện có</h3>
+        <p>Các LMS phổ biến (Moodle, Google Classroom...) thiếu AI thực sự, thiếu gamification, giao diện phức tạp và không được Việt hoá đầy đủ cho người dùng Việt.</p>
+      </div>
+      <div class="pcard gcard o">
+        <div class="pi"><i data-lucide="activity"></i></div>
+        <h3>Thói quen học tập đã thay đổi sau COVID-19</h3>
+        <p>Đại dịch cho thấy học trực tuyến là tất yếu. Nhưng học sinh cần hơn cả video call — cần một nền tảng tương tác, thông minh và tạo động lực.</p>
+      </div>
+      <div class="pcard gcard a">
+        <div class="pi"><i data-lucide="flag"></i></div>
+        <h3>Khát vọng tạo sản phẩm "Make in Vietnam"</h3>
+        <p>Muốn chứng minh người Việt có thể làm ra sản phẩm công nghệ giáo dục đẳng cấp quốc tế, phục vụ đúng nhu cầu học sinh Việt Nam — bằng tiếng Việt, cho người Việt.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5: SECTION — Vấn đề -->
+  <div class="slide slide-section" data-i="5">
+    <div class="sec-icon"><i data-lucide="alert-triangle"></i></div>
+    <div class="sec-num">03</div>
+    <h2>Thực trạng &amp; Vấn đề</h2>
+    <p class="sec-desc">Những khó khăn trong giáo dục truyền thống mà học sinh, giáo viên và phụ huynh đang đối mặt mỗi ngày</p>
+  </div>
+
+  <!-- 4: VẤN ĐỀ CHI TIẾT -->
+  <div class="slide slide-content" data-i="4">
+    <h2>Những <em>vấn đề</em> trước khi có EduSelf</h2>
+    <div class="problem-grid">
+      <div class="pcard gcard r"><div class="pi"><i data-lucide="book-open"></i></div><h3>Học tập thụ động, một chiều</h3><p>Học sinh chỉ đọc và ghi nhớ. Không có người hướng dẫn khi tự học ở nhà. Thắc mắc không được giải đáp kịp thời, dẫn đến hiểu sai kiến thức.</p></div>
+      <div class="pcard gcard o"><div class="pi"><i data-lucide="users"></i></div><h3>Thiếu cá nhân hoá</h3><p>Một giáo viên dạy hàng chục học sinh cùng một phương pháp. Học sinh giỏi thấy nhàm chán, học sinh yếu không theo kịp — không ai được phục vụ đúng nhu cầu.</p></div>
+      <div class="pcard gcard a"><div class="pi"><i data-lucide="pen-line"></i></div><h3>Chấm điểm thủ công, nặng nhọc</h3><p>Giáo viên mất hàng giờ soạn đề, chấm bài, vào điểm. Thời gian quý báu dành cho giảng dạy bị cắt giảm nghiêm trọng.</p></div>
+      <div class="pcard gcard r"><div class="pi"><i data-lucide="trending-down"></i></div><h3>Không theo dõi được tiến độ</h3><p>Phụ huynh không biết con học gì, học bao lâu, mạnh yếu ra sao. Nhà trường không có dữ liệu để đánh giá và cải thiện chất lượng dạy-học.</p></div>
+      <div class="pcard gcard o"><div class="pi"><i data-lucide="crosshair"></i></div><h3>Không phát hiện lỗ hổng kiến thức</h3><p>Học sinh không biết mình yếu phần nào để ôn tập. Lỗ hổng kiến thức tích luỹ âm thầm qua thời gian, đến khi thi mới lộ ra.</p></div>
+      <div class="pcard gcard a"><div class="pi"><i data-lucide="frown"></i></div><h3>Thiếu động lực học tập</h3><p>Không có yếu tố khuyến khích hay khen thưởng kịp thời. Học sinh dễ chán nản, thiếu môi trường cạnh tranh lành mạnh để phấn đấu.</p></div>
+    </div>
+  </div>
+
+  <!-- 7: SECTION — Giải pháp -->
+  <div class="slide slide-section" data-i="7">
+    <div class="sec-icon"><i data-lucide="lightbulb"></i></div>
+    <div class="sec-num">04</div>
+    <h2>Giải pháp của EduSelf</h2>
+    <p class="sec-desc">Cách EduSelf giải quyết từng vấn đề bằng công nghệ AI tiên tiến và thiết kế lấy người học làm trung tâm</p>
+  </div>
+
+  <!-- 6: GIẢI PHÁP CHI TIẾT -->
+  <div class="slide slide-content" data-i="6">
+    <h2>EduSelf đã <em>giải quyết</em> những vấn đề đó như thế nào?</h2>
+    <div class="solution-grid">
+      <div class="scard gcard"><div class="si"><i data-lucide="message-circle"></i></div><div><h4>Trợ lý AI thông minh — Học chủ động</h4><p>Trợ lý AI 24/7 đặt câu hỏi gợi mở theo phương pháp gợi mở, dẫn dắt học sinh tự khám phá kiến thức thay vì đưa sẵn đáp án.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="brain"></i></div><div><h4>Lộ trình học cá nhân hoá</h4><p>AI phân tích năng lực từng học sinh, đề xuất lộ trình phù hợp và bài tập riêng biệt — không ai bị bỏ lại phía sau.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="zap"></i></div><div><h4>Tự động tạo &amp; chấm bài</h4><p>AI tạo câu hỏi trắc nghiệm + tự luận và tự động chấm điểm theo rubric. Giáo viên tiết kiệm đến 70% thời gian.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="bar-chart-3"></i></div><div><h4>Theo dõi tiến độ minh bạch</h4><p>Dashboard trực quan với biểu đồ, số liệu chi tiết. Phụ huynh nhận báo cáo AI hàng tuần về tình hình học tập của con.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="search"></i></div><div><h4>Chẩn đoán điểm yếu thông minh</h4><p>Tự động phát hiện lỗ hổng kiến thức qua bài làm sai, nhóm theo chủ đề, AI tạo bài tập riêng để khắc phục ngay.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="trophy"></i></div><div><h4>Học mà chơi</h4><p>Kim cương, streak ngày học, thành tựu và bảng xếp hạng tạo động lực. Mỗi nỗ lực đều được ghi nhận và khen thưởng xứng đáng.</p></div></div>
+    </div>
+  </div>
+
+  <!-- 7: SO SÁNH TRƯỚC/SAU -->
+  <div class="slide slide-content" data-i="7">
+    <h2>Trước và sau khi có <em>EduSelf</em></h2>
+    <div class="ba-wrap">
+      <div class="ba-box bad">
+        <div class="ba-h"><i data-lucide="x-circle"></i> Trước khi có EduSelf</div>
+        <ul>
+          <li>Học sinh tự học một mình, không ai hướng dẫn khi gặp khó</li>
+          <li>Giáo viên mất 4-5 tiếng/tuần soạn đề và chấm bài thủ công</li>
+          <li>Phụ huynh mù mờ không biết con học hành ra sao</li>
+          <li>Học sinh không biết mình yếu chỗ nào để cải thiện</li>
+          <li>Không có động lực, dễ bỏ cuộc giữa chừng</li>
+          <li>Dữ liệu học tập phân tán, không đo lường được</li>
+        </ul>
+      </div>
+      <div class="ba-arr">⟶</div>
+      <div class="ba-box good">
+        <div class="ba-h"><i data-lucide="check-circle"></i> Sau khi có EduSelf</div>
+        <ul>
+          <li>AI Tutor đồng hành 24/7, giải đáp mọi thắc mắc theo phương pháp gợi mở</li>
+          <li>AI tạo &amp; chấm bài tự động, giáo viên chỉ cần kiểm tra lại</li>
+          <li>Dashboard &amp; báo cáo AI hàng tuần cho phụ huynh</li>
+          <li>Chẩn đoán điểm yếu + bài tập cải thiện riêng cho từng học sinh</li>
+          <li>Kim cương, streak, thành tựu, bảng xếp hạng thúc đẩy học tập</li>
+          <li>Toàn bộ dữ liệu tập trung, phân tích &amp; xuất báo cáo dễ dàng</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10: SECTION — Tính năng -->
+  <div class="slide slide-section" data-i="10">
+    <div class="sec-icon"><i data-lucide="zap"></i></div>
+    <div class="sec-num">05</div>
+    <h2>Tính năng nổi bật</h2>
+    <p class="sec-desc">10 nhóm tính năng chính — tất cả đã hoàn thiện, sẵn sàng sử dụng cho mọi đối tượng</p>
+  </div>
+
+  <!-- 9: TÍNH NĂNG CỐT LÕI -->
+  <div class="slide slide-content" data-i="9">
+    <h2>Nhóm tính năng <em>cốt lõi</em></h2>
+    <div class="feature-grid">
+      <div class="fcard gcard"><div class="fi blu"><i data-lucide="bot"></i></div><h4>Trợ lý AI thông minh</h4><p>Chat streaming với AI, quiz inline trong hội thoại, tóm tắt bài học, giải thích bằng câu hỏi gợi mở</p></div>
+      <div class="fcard gcard"><div class="fi pur"><i data-lucide="library"></i></div><h4>Quản lý học tập</h4><p>Quản lý môn học, khoá học, bài học. Upload &amp; xem PDF với panel kéo thả linh hoạt</p></div>
+      <div class="fcard gcard"><div class="fi grn"><i data-lucide="file-text"></i></div><h4>Bài tập &amp; Chấm điểm</h4><p>Quy trình ASSIGNED → ACCEPTED, AI chấm tự luận, ma trận đề Bộ GD&ĐT, audit log</p></div>
+      <div class="fcard gcard"><div class="fi amb"><i data-lucide="bar-chart-3"></i></div><h4>Theo dõi tiến độ</h4><p>Phiên học tự động, biểu đồ 7 ngày, bảng xếp hạng tuần/tháng, mục tiêu 2h/ngày</p></div>
+      <div class="fcard gcard"><div class="fi ros"><i data-lucide="trophy"></i></div><h4>Học mà chơi</h4><p>Kim cương, streak ngày học, 8 loại thành tựu, lịch sử giao dịch, admin trao thưởng</p></div>
+      <div class="fcard gcard"><div class="fi cya"><i data-lucide="crosshair"></i></div><h4>Chẩn đoán điểm yếu</h4><p>Phát hiện lỗ hổng kiến thức, AI tạo bài tập cải thiện riêng, theo dõi tiến bộ</p></div>
+      <div class="fcard gcard"><div class="fi ind"><i data-lucide="map"></i></div><h4>Mind Map &amp; Đồ thị kiến thức</h4><p>Sơ đồ tư duy AI và đồ thị kiến thức thể hiện mối liên hệ giữa các khái niệm</p></div>
+      <div class="fcard gcard"><div class="fi tea"><i data-lucide="layers"></i></div><h4>Thẻ ghi nhớ ()</h4><p>Thẻ ghi nhớ với thuật toán lặp lại ngắt quãng, , ôn tập thông minh</p></div>
+    </div>
+  </div>
+
+  <!-- 10: TÍNH NĂNG MỞ RỘNG -->
+  <div class="slide slide-content" data-i="10">
+    <h2>Nhóm tính năng <em>mở rộng</em></h2>
+    <div class="feature-grid" style="grid-template-columns: repeat(3,1fr);">
+      <div class="fcard gcard"><div class="fi blu"><i data-lucide="layout-dashboard"></i></div><h4>Dashboard đa vai trò</h4><p>Dashboard riêng cho Học sinh, Giáo viên, Phụ huynh và Admin với dữ liệu phù hợp từng vai trò</p></div>
+      <div class="fcard gcard"><div class="fi pur"><i data-lucide="shield"></i></div><h4>Bảo mật &amp; Phân quyền</h4><p>Đăng nhập an toàn, phân quyền 5 cấp chi tiết đến từng chức năng cho từng vai trò</p></div>
+      <div class="fcard gcard"><div class="fi grn"><i data-lucide="settings-2"></i></div><h4>Quản trị hệ thống</h4><p>CRUD người dùng, môn học, lớp học. Seed data tự động. Xuất CSV toàn bộ dữ liệu</p></div>
+      <div class="fcard gcard"><div class="fi amb"><i data-lucide="calendar-check"></i></div><h4>Điểm danh &amp; Ngân hàng câu hỏi</h4><p>Giáo viên điểm danh, quản lý ngân hàng câu hỏi, import hàng loạt</p></div>
+      <div class="fcard gcard"><div class="fi cya"><i data-lucide="search"></i></div><h4>Tìm kiếm &amp; Thông báo</h4><p>Tìm kiếm toàn cục nhanh chóng, hệ thống thông báo trong ứng dụng real-time</p></div>
+      <div class="fcard gcard"><div class="fi ind"><i data-lucide="file-text"></i></div><h4>Báo cáo AI hàng tuần</h4><p>AI tổng hợp và tạo báo cáo tiến độ hàng tuần cho từng học sinh, gửi đến phụ huynh</p></div>
+      <div class="fcard gcard"><div class="fi tea"><i data-lucide="smartphone"></i></div><h4>Responsive &amp; Tiếng Việt</h4><p>Giao diện 100% tiếng Việt, tương thích mobile, tablet, desktop. Skeleton loading, error states</p></div>
+      <div class="fcard gcard"><div class="fi blu"><i data-lucide="link-2"></i></div><h4>Liên kết Phụ huynh</h4><p>Phụ huynh liên kết tài khoản với con, theo dõi chi tiết điểm số, thời gian học, điểm yếu</p></div>
+      <div class="fcard gcard"><div class="fi ros"><i data-lucide="school"></i></div><h4>Lớp học &amp; Cấp học</h4><p>Quản lý lớp học theo cấp học (Tiểu học, THCS, THPT), phân công giáo viên chủ nhiệm</p></div>
+    </div>
+  </div>
+
+  <!-- 11: AI TUTOR DEEP DIVE -->
+  <div class="slide slide-content" data-i="11">
+    <h2><em>Trợ lý AI thông minh</em> — Trái tim của EduSelf</h2>
+    <div class="flow">
+      <div class="fs"><i data-lucide="book-open"></i><div class="fl">Đọc tài liệu</div><div class="fsl">PDF Bài học</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="message-circle"></i><div class="fl">Chat với AI</div><div class="fsl">trò chuyện mượt mà</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="help-circle"></i><div class="fl">Quiz tương tác</div><div class="fsl">Inline trong chat</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="pen-line"></i><div class="fl">Bài tập tự luận</div><div class="fsl">AI chấm điểm</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="trending-up"></i><div class="fl">Báo cáo &amp; Cải thiện</div><div class="fsl">Lộ trình cá nhân</div></div>
+    </div>
+    <div class="solution-grid">
+      <div class="scard gcard"><div class="si"><i data-lucide="brain"></i></div><div><h4>Phương pháp gợi mở</h4><p>AI không đưa đáp án trực tiếp mà đặt câu hỏi gợi mở, giúp học sinh tự suy luận và khám phá — đúng với cách bộ não học tốt nhất.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="sigma"></i></div><div><h4>Hỗ trợ công thức toán học</h4><p>Công thức toán, lý, hoá hiển thị sắc nét. Học sinh dễ dàng đọc hiểu các công thức phức tạp ngay trong chat.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="list-checks"></i></div><div><h4>Sinh quiz tự động (5-20 câu)</h4><p>AI tạo câu hỏi trắc nghiệm từ nội dung bài học. Quiz kết thúc bài giúp đánh giá mức độ hiểu bài tức thì.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="shield-alert"></i></div><div><h4>Kiểm soát ổn định</h4><p>Giới hạn giới hạn hợp lý để bảo vệ hệ thống. Bảo vệ hệ thống và đảm bảo trải nghiệm mượt mà.</p></div></div>
+    </div>
+  </div>
+
+  <!-- 12: ASSIGNMENT WORKFLOW -->
+  <div class="slide slide-content" data-i="12">
+    <h2>Quy trình <em>Bài tập &amp; Chấm điểm</em></h2>
+    <div class="flow" style="margin-bottom:26px;">
+      <div class="fs"><i data-lucide="clipboard-list"></i><div class="fl">ĐÃ GIAO</div><div class="fsl">Giáo viên giao bài</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="upload"></i><div class="fl">ĐÃ NỘP</div><div class="fsl">Học sinh nộp bài</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="check-check"></i><div class="fl">ĐÃ CHẤM</div><div class="fsl">AI / GV chấm điểm</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="refresh-cw"></i><div class="fl">ĐÃ TRẢ</div><div class="fsl">Trả bài cho HS</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="target"></i><div class="fl">ĐÃ NHẬN</div><div class="fsl">HS chấp nhận điểm</div></div>
+    </div>
+    <div class="solution-grid">
+      <div class="scard gcard"><div class="si"><i data-lucide="sparkles"></i></div><div><h4>Chấm điểm AI tự động</h4><p>AI phân tích bài làm, đối chiếu rubric, đưa ra điểm số kèm nhận xét chi tiết. Giáo viên có thể điều chỉnh trước khi trả bài.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="grid-3x3"></i></div><div><h4>Ma trận đề thi chuẩn Bộ GD&ĐT</h4><p>Xây dựng ma trận đề theo chuẩn Bộ GD&amp;ĐT. AI hỗ trợ tạo câu hỏi phù hợp với từng ô trong ma trận.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="scroll-text"></i></div><div><h4>Audit Log minh bạch</h4><p>Mọi thao tác đều được ghi nhận: ai giao, ai nộp, ai chấm, sửa điểm lúc nào. Truy vết đầy đủ và minh bạch.</p></div></div>
+      <div class="scard gcard"><div class="si"><i data-lucide="download"></i></div><div><h4>Xuất CSV bảng điểm</h4><p>Xuất bảng điểm ra file CSV để lưu trữ hoặc import vào phần mềm quản lý nhà trường hiện có.</p></div></div>
+    </div>
+  </div>
+
+  <!-- 13: GAMIFICATION -->
+  <div class="slide slide-content" data-i="13">
+    <h2><em>Học mà chơi</em> — Biến học tập thành cuộc phiêu lưu</h2>
+    <div class="stats-row" style="margin-bottom:30px;">
+      <div class="stat"><div class="sn icon-stat"><i data-lucide="gem"></i></div><div class="sl">Kim cương thưởng<br>khi học, quiz, nộp bài</div></div>
+      <div class="stat"><div class="sn icon-stat"><i data-lucide="flame"></i></div><div class="sl">Streak chuỗi ngày<br>học liên tục</div></div>
+      <div class="stat"><div class="sn icon-stat"><i data-lucide="award"></i></div><div class="sl">8 loại thành tựu<br>cho các cột mốc</div></div>
+      <div class="stat"><div class="sn icon-stat"><i data-lucide="trophy"></i></div><div class="sl">Bảng xếp hạng<br>tuần / tháng / tất cả</div></div>
+    </div>
+    <div class="feature-grid" style="grid-template-columns: repeat(4,1fr);">
+      <div class="fcard gcard"><div class="fi amb"><i data-lucide="coins"></i></div><h4>Kiếm kim cương</h4><p>Học bài, trả lời quiz, nộp bài tập đều được thưởng kim cương</p></div>
+      <div class="fcard gcard"><div class="fi ros"><i data-lucide="scroll-text"></i></div><h4>Lịch sử giao dịch</h4><p>Xem lại toàn bộ lịch sử nhận và tiêu kim cương</p></div>
+      <div class="fcard gcard"><div class="fi pur"><i data-lucide="star"></i></div><h4>Thành tựu</h4><p>8 thành tựu mặc định: học 10h, streak 7 ngày, điểm cao...</p></div>
+      <div class="fcard gcard"><div class="fi blu"><i data-lucide="crown"></i></div><h4>Admin trao thưởng</h4><p>Admin trao kim cương thủ công cho học sinh xuất sắc</p></div>
+    </div>
+  </div>
+
+  <!-- 14: PROGRESS & WEAKNESS -->
+  <div class="slide slide-content" data-i="14">
+    <h2>Theo dõi <em>tiến độ</em> &amp; Chẩn đoán <em>điểm yếu</em></h2>
+    <div class="split2">
+      <div class="sp-card gcard blue">
+        <h3><i data-lucide="bar-chart-3"></i> Theo dõi tiến độ</h3>
+        <ul>
+          <li><span class="ck">✓</span> Phiên học tự động (bắt đầu / tạm dừng / kết thúc)</li>
+          <li><span class="ck">✓</span> công nghệ lưu dữ liệu thông minh khi đóng tab — không mất dữ liệu</li>
+          <li><span class="ck">✓</span> Thống kê: tổng giờ, hôm nay, tuần này, điểm TB</li>
+          <li><span class="ck">✓</span> Biểu đồ cột 7 ngày học tập trực quan</li>
+          <li><span class="ck">✓</span> Bảng xếp hạng: tuần / tháng / tất cả</li>
+          <li><span class="ck">✓</span> Mục tiêu học tập: 2 giờ/ngày, 10 giờ/tuần</li>
+        </ul>
+      </div>
+      <div class="sp-card gcard purple">
+        <h3><i data-lucide="crosshair"></i> Chẩn đoán điểm yếu</h3>
+        <ul>
+          <li><span class="ck">✓</span> Tự động ghi nhận khi trả lời sai / điểm thấp</li>
+          <li><span class="ck">✓</span> Gom nhóm thông minh theo bài học + chủ đề</li>
+          <li><span class="ck">✓</span> Tự động cải thiện khi học sinh trả lời đúng</li>
+          <li><span class="ck">✓</span> AI tạo bài tập cải thiện riêng cho từng điểm yếu</li>
+          <li><span class="ck">✓</span> Giáo viên thêm ghi chú coach cho học sinh</li>
+          <li><span class="ck">✓</span> Dashboard trực quan — biết ngay mình cần ôn gì</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 17: SECTION — Công nghệ -->
+  <div class="slide slide-section" data-i="17">
+    <div class="sec-icon"><i data-lucide="cpu"></i></div>
+    <div class="sec-num">06</div>
+    <h2>Công nghệ sử dụng</h2>
+    <p class="sec-desc">Kiến trúc hiện đại, hiệu năng cao, dễ mở rộng và bảo trì — sẵn sàng cho quy mô toàn quốc</p>
+  </div>
+
+  <!-- 16: TECH STACK -->
+  <div class="slide slide-content" data-i="16">
+    <h2>Kiến trúc <em>công nghệ</em> hiện đại</h2>
+    <div class="tech-grid">
+      <div class="titem gcard"><div class="ti"><i data-lucide="monitor"></i></div><div class="tn">Trang web</div><div class="tr">Hiện đại, nhanh</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="server"></i></div><div class="tn">Máy chủ</div><div class="tr">Mạnh mẽ, ổn định</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="database"></i></div><div class="tn">Cơ sở dữ liệu</div><div class="tr">Lưu trữ an toàn</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="lock"></i></div><div class="tn">Bảo mật</div><div class="tr">Đăng nhập & phân quyền</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="cloud"></i></div><div class="tn">Đám mây</div><div class="tr">Lưu trữ tài liệu</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="bot"></i></div><div class="tn">Trí tuệ nhân tạo</div><div class="tr">AI thông minh</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="palette"></i></div><div class="tn">Giao diện</div><div class="tr">Đẹp, dễ dùng</div></div>
+      <div class="titem gcard"><div class="ti"><i data-lucide="smartphone"></i></div><div class="tn">Mọi thiết bị</div><div class="tr">Điện thoại, máy tính</div></div>
+    </div>
+    <div class="tag-row">
+      <span class="tag ai" style="font-size:12px;">Toàn bộ giao diện tiếng Việt</span>
+      <span class="tag pl" style="font-size:12px;">Dùng được trên mọi thiết bị</span>
+      <span class="tag ed" style="font-size:12px;">Hoạt động liên tục 24/7</span>
+    </div>
+  </div>
+
+  <!-- 17: ARCHITECTURE -->
+  <div class="slide slide-content" data-i="17">
+    <h2>Kiến trúc <em>hệ thống</em></h2>
+    <div class="arch">
+      <div class="arch-box blue"><i data-lucide="monitor"></i><b>Người dùng</b><div class="ab-sub">Học sinh · Giáo viên · Phụ huynh · Quản trị</div></div>
+      <div class="arch-arrow">⬇ Kết nối an toàn</div>
+      <div class="arch-box purple"><i data-lucide="globe"></i><b>Nền tảng web</b><div class="ab-sub">Giao diện trực quan, tốc độ cao</div></div>
+      <div class="arch-arrow">⬇ Xử lý & phản hồi</div>
+      <div class="arch-row">
+        <div class="arch-box green"><i data-lucide="server"></i><b>Máy chủ xử lý</b><div class="ab-sub">Điều phối hoạt động<br>Phân quyền & bảo mật</div></div>
+        <div class="arch-box amber"><i data-lucide="database"></i><b>Kho dữ liệu</b><div class="ab-sub">Lưu trữ an toàn<br>Toàn bộ thông tin</div></div>
+        <div class="arch-box cyan"><i data-lucide="cloud"></i><b>Kho tài liệu</b><div class="ab-sub">Lưu trữ bài giảng<br>PDF & tài liệu học</div></div>
+      </div>
+      <div class="arch-arrow">⬇ Kết nối thông minh</div>
+      <div class="arch-box rose"><i data-lucide="sparkles"></i><b>Trí tuệ nhân tạo</b><div class="ab-sub">Trò chuyện · Tạo câu hỏi · Chấm điểm · Báo cáo · Sơ đồ tư duy</div></div>
+    </div>
+  </div>
+
+  <!-- 20: SECTION — Điểm mới -->
+  <div class="slide slide-section" data-i="20">
+    <div class="sec-icon"><i data-lucide="sparkles"></i></div>
+    <div class="sec-num">07</div>
+    <h2>Điểm mới &amp; Sáng tạo</h2>
+    <p class="sec-desc">Những yếu tố khác biệt cốt lõi làm nên giá trị riêng của EduSelf so với các nền tảng hiện có trên thị trường</p>
+  </div>
+
+  <!-- 19: COMPARISON -->
+  <div class="slide slide-content" data-i="19">
+    <h2>Điều gì làm <em>EduSelf</em> khác biệt?</h2>
+    <table class="cmp-table">
+      <thead><tr><th style="width:22%">Tiêu chí</th><th style="width:39%">Nền tảng EduSelf khác</th><th style="width:39%">EduSelf của chúng tôi</th></tr></thead>
+      <tbody>
+        <tr><td class="lbl">AI Tutor</td><td class="old">Chatbot trả lời trực tiếp, không có phương pháp sư phạm</td><td class="new">Trợ lý AI thông minh — đặt câu hỏi gợi mở, dẫn dắt học sinh tự khám phá kiến thức</td></tr>
+        <tr><td class="lbl">Cá nhân hoá</td><td class="old">Gợi ý khoá học dựa trên danh mục có sẵn, không thực sự cá nhân</td><td class="new">AI phân tích năng lực → chẩn đoán điểm yếu → tạo lộ trình &amp; bài tập riêng biệt</td></tr>
+        <tr><td class="lbl">Chấm điểm</td><td class="old">Trắc nghiệm tự động, tự luận bắt buộc chấm thủ công</td><td class="new">AI chấm cả tự luận theo rubric chi tiết, giáo viên chỉ kiểm tra lại</td></tr>
+        <tr><td class="lbl">Học mà chơi</td><td class="old">Huy hiệu cơ bản, không có hệ thống thưởng thực chất</td><td class="new">Kim cương + Streak + 8 Thành tựu + Bảng xếp hạng — đầy đủ và có chiều sâu</td></tr>
+        <tr><td class="lbl">Công cụ học tập</td><td class="old">Video + quiz là chính</td><td class="new">Sơ đồ tư duy AI + Đồ thị kiến thức + Thẻ ghi nhớ () + Sơ đồ tư duy</td></tr>
+        <tr><td class="lbl">Báo cáo</td><td class="old">Bảng điểm tĩnh, không phân tích</td><td class="new">AI tạo báo cáo hàng tuần + Dashboard trực quan theo vai trò</td></tr>
+        <tr><td class="lbl">Ngôn ngữ</td><td class="old">Chủ yếu tiếng Anh, ít hỗ trợ tiếng Việt</td><td class="new">Toàn bộ UI bằng tiếng Việt, nội dung phù hợp chương trình Việt Nam</td></tr>
+        <tr><td class="lbl">Phân quyền</td><td class="old">2-3 vai trò cơ bản (admin, teacher, student)</td><td class="new">phân quyền 5 cấp + phân quyền chi tiết đến từng chức năng</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 20: HIỆU QUẢ -->
+  <div class="slide slide-content" data-i="20">
+    <h2><em>Hiệu quả</em> mang lại</h2>
+    <div class="impact-grid">
+      <div class="icard gcard blue">
+        <div class="ii"><i data-lucide="cog"></i></div>
+        <h3>Hiệu quả Kỹ thuật</h3>
+        <ul>
+          <li>Tiết kiệm 70% thời gian soạn &amp; chấm bài cho giáo viên</li>
+          <li>AI hoạt động 24/7, phản hồi tức thì qua phản hồi tức thì</li>
+          <li>45+ dịch vụ hoạt động ổn định, kiến trúc rõ ràng dễ bảo trì</li>
+          <li>công nghệ lưu dữ liệu thông minh — không mất dữ liệu ngay cả khi đóng tab đột ngột</li>
+        </ul>
+      </div>
+      <div class="icard gcard green">
+        <div class="ii"><i data-lucide="landmark"></i></div>
+        <h3>Hiệu quả Kinh tế</h3>
+        <ul>
+          <li>Chi phí triển khai thấp hơn nhiều so với giải pháp nước ngoài</li>
+          <li>Giảm chi phí in ấn đề thi, bài tập, tài liệu</li>
+          <li>Mở rộng không giới hạn nhờ hạ tầng cloud (hạ tầng đám mây)</li>
+          <li>Không cần mua bản quyền phần mềm đắt đỏ</li>
+        </ul>
+      </div>
+      <div class="icard gcard purple">
+        <div class="ii"><i data-lucide="globe-2"></i></div>
+        <h3>Hiệu quả Xã hội</h3>
+        <ul>
+          <li>Thu hẹp khoảng cách giáo dục giữa thành thị và nông thôn</li>
+          <li>Học sinh vùng sâu, vùng xa được tiếp cận AI Tutor chất lượng cao</li>
+          <li>Tăng cường sự tham gia của phụ huynh vào việc học của con</li>
+          <li>Giảm áp lực công việc cho giáo viên</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 21: KHẢ NĂNG ÁP DỤNG -->
+  <div class="slide slide-content" data-i="21">
+    <h2><em>Khả năng</em> áp dụng</h2>
+    <div class="split2" style="margin-bottom:18px;">
+      <div class="sp-card gcard blue">
+        <h3><i data-lucide="target"></i> Đối tượng sử dụng</h3>
+        <ul>
+          <li><i data-lucide="school" style="width:18px;height:18px;color:#60a5fa;"></i> Trường học các cấp (Tiểu học, THCS, THPT)</li>
+          <li><i data-lucide="home" style="width:18px;height:18px;color:#60a5fa;"></i> Học sinh tự học tại nhà</li>
+          <li><i data-lucide="graduation-cap" style="width:18px;height:18px;color:#60a5fa;"></i> Trung tâm dạy thêm, gia sư</li>
+          <li><i data-lucide="building-2" style="width:18px;height:18px;color:#60a5fa;"></i> Sở / Phòng GD&amp;ĐT quản lý tập trung</li>
+        </ul>
+      </div>
+      <div class="sp-card gcard green">
+        <h3><i data-lucide="trending-up"></i> Quy mô triển khai</h3>
+        <ul>
+          <li><i data-lucide="building" style="width:18px;height:18px;color:#34d399;"></i> <b>1 trường</b> — Triển khai trong 1-2 ngày</li>
+          <li><i data-lucide="grid-3x3" style="width:18px;height:18px;color:#34d399;"></i> <b>Cụm trường</b> — Dùng chung hạ tầng cloud</li>
+          <li><i data-lucide="map-pin" style="width:18px;height:18px;color:#34d399;"></i> <b>Cấp tỉnh</b> — Hệ thống tự động mở rộng theo nhu cầu</li>
+          <li><i data-lucide="globe" style="width:18px;height:18px;color:#34d399;"></i> <b>Toàn quốc</b> — Kiến trúc sẵn sàng mở rộng</li>
+        </ul>
+      </div>
+    </div>
+    <div class="gcard" style="padding:18px 26px; max-width:1020px; width:100%; display:flex; align-items:center; gap:14px; border-color:rgba(245,158,11,.2); background:rgba(245,158,11,.03);">
+      <i data-lucide="telescope" style="width:32px;height:32px;color:#fbbf24;flex-shrink:0;"></i>
+      <div>
+        <h4 style="font-weight:700;color:#fbbf24;margin-bottom:3px;">Định hướng phát triển tiếp theo</h4>
+        <p style="font-size:13px;color:#cbd5e1;line-height:1.5;">Trò chuyện giọng nói AI • Thi đấu trực tuyến • Lập kế hoạch học tập • Tích hợp hệ thống quản lý nhà trường • Ứng dụng điện thoại</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 22: SECTION — Hành trình phát triển -->
+  <div class="slide slide-section" data-i="22">
+    <div class="sec-icon"><i data-lucide="clock"></i></div>
+    <div class="sec-num">08</div>
+    <h2>Hành trình phát triển</h2>
+    <p class="sec-desc">Từ ý tưởng ban đầu đến sản phẩm hoàn thiện trong gần 6 tuần làm việc liên tục</p>
+  </div>
+
+  <!-- 23: TIMELINE -->
+  <div class="slide slide-content" data-i="23">
+    <h2>Từ <em>ý tưởng</em> đến <em>sản phẩm</em></h2>
+    <div style="display:flex; flex-direction:column; gap:10px; max-width:1000px; width:100%; position:relative;">
+      <!-- Timeline line -->
+      <div style="position:absolute; left:46px; top:0; bottom:0; width:3px; background:linear-gradient(180deg,#3b82f6,#8b5cf6,#10b981); border-radius:3px;"></div>
+      <!-- Items -->
+      <div style="display:flex; gap:18px; align-items:flex-start; position:relative; z-index:1;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;">1</div>
+        <div class="gcard" style="flex:1;padding:14px 18px;">
+          <h4 style="color:#60a5fa;margin-bottom:2px;">Tuần 1 (7/5 – 14/5/2026) — Khởi động & Nền móng</h4>
+          <p style="font-size:12px;color:#94a3b8;">Khởi tạo dự án Next.js + Go backend. Xây dựng hệ thống xác thực, phân quyền 5 vai trò. Tích hợp trình xem PDF và AI Tutor nền tảng.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:18px; align-items:flex-start; position:relative; z-index:1;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;">2</div>
+        <div class="gcard" style="flex:1;padding:14px 18px;">
+          <h4 style="color:#818cf8;margin-bottom:2px;">Tuần 2 (15/5 – 21/5/2026) — AI & Học tập thông minh</h4>
+          <p style="font-size:12px;color:#94a3b8;">Hoàn thiện AI Socratic Tutor với streaming chat, quiz tương tác, chấm điểm tự động. Bổ sung Flashcards, Mind Map, Knowledge Graph. Triển khai dashboard theo vai trò.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:18px; align-items:flex-start; position:relative; z-index:1;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#8b5cf6;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;">3</div>
+        <div class="gcard" style="flex:1;padding:14px 18px;">
+          <h4 style="color:#a78bfa;margin-bottom:2px;">Tuần 3 (22/5 – 28/5/2026) — Hoàn thiện hệ sinh thái</h4>
+          <p style="font-size:12px;color:#94a3b8;">Xây dựng module Phụ huynh, Kế hoạch học tập, Ngân hàng câu hỏi, Điểm danh. Triển khai báo cáo AI hàng tuần và hệ thống thông báo.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:18px; align-items:flex-start; position:relative; z-index:1;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;">4</div>
+        <div class="gcard" style="flex:1;padding:14px 18px;">
+          <h4 style="color:#34d399;margin-bottom:2px;">Tuần 4-5 (29/5 – 15/6/2026) — Triển khai & Hoàn thiện</h4>
+          <p style="font-size:12px;color:#94a3b8;">Deploy lên Vercel + Azure. Kiểm thử toàn diện, sửa lỗi, tối ưu hiệu năng. Hoàn thiện UI/UX tiếng Việt. Chuẩn bị tài liệu và bài thuyết trình.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:18px; align-items:flex-start; position:relative; z-index:1;">
+        <div style="width:38px;height:38px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;">🚀</div>
+        <div class="gcard" style="flex:1;padding:14px 18px;border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.03);">
+          <h4 style="color:#fbbf24;margin-bottom:2px;">Hiện tại — Sẵn sàng ra mắt</h4>
+          <p style="font-size:12px;color:#94a3b8;">Sản phẩm hoàn thiện với 10 nhóm tính năng, 45+ dịch vụ, hỗ trợ 5 vai trò người dùng. Sẵn sàng triển khai cho trường học và học sinh.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 24: QUY TRÌNH SỬ DỤNG -->
+  <div class="slide slide-content" data-i="24">
+    <h2>Một buổi học <em>điển hình</em> trên EduSelf</h2>
+    <div class="flow" style="margin-bottom:18px;">
+      <div class="fs"><i data-lucide="log-in"></i><div class="fl">Đăng nhập</div><div class="fsl">Mở máy, vào web</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="layout-dashboard"></i><div class="fl">Dashboard</div><div class="fsl">Xem tiến độ</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="book-open"></i><div class="fl">Chọn bài học</div><div class="fsl">Môn → Khoá → Bài</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="file-text"></i><div class="fl">Đọc tài liệu</div><div class="fsl">Xem PDF</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="message-circle"></i><div class="fl">Chat với AI</div><div class="fsl">Hỏi đáp gợi mở</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="check-circle"></i><div class="fl">Làm quiz</div><div class="fsl">Kiểm tra hiểu bài</div></div>
+      <div class="arr">→</div>
+      <div class="fs"><i data-lucide="gem"></i><div class="fl">Nhận thưởng</div><div class="fsl">Kim cương & streak</div></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; max-width:1000px; width:100%;">
+      <div class="sp-card gcard blue">
+        <h3><i data-lucide="clock"></i> Thời lượng: ~45 phút / bài</h3>
+        <ul>
+          <li><span class="ck">✓</span> 15 phút đầu: Đọc tài liệu PDF, đánh dấu phần quan trọng</li>
+          <li><span class="ck">✓</span> 15 phút giữa: Trò chuyện với AI — đặt câu hỏi, nhờ giải thích</li>
+          <li><span class="ck">✓</span> 10 phút cuối: Làm quiz kết thúc bài, xem kết quả</li>
+          <li><span class="ck">✓</span> 5 phút: Nhận kim cương, kiểm tra streak, xem bảng xếp hạng</li>
+        </ul>
+      </div>
+      <div class="sp-card gcard green">
+        <h3><i data-lucide="sparkles"></i> Điểm đặc biệt</h3>
+        <ul>
+          <li><span class="ck">✓</span> AI Socratic không trả lời thẳng — gợi mở để học sinh tự nghĩ</li>
+          <li><span class="ck">✓</span> Công thức toán hiển thị đẹp ngay trong chat</li>
+          <li><span class="ck">✓</span> Quiz hiện ngay trong khung chat, không cần chuyển trang</li>
+          <li><span class="ck">✓</span> Nếu trả lời sai, AI ghi nhận điểm yếu và tạo bài tập riêng</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 25: CHI PHÍ TRIỂN KHAI -->
+  <div class="slide slide-content" data-i="25">
+    <h2><em>Chi phí</em> triển khai</h2>
+    <table class="cmp-table" style="margin-bottom:22px;">
+      <thead><tr><th>Hạng mục</th><th>EduSelf</th><th>Giải pháp nước ngoài (Moodle/Google)</th></tr></thead>
+      <tbody>
+        <tr><td class="lbl">Chi phí nền tảng / năm</td><td class="new"><b>~3-5 triệu VNĐ</b><br>(cloud + domain)</td><td class="old"><b>~20-50 triệu VNĐ</b><br>(bản quyền + hosting)</td></tr>
+        <tr><td class="lbl">Chi phí AI / năm</td><td class="new"><b>~2-3 triệu VNĐ</b><br>(API với mức dùng học sinh)</td><td class="old"><b>Không có sẵn</b><br>(phải mua thêm dịch vụ AI)</td></tr>
+        <tr><td class="lbl">Triển khai</td><td class="new"><b>1-2 ngày</b><br>Miễn phí cài đặt</td><td class="old"><b>1-4 tuần</b><br>Cần chuyên gia cấu hình</td></tr>
+        <tr><td class="lbl">Bảo trì</td><td class="new"><b>Tự động</b><br>Cập nhật qua cloud</td><td class="old"><b>Thủ công / thuê ngoài</b><br>Phí bảo trì cao</td></tr>
+        <tr><td class="lbl">Ngôn ngữ</td><td class="new"><b>Tiếng Việt 100%</b><br>Phù hợp chương trình VN</td><td class="old"><b>Tiếng Anh là chính</b><br>Việt hoá hạn chế</td></tr>
+        <tr><td class="lbl"><b>Tổng chi phí ước tính / năm</b></td><td class="new"><b>5-8 triệu VNĐ</b></td><td class="old"><b>30-80 triệu VNĐ</b></td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:#94a3b8;text-align:center;max-width:900px;">Chi phí trên ước tính cho quy mô 1 trường (~500-1000 học sinh). EduSelf tiết kiệm <b style="color:#34d399;">80-90%</b> chi phí so với giải pháp nước ngoài nhờ tận dụng hạ tầng đám mây và công nghệ nguồn mở.</p>
+  </div>
+
+  <!-- 26: THANK YOU -->
+  <div class="slide slide-thanks" data-i="27">
+    <div class="thanks-icon"><i data-lucide="heart-handshake"></i></div>
+    <h2>Xin cảm ơn!</h2>
+    <p class="thanks-sub">Hệ thống Quản lý Học tập Thông minh<br><span style="font-size:16px;color:#64748b;">Sẵn sàng cho tương lai giáo dục Việt Nam</span></p>
+    <div class="tag-row">
+      <span class="tag ai"><i data-lucide="bot"></i> AI-Powered</span>
+      <span class="tag pl"><i data-lucide="map-pin"></i> Made in Vietnam</span>
+      <span class="tag ed"><i data-lucide="book-open"></i> Education First</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <button id="btnPrev" title="Slide trước (←)"><i data-lucide="chevron-left" style="width:20px;height:20px;"></i></button>
+  <div class="pg"><div class="pg-fill" id="pgFill"></div></div>
+  <span class="ctr" id="ctr">1 / 23</span>
+  <button id="btnNext" title="Slide tiếp (→)"><i data-lucide="chevron-right" style="width:20px;height:20px;"></i></button>
+</div>
+
+<script>
+(function(){
+  const slides = document.querySelectorAll('.slide');
+  const T = slides.length;
+  let cur = 0;
+  const btnP = document.getElementById('btnPrev');
+  const btnN = document.getElementById('btnNext');
+  const ctr = document.getElementById('ctr');
+  const pg = document.getElementById('pgFill');
+  const hint = document.getElementById('kbHint');
+
+  function show(i) {
+    slides.forEach(s => s.classList.remove('active'));
+    slides[i].classList.add('active');
+    ctr.textContent = (i+1) + ' / ' + T;
+    pg.style.width = ((i+1)/T*100) + '%';
+    btnP.disabled = i === 0;
+    btnN.disabled = i === T-1;
+    cur = i;
+    lucide.createIcons();
+  }
+
+  btnP.addEventListener('click', () => { if (cur > 0) show(cur-1); });
+  btnN.addEventListener('click', () => { if (cur < T-1) show(cur+1); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault(); if (cur < T-1) show(cur+1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (cur > 0) show(cur-1);
+    } else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(T-1); }
+  });
+
+  let tx=0, ty=0;
+  document.addEventListener('touchstart', e => { tx=e.touches[0].clientX; ty=e.touches[0].clientY; });
+  document.addEventListener('touchend', e => {
+    const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+    if (Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>40) {
+      if (dx<0 && cur<T-1) show(cur+1); else if (dx>0 && cur>0) show(cur-1);
+    }
+  });
+
+  let wt;
+  document.addEventListener('wheel', e => {
+    if (wt) return;
+    wt = setTimeout(() => { wt=null; }, 700);
+    if (Math.abs(e.deltaY)>20) {
+      if (e.deltaY>0 && cur<T-1) show(cur+1);
+      else if (e.deltaY<0 && cur>0) show(cur-1);
+    }
+  }, {passive:true});
+
+  function hideHint(){ hint.style.opacity='0'; setTimeout(()=>hint.remove(),2000); }
+  document.addEventListener('keydown', hideHint, {once:true});
+  document.addEventListener('wheel', hideHint, {once:true});
+  document.addEventListener('touchstart', hideHint, {once:true});
+
+  document.querySelectorAll('.gcard').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r=card.getBoundingClientRect();
+      card.style.setProperty('--mx', (e.clientX-r.left)+'px');
+      card.style.setProperty('--my', (e.clientY-r.top)+'px');
+    });
+  });
+
+  lucide.createIcons();
+  show(0);
+})();
+</script>
+</body>
+</html>
