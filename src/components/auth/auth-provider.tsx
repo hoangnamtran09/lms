@@ -128,13 +128,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const sessionUser = data.user as SupabaseSessionUser;
       const token = data.session?.access_token;
-      // Dùng fallback user ngay lập tức để UI hiển thị nhanh
       const fallbackUser = buildFallbackUser(sessionUser);
       setUser(fallbackUser);
       if (token) setTokenCookie(token);
-      // Đợi backend trả về role chính xác trước khi redirect
-      const verifiedUser = await fetchLocalUser(sessionUser, token);
-      return verifiedUser || fallbackUser;
+
+      // Fetch backend user in background — don’t block redirect waiting for cold backend
+      fetchLocalUser(sessionUser, token).then((verifiedUser) => {
+        if (verifiedUser && verifiedUser.role !== fallbackUser.role) {
+          setUser(verifiedUser);
+        }
+      });
+
+      return fallbackUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
       setError(message);

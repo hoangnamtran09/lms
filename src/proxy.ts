@@ -17,6 +17,14 @@ function copySupabaseCookies(from: NextResponse, to: NextResponse) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Fast path: no Supabase cookies → redirect immediately without calling Supabase
+  const hasSupabaseCookies = request.cookies.getAll().some(c => c.name.startsWith("sb-"));
+  if (!hasSupabaseCookies && !publicPaths.some(p => pathname.startsWith(p))) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
   // Temp response collects cookies Supabase sets during session check/refresh
   const cookieJar = NextResponse.next({ request });
 

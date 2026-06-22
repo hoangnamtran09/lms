@@ -5,9 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/lms/backend/internal/config"
+	"github.com/lms/backend/internal/middleware"
 	"github.com/lms/backend/internal/router"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -28,6 +30,23 @@ func main() {
 	if err != nil {
 		slog.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
+	}
+
+	// Configure connection pool (PgBouncer in transaction mode)
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+		sqlDB.SetConnMaxIdleTime(1 * time.Minute)
+	}
+
+	// Warm-up JWKS cache so first JWT verification doesn’t pay the fetch penalty
+	if cfg.SupabaseURL != "" {
+		go func() {
+			if _, err := middleware.FetchJWKS(cfg.SupabaseURL); err != nil {
+				slog.Warn("JWKS warm-up failed", "error", err)
+			}
+		}()
 	}
 
 	// Auto-migrate and seed only when not explicitly skipped.

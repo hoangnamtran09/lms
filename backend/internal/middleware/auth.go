@@ -120,7 +120,7 @@ func peekAlg(tokenStr string) string {
 	return alg
 }
 
-func fetchJWKS(supabaseURL string) (map[string]*ecdsa.PublicKey, error) {
+func FetchJWKS(supabaseURL string) (map[string]*ecdsa.PublicKey, error) {
 	// Check cache
 	if cached, ok := jwksCache.Load(supabaseURL); ok {
 		entry := cached.(jwksEntry)
@@ -191,7 +191,7 @@ func parseES256(tokenStr, supabaseURL string) (*Claims, error) {
 		return nil, fmt.Errorf("supabase URL not configured")
 	}
 
-	keys, err := fetchJWKS(supabaseURL)
+	keys, err := FetchJWKS(supabaseURL)
 	if err != nil {
 		return nil, err
 	}
