@@ -99,6 +99,7 @@ var permissionMatrix = map[Role]map[Resource][]Action{
 		ResGrades:       {ActRead},
 		ResAnalytics:    {ActRead},
 		ResAchievements: {ActRead},
+		ResAI:           {ActRead},
 		ResChildren:     {ActManage},
 		ResQuestionBank: {ActRead},
 	},

@@ -65,7 +65,9 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 		if !hasHistory {
 			status, err := h.progressService.GetStatus(r.Context(), req.SessionID)
-			if err != nil || !status.ChatUnlocked {
+			// Buffer 10 giây vì timer frontend chạy sớm hơn session backend được tạo
+			chatAllowed := err == nil && (status.ChatUnlocked || status.ElapsedSeconds >= 50)
+			if !chatAllowed {
 				jsonErr(w, "Bạn cần đọc bài đủ thời gian để mở khoá chat", http.StatusForbidden)
 				return
 			}
