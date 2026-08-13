@@ -1,11 +1,5 @@
 {
   "framework": "nextjs",
   "buildCommand": "next build",
-  "installCommand": "pnpm install",
-  "crons": [
-    {
-      "path": "/api/health",
-      "schedule": "*/10 * * * *"
-    }
-  ]
+  "installCommand": "pnpm install"
 }
