@@ -1,0 +1,7 @@
+.env
+.next
+server
+server.log
+*.db
+test-results
+.git

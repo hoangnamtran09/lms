@@ -1,0 +1,19 @@
+name: Keep backend warm
+
+on:
+  schedule:
+    # Ping every 10 minutes (UTC) to keep the Azure Container App from scaling
+    # to zero. Vercel Hobby plan does not allow sub-daily cron jobs, so this
+    # runs on GitHub Actions instead.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keep-warm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -m 30 \
+            https://lms-backend.agreeableriver-a1dda4c6.southeastasia.azurecontainerapps.io/api/health \
+            && echo "Health OK"
