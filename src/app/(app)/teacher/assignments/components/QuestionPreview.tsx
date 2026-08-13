@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { MathText } from "@/components/ai/math-text";
 
 interface GeneratedQuestion {
   id: string;
@@ -180,6 +181,9 @@ function QuestionCard({
       <div className="space-y-3">
         <div>
           <Label className="text-xs text-gray-500">Nội dung câu hỏi</Label>
+          <div className="mt-1 mb-2 text-sm text-gray-900 leading-relaxed">
+            <MathText text={q.question} />
+          </div>
           <Textarea
             value={q.question}
             onChange={(e) => updateQuestion(i, "question", e.target.value)}
@@ -226,7 +230,7 @@ function QuestionCard({
         {q.explanation && (
           <div>
             <Label className="text-xs text-gray-500">Giải thích</Label>
-            <p className="text-sm text-gray-600 mt-1">{q.explanation}</p>
+            <p className="text-sm text-gray-600 mt-1"><MathText text={q.explanation} /></p>
           </div>
         )}
         {q.options && q.options.length > 0 && (
@@ -235,7 +239,7 @@ function QuestionCard({
             <div className="grid grid-cols-2 gap-1 mt-1">
               {q.options.map((opt, j) => (
                 <span key={j} className={`text-sm px-2 py-1 rounded ${opt.isCorrect ? "bg-emerald-100 text-emerald-700 font-medium" : "bg-gray-100 text-gray-600"}`}>
-                  {opt.text}
+                  <MathText text={opt.text} />
                 </span>
               ))}
             </div>

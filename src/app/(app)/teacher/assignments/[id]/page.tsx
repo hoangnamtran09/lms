@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { MathText } from "@/components/ai/math-text";
 import {
   Select,
   SelectContent,
@@ -549,7 +550,7 @@ export default function TeacherAssignmentDetailPage({
                           ) : (
                             /* View mode */
                             <div className="flex-1">
-                              <p className="text-gray-900 font-medium">{q.question}</p>
+                              <p className="text-gray-900 font-medium"><MathText text={q.question} /></p>
                               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                                 <span className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
                                   {q.type === "mcq" ? "Trắc nghiệm" : "Tự luận"}
@@ -563,20 +564,20 @@ export default function TeacherAssignmentDetailPage({
                                   {q.score || 10} điểm
                                 </span>
                                 {q.expectedAnswer && (
-                                  <span className="text-xs text-gray-400">Đáp án: {q.expectedAnswer}</span>
+                                  <span className="text-xs text-gray-400">Đáp án: <MathText text={q.expectedAnswer} /></span>
                                 )}
                               </div>
                               {q.type === "mcq" && q.options && q.options.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                                   {q.options.map((opt, oi) => (
                                     <span key={oi} className={`text-xs px-2.5 py-1 rounded-full border ${opt.isCorrect ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                                      {String.fromCharCode(65 + oi)}. {opt.text} {opt.isCorrect ? "✓" : ""}
+                                      {String.fromCharCode(65 + oi)}. <MathText text={opt.text} /> {opt.isCorrect ? "✓" : ""}
                                     </span>
                                   ))}
                                 </div>
                               )}
                               {q.explanation && (
-                                <p className="text-xs text-gray-400 mt-2.5 italic">💡 {q.explanation}</p>
+                                <p className="text-xs text-gray-400 mt-2.5 italic">💡 <MathText text={q.explanation} /></p>
                               )}
                             </div>
                           )}

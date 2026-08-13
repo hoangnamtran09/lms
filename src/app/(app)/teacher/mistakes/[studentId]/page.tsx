@@ -168,7 +168,7 @@ function LessonQuizPanel({
                         }`}
                       >
                         <span className="font-semibold mr-2">{String.fromCharCode(65 + oIdx)}.</span>
-                        {opt.text}
+                        <MathText text={opt.text} />
                         {q.answered && oIdx === correctIdx && " ✓"}
                         {q.answered && oIdx === q.selectedIdx && oIdx !== correctIdx && " ✗"}
                       </button>

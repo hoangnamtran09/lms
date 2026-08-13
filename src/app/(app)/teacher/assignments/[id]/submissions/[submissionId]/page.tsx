@@ -25,6 +25,7 @@ import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GradingSheet } from "@/components/assignment/grading-sheet";
+import { MathText } from "@/components/ai/math-text";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -677,7 +678,7 @@ export default function SubmissionDetailPage({
                       ) : null)}
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {q.question}
+                    <MathText text={q.question} />
                   </h3>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs text-gray-400">
@@ -715,7 +716,7 @@ export default function SubmissionDetailPage({
                               {letter}
                             </div>
                             <p className="text-base font-bold text-emerald-700">
-                              {opt.text}
+                              <MathText text={opt.text} />
                             </p>
                             <Check className="absolute right-4 size-5 text-emerald-500" />
                           </div>
@@ -732,7 +733,7 @@ export default function SubmissionDetailPage({
                               {letter}
                             </div>
                             <p className="text-base font-bold text-red-700">
-                              {opt.text}
+                              <MathText text={opt.text} />
                             </p>
                             <span className="absolute right-4 text-xs text-red-500 font-medium">
                               HS chọn
@@ -751,7 +752,7 @@ export default function SubmissionDetailPage({
                               {letter}
                             </div>
                             <p className="text-base font-bold text-emerald-700">
-                              {opt.text}
+                              <MathText text={opt.text} />
                             </p>
                             <span className="absolute right-4 text-xs text-emerald-600 font-bold flex items-center gap-1">
                               <Check className="size-3.5" /> Đáp án
@@ -769,7 +770,7 @@ export default function SubmissionDetailPage({
                             {letter}
                           </div>
                           <p className="text-base text-gray-600">
-                            {opt.text}
+                            <MathText text={opt.text} />
                           </p>
                         </div>
                       );
@@ -798,7 +799,7 @@ export default function SubmissionDetailPage({
                           Đáp án mong đợi
                         </p>
                         <p className="text-sm text-gray-700">
-                          {q.expectedAnswer}
+                          <MathText text={q.expectedAnswer} />
                         </p>
                       </div>
                     )}
