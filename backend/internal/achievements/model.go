@@ -81,12 +81,7 @@ func (s *Service) Evaluate(ctx context.Context, userID string) ([]string, error)
 			continue // already earned
 		}
 		if s.checkRule(&a, stats) {
-			ua := struct {
-				ID            string    `gorm:"primaryKey;size:36"`
-				UserID        string    `gorm:"size:36;not null;index"`
-				AchievementID string    `gorm:"size:36;not null"`
-				EarnedAt      time.Time `json:"earnedAt"`
-			}{
+			ua := UserAchievement{
 				ID:            uuid.New().String(),
 				UserID:        userID,
 				AchievementID: a.ID,

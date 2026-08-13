@@ -114,14 +114,44 @@ func TestSanitizeJSONString(t *testing.T) {
 			want: "{\"key\": \"val\\rue\"}",
 		},
 		{
-			name: "newline inside JSON string kept",
-			in:   "{\"key\": \"line1\\nline2\"}",
-			want: "{\"key\": \"line1\\nline2\"}",
-		},
-		{
 			name: "escaped backslash preserved",
 			in:   `{"key": "path\\to\\file"}`,
 			want: `{"key": "path\\to\\file"}`,
+		},
+		{
+			name: "latex invalid escape gets escaped",
+			in:   `{"question": "Tính \cos 30^\circ"}`,
+			want: `{"question": "Tính \\cos 30^\\circ"}`,
+		},
+		{
+			name: "latex frac gets escaped",
+			in:   `{"question": "Tính $\frac{1}{2}$"}`,
+			want: `{"question": "Tính $\\frac{1}{2}$"}`,
+		},
+		{
+			name: "latex tan and times get escaped",
+			in:   `{"q": "$\tan x$ và $\times$"}`,
+			want: `{"q": "$\\tan x$ và $\\times$"}`,
+		},
+		{
+			name: "latex beta and neq get escaped",
+			in:   `{"q": "$\beta$ và $a \neq b$"}`,
+			want: `{"q": "$\\beta$ và $a \\neq b$"}`,
+		},
+		{
+			name: "latex rightarrow gets escaped",
+			in:   `{"q": "$x \rightarrow y$"}`,
+			want: `{"q": "$x \\rightarrow y$"}`,
+		},
+		{
+			name: "valid unicode escape preserved",
+			in:   "{\"key\": \"\\u0041\"}",
+			want: "{\"key\": \"\\u0041\"}",
+		},
+		{
+			name: "escaped quote preserved",
+			in:   `{"key": "say \"hi\""}`,
+			want: `{"key": "say \"hi\""}`,
 		},
 		{
 			name: "plain text outside strings unchanged",

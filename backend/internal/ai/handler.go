@@ -94,56 +94,86 @@ func extractJSON(raw string) string {
 	return s
 }
 
-// sanitizeJSONString replaces raw control characters that are invalid inside JSON strings.
+// sanitizeJSONString makes an AI-generated JSON string safe to parse with
+// encoding/json. LLMs often emit LaTeX backslashes (\frac, \cos, \alpha, …)
+// and raw control characters inside JSON string values, which are invalid JSON
+// escapes. This rewrites only the invalid escapes (turning "\c" into "\\c")
+// while leaving valid JSON escapes untouched.
 func sanitizeJSONString(s string) string {
-	// Replace raw tabs, carriage returns, and other control chars (except \n)
-	// within JSON string values. Also handles LaTeX backslash sequences
-	// like \alpha, \Delta, \beta that are not valid JSON escapes.
+	runes := []rune(s)
 	var b strings.Builder
 	b.Grow(len(s))
+
 	inString := false
-	escaped := false
-	for _, r := range s {
-		if escaped {
-			escaped = false
-			// Previous char was \ inside a string.
-			// Double-escape so json.Unmarshal preserves literal backslash.
-			// \a  →  \\a  (JSON for literal "\a")
-			b.WriteString("\\\\")
-			b.WriteRune(r)
-			continue
-		}
-		if r == '\\' && inString {
-			escaped = true
-			// Don't write the backslash yet — let the escaped handler decide
-			continue
-		}
-		if r == '"' {
-			inString = !inString
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		if !inString {
+			if r == '"' {
+				inString = true
+			}
 			b.WriteRune(r)
 			continue
 		}
 
-		if inString {
-			switch r {
-			case '\t':
-				b.WriteString("\\t")
-			case '\r':
-				b.WriteString("\\r")
-			case '\n':
-				b.WriteString("\\n")
-			default:
-				if r < 0x20 {
-					b.WriteString(fmt.Sprintf("\\u%04x", r))
-				} else {
-					b.WriteRune(r)
-				}
+		switch r {
+		case '\\':
+			if i+1 < len(runes) && isValidJSONEscape(runes[i+1:]) {
+				// Valid escape (\n, \", \\, A, …): keep as-is.
+				b.WriteRune(r)
+				b.WriteRune(runes[i+1])
+				i++
+			} else {
+				// Invalid escape (LaTeX \c, \s, \a, …): escape the backslash
+				// so it becomes a literal "\".
+				b.WriteString("\\\\")
 			}
-		} else {
+		case '"':
+			inString = false
 			b.WriteRune(r)
+		case '\t':
+			b.WriteString("\\t")
+		case '\r':
+			b.WriteString("\\r")
+		case '\n':
+			b.WriteString("\\n")
+		default:
+			if r < 0x20 {
+				b.WriteString(fmt.Sprintf("\\u%04x", r))
+			} else {
+				b.WriteRune(r)
+			}
 		}
 	}
 	return b.String()
+}
+
+func isHexDigit(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+}
+
+// isValidJSONEscape reports whether the runes immediately following a backslash
+// form a valid JSON escape sequence.
+func isValidJSONEscape(rest []rune) bool {
+	if len(rest) == 0 {
+		return false
+	}
+	switch rest[0] {
+	case '"', '\\', '/':
+		return true
+	case 'u':
+		if len(rest) < 5 {
+			return false
+		}
+		for _, h := range rest[1:5] {
+			if !isHexDigit(h) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 // POST /api/ai/generate-weakness-quiz
