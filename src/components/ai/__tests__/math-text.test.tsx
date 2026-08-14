@@ -21,6 +21,17 @@ describe("MathText", () => {
     expect(container.querySelector(".katex")).toBeTruthy();
   });
 
+  it("render inline math \\(...\\) thành KaTeX HTML", () => {
+    const { container } = render(<MathText text={"Tính \\(x^2 + 1\\) khi x = 2"} />);
+    expect(container.querySelector(".katex")).toBeTruthy();
+    expect(container.textContent).toContain("Tính");
+  });
+
+  it("render display math \\[...\\] thành KaTeX HTML", () => {
+    const { container } = render(<MathText text={"Kết quả \\[\\frac{a}{b}\\] là"} />);
+    expect(container.querySelector(".katex")).toBeTruthy();
+  });
+
   it("render nhiều công thức trong cùng text", () => {
     // Lưu ý: code xử lý $$...$$ trước, nếu có display math thì bỏ qua inline math
     const { container } = render(
